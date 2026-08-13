@@ -1,0 +1,7 @@
+node_modules/
+work/
+generated/**/states.geojson
+generated/**/districts/*.geojson
+metadata/validation-report.json
+work/soi-outline-local/
+work/legacy-generated-artifacts/

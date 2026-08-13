@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "source": {
+    "provider": "DataMeet India community",
+    "repository": "https://github.com/datameet/maps",
+    "commit": "b3fbbde595310b397a55d718e0958ce249a4fa1f",
+    "input": "States/Admin2.shp",
+    "inputSha256": "b61ebc11a7487ce1c340d55fc9d0c1a2b63af1f73191fef691c11693c726130d",
+    "license": "CC BY 4.0 (DataMeet repository default; no state-specific override found)",
+    "attribution": "India boundaries by DataMeet India community (CC BY 4.0)",
+    "statement": "This is DataMeet geometry selected as an openly licensed reference overlay aligned to the official Indian depiction; it is not Survey of India data and is not an administrative/statistical data layer."
+  },
+  "transformation": {
+    "method": "topojson-server topology of the 36 current state/UT source features → topojson-client merge (eliminates internal state arcs) → topology-preserving simplification → degenerate-ring removal and exterior-winding cleanup → final topology output",
+    "quantization": 20000,
+    "retainedVertexShare": 0.005
+  },
+  "output": {
+    "topology": "outline.topo.json",
+    "object": "outline",
+    "id": "in-datameet-current-claim-outline",
+    "status": "reference-outline; non-statistical; data-unavailable",
+    "featureCount": 1,
+    "sha256": "7ddaa15e9c458d6866237ef0261433a3e51c074c2f3bb51d249aa3b8cd714a76",
+    "bytes": 11773,
+    "bounds": {
+      "minLongitude": 68.13745632966867,
+      "minLatitude": 6.757400410828402,
+      "maxLongitude": 97.41149826167937,
+      "maxLatitude": 37.07761064660468
+    }
+  },
+  "historicalParentOverlays": {
+    "in-hs-01-jammu-and-kashmir": {
+      "topology": "historical-parent-overlays/in-hs-01-jammu-and-kashmir.topo.json",
+      "object": "outline",
+      "id": "in-hs-01-jammu-and-kashmir-current-claim-reference-outline",
+      "parentId": "in-hs-01-jammu-and-kashmir",
+      "status": "reference-outline; non-statistical; data-unavailable",
+      "sourceFeatures": [
+        "Jammu & Kashmir",
+        "Ladakh"
+      ],
+      "statement": "Reference-only current claim overlay for the historical Census-2011 Jammu & Kashmir parent. The 22 Census district features remain the only value-bearing districts; this overlay must be hatched/data-unavailable.",
+      "sha256": "920dae5203a25b6e8131a69045fe82a85c77ef40267178d5d17c11d1ee303b46",
+      "bytes": 1537,
+      "bounds": {
+        "minLongitude": 72.53308376439827,
+        "minLatitude": 32.2776566507069,
+        "maxLongitude": 80.32697716795815,
+        "maxLatitude": 37.07689040141948
+      }
+    }
+  }
+}

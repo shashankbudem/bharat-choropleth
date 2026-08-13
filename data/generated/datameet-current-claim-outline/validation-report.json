@@ -1,0 +1,26 @@
+{
+  "result": "pass",
+  "featureCount": 1,
+  "bounds": {
+    "minLongitude": 68.13745632966867,
+    "minLatitude": 6.757400410828402,
+    "maxLongitude": 97.41149826167937,
+    "maxLatitude": 37.07761064660468
+  },
+  "sphericalArea": 0.08069742879881082,
+  "bytes": 11773,
+  "gzipBytes": 4550,
+  "checksum": "7ddaa15e9c458d6866237ef0261433a3e51c074c2f3bb51d249aa3b8cd714a76",
+  "historicalParentOverlay": {
+    "featureCount": 1,
+    "bounds": {
+      "minLongitude": 72.53308376439827,
+      "minLatitude": 32.2776566507069,
+      "maxLongitude": 80.32697716795815,
+      "maxLatitude": 37.07689040141948
+    },
+    "sphericalArea": 0.005459360654931239,
+    "checksum": "920dae5203a25b6e8131a69045fe82a85c77ef40267178d5d17c11d1ee303b46"
+  },
+  "errors": []
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@bharat-choropleth/data-prep",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Reproducible, versioned boundary preparation for Bharat Choropleth.",
+  "type": "module",
+  "scripts": {
+    "prepare": "node src/prepare-boundaries.mjs",
+    "prepare:claim-outline": "node src/prepare-datameet-claim-outline.mjs",
+    "validate:claim-outline": "node src/validate-datameet-claim-outline.mjs",
+    "validate": "node src/validate-boundaries.mjs && node src/validate-datameet-claim-outline.mjs",
+    "build": "npm run prepare && npm run prepare:claim-outline && npm run validate"
+  },
+  "dependencies": {
+    "d3-geo": "^3.1.1",
+    "shapefile": "^0.6.6",
+    "topojson-client": "^3.1.0",
+    "topojson-server": "^3.0.1",
+    "topojson-simplify": "^3.0.3"
+  }
+}

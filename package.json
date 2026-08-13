@@ -1,0 +1,19 @@
+{
+  "name": "bharat-choropleth-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Open-source, accessible India state-to-district choropleth components.",
+  "packageManager": "pnpm@10.0.0",
+  "scripts": {
+    "build": "pnpm --filter bharat-choropleth build",
+    "build:data": "pnpm --dir data run build",
+    "test": "pnpm --filter bharat-choropleth test",
+    "typecheck": "pnpm --filter bharat-choropleth typecheck && pnpm --filter @bharat-choropleth/demo exec tsc --noEmit",
+    "build:demo": "pnpm --filter @bharat-choropleth/demo build",
+    "validate:data": "pnpm --dir data run validate",
+    "check": "pnpm typecheck && pnpm test && pnpm build && pnpm build:demo && pnpm validate:data"
+  },
+  "devDependencies": {
+    "pnpm": "10.0.0"
+  }
+}
