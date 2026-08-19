@@ -1,6 +1,6 @@
 # Bharat Choropleth
 
-`bharat-choropleth` is an open-source React renderer for accessible India state-to-district choropleths, with a framework-free `bharat-choropleth-js` port for non-React use — same behavior, same CSS, either an ES module or a single `<script>` tag. This workspace also includes a separately documented, historical Census-2011 state/UT-to-district boundary bundle for the reference implementation.
+`bharat-choropleth` is an open-source React renderer for accessible India state-to-district choropleths, with a framework-free `bharat-choropleth-js` port for non-React use — same behavior, same CSS, either an ES module or a single `<script>` tag. A native `bharat_choropleth` Flutter package provides the same map interaction without a WebView. This workspace also includes a separately documented, historical Census-2011 state/UT-to-district boundary bundle for the reference implementation.
 
 The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, then loads a selected state's district layer on demand. It follows the approved Atlas UX: hover/focus inspection, activation/drill-down, a breadcrumb return, optional legend and host-owned insight content. The legend also filters — picking a swatch highlights the regions painted in it and dulls the rest, picked again or Escape to clear.
 
@@ -17,6 +17,31 @@ apps/demo         Documentation/demo application using the included historical b
 ```
 
 `pnpm check` covers the JavaScript workspace only. The Flutter package is a pub package outside it — run `pnpm check:flutter` (or `pnpm check:all` for both), which needs the Flutter SDK on your PATH.
+
+## Availability
+
+The registry releases are **not published yet**. Until the first release, use this repository (or a Git dependency) rather than expecting the names below to resolve from npm or pub.dev.
+
+| Target | Planned package | Registry | Source |
+| --- | --- | --- | --- |
+| React | `bharat-choropleth` | npm | [`packages/react`](./packages/react) |
+| Plain JavaScript | `bharat-choropleth-js` | npm | [`packages/js`](./packages/js) |
+| Flutter | `bharat_choropleth` | pub.dev | [`packages/flutter`](./packages/flutter) |
+
+When a release is published, the install commands will be:
+
+```bash
+# React
+npm add bharat-choropleth
+
+# Framework-free JavaScript
+npm add bharat-choropleth-js
+
+# Flutter
+flutter pub add bharat_choropleth
+```
+
+Maintainers: see [Publishing the packages](./docs/PUBLISHING.md) for the release checklist. Do not put registry credentials in this repository or in committed configuration.
 
 The code and boundary data have different licences. The React renderer is MIT licensed. The included Census-2011 geometry is derived from DataMeet’s district dataset and is licensed CC BY 2.5 India; it requires attribution and is not a current administrative register. See [data/README.md](./data/README.md), [data/ATTRIBUTION.md](./data/ATTRIBUTION.md), and [the generated manifest](./data/generated/census-2011/manifest.json) before redistributing it.
 
@@ -35,7 +60,7 @@ An optional current-vintage state/UT and district bundle (`data/generated/curren
 - Tooltip and insight UI are slots. Default copy contains only generic data concepts; a dashboard owns its metric/year wording and surrounding chrome.
 - Regions are keyboard focusable and activate with Enter/Space. Focus and pointer hover have the same inspection callback. CSS includes a reduced-motion mode and public CSS variables.
 
-## Without a framework: one script tag
+## Without a framework: one script tag (after the first npm release)
 
 For plain JavaScript — or any framework that can load a plain JS library — [`bharat-choropleth-js`](./packages/js) needs a single script tag and no build step:
 
@@ -52,7 +77,7 @@ For plain JavaScript — or any framework that can load a plain JS library — [
 
 The stylesheet is injected by the script, boundary data is fetched on construction (never bundled — set `dataBaseUrl` to self-host), and values written before it arrives are applied when it does. Clicking a state drills into its districts. See [packages/js/README.md](./packages/js/README.md).
 
-## Install
+## React install (after the first npm release)
 
 ```bash
 pnpm add bharat-choropleth
@@ -163,8 +188,6 @@ pnpm validate:data
 pnpm check
 ```
 
-## Before public release
+## Release status
 
-- Publish the renderer and the historical data bundle as separately versioned artifacts, retaining the data manifest and CC BY 2.5 India attribution.
-- Add visual regression and screen-reader testing using the included Census-2011 bundle and every future source edition.
-- Establish public package scope, release automation, security reporting, and a policy for future official/current boundary editions.
+The three public package releases are pending. Their package metadata, package-root documentation, changelog and licence files must be ready before a maintainer follows the [publishing guide](./docs/PUBLISHING.md). The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.

@@ -1,0 +1,17 @@
+# Generated Dart and Flutter artifacts
+.dart_tool/
+build/
+.packages
+example/.dart_tool/
+example/build/
+
+# Local editor and diagnostic files
+*.iml
+*.log
+
+# The example consumes these copied development assets locally. The library
+# intentionally publishes no boundary data.
+example/assets/states.topo.json
+example/assets/parity-config.json
+example/assets/districts/
+example/assets/overlays/

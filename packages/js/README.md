@@ -1,6 +1,6 @@
 # `bharat-choropleth-js`
 
-An accessible SVG India state-to-district choropleth with no framework dependency. Drop one `<script>` tag into any HTML page, or import it as an ES module from a bundler. Same behavior, same CSS classes and same stylesheet as the React [`bharat-choropleth`](../react).
+An accessible SVG India state-to-district choropleth with no framework dependency. Drop one `<script>` tag into any HTML page, or import it as an ES module from a bundler. Same behavior, CSS classes, and stylesheet as the React [`bharat-choropleth`](https://www.npmjs.com/package/bharat-choropleth) package.
 
 ## One script tag
 
@@ -28,7 +28,7 @@ That's the whole setup. No stylesheet link, no build step, no `await`, no bounda
 - **Values set before the data arrives are applied when it arrives.** Every line above runs while the download is still in flight; nothing is dropped and nothing needs awaiting. `map.ready` is a promise if you want one.
 - **Clicking a state drills into its districts**, fetched from the same base URL. Pass `districts: false` to turn that off.
 
-Run [`example/bharat-choropleth.html`](./example/bharat-choropleth.html) for a complete working page: serve the **repo root** over HTTP (`npx serve`), then open `/packages/js/example/bharat-choropleth.html`.
+See the [complete example](https://github.com/shashankbudem/bharat-choropleth/tree/main/packages/js/example) in the repository. To run it locally, serve the **repo root** over HTTP (`npx serve`), then open `/packages/js/example/bharat-choropleth.html`.
 
 ## Setting values
 
@@ -86,7 +86,7 @@ Every thickness is a CSS variable, so you can theme without touching the rendere
 }
 ```
 
-Every other [`IndiaChoroplethOptions`](./src/types.ts) field (`referenceOverlay`, `loadDistricts`, `onRegionClick`, `formatValue`, `renderTooltip`, `showLegend`, ...) is accepted and forwarded.
+Every other [`IndiaChoroplethOptions`](https://github.com/shashankbudem/bharat-choropleth/blob/main/packages/js/src/types.ts) field (`referenceOverlay`, `loadDistricts`, `onRegionClick`, `formatValue`, `renderTooltip`, `showLegend`, ...) is accepted and forwarded.
 
 Methods: `setValues`, `getValues`, `select(id)`, `drillDown(name | null)`, `getSelected()`, `getInspected()`, `destroy()`. The full engine is at `map.engine` (`null` until the data loads — `await map.ready` first).
 
@@ -126,7 +126,7 @@ Or supply geometry directly and skip the fetch entirely, in which case the map r
 var map = new BharatChoropleth("#map", { geometry: myTopoJson });   // or a URL string
 ```
 
-See [`data/ATTRIBUTION.md`](../../data/ATTRIBUTION.md) for the licence and attribution of every bundle. Each asset keeps its own source's terms — don't blend the notices.
+See the repository's [data attribution](https://github.com/shashankbudem/bharat-choropleth/blob/main/data/ATTRIBUTION.md) for the licence and attribution of every bundle. Each asset keeps its own source's terms — don't blend the notices.
 
 ## From a bundler
 
@@ -153,11 +153,11 @@ const map = new IndiaChoropleth(container, options);
 ```
 
 - `container`: an `HTMLElement`, or a CSS selector string resolved via `document.querySelector`.
-- `options`: the same shape as the React `IndiaChoroplethProps` — see [`src/types.ts`](./src/types.ts). Two slots differ because there's no JSX:
+- `options`: the same shape as the React `IndiaChoroplethProps` — see [`src/types.ts`](https://github.com/shashankbudem/bharat-choropleth/blob/main/packages/js/src/types.ts). Two slots differ because there's no JSX:
   - `renderTooltip?: (context) => string | Node` — return a string (set as `textContent`) or a DOM node to mount directly. Omit for the built-in tooltip.
   - `renderInsights?: (context, container: HTMLElement) => void` — imperatively populate the given container; called on every hover/selection change. Omit to skip the insights panel entirely.
 
-It requires an explicit `states` layer with `getId`/`getLabel`/`getValue` accessors, and never fetches anything on your behalf. Under a script tag it is available as `window.IndiaChoropleth`; see [`example/index.html`](./example/index.html).
+It requires an explicit `states` layer with `getId`/`getLabel`/`getValue` accessors, and never fetches anything on your behalf. Under a script tag it is available as `window.IndiaChoropleth`; see the [full-engine example](https://github.com/shashankbudem/bharat-choropleth/blob/main/packages/js/example/index.html).
 
 ### Instance methods
 

@@ -11,6 +11,9 @@
     "topojson"
   ],
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "repository": {
     "type": "git",
     "url": "git+https://github.com/shashankbudem/bharat-choropleth.git",
@@ -59,6 +62,8 @@
   },
   "scripts": {
     "build": "tsup src/index.ts --format esm --dts --sourcemap --external react --external react-dom && cp src/style.css dist/style.css",
+    "prepack": "pnpm run build && pnpm run typecheck",
+    "prepublishOnly": "pnpm test",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
