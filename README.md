@@ -20,15 +20,15 @@ apps/demo         Documentation/demo application using the included historical b
 
 ## Availability
 
-The registry releases are **not published yet**. Until the first release, use this repository (or a Git dependency) rather than expecting the names below to resolve from npm or pub.dev.
+Version `0.1.0` is publicly available for all three packages.
 
-| Target | Planned package | Registry | Source |
+| Target | Package | Registry | Source |
 | --- | --- | --- | --- |
-| React | `bharat-choropleth` | npm | [`packages/react`](./packages/react) |
-| Plain JavaScript | `bharat-choropleth-js` | npm | [`packages/js`](./packages/js) |
-| Flutter | `bharat_choropleth` | pub.dev | [`packages/flutter`](./packages/flutter) |
+| React | [`bharat-choropleth@0.1.0`](https://www.npmjs.com/package/bharat-choropleth) | npm | [`packages/react`](./packages/react) |
+| Plain JavaScript | [`bharat-choropleth-js@0.1.0`](https://www.npmjs.com/package/bharat-choropleth-js) | npm | [`packages/js`](./packages/js) |
+| Flutter | [`bharat_choropleth@0.1.0`](https://pub.dev/packages/bharat_choropleth) | pub.dev | [`packages/flutter`](./packages/flutter) |
 
-When a release is published, the install commands will be:
+Install with:
 
 ```bash
 # React
@@ -60,7 +60,7 @@ An optional current-vintage state/UT and district bundle (`data/generated/curren
 - Tooltip and insight UI are slots. Default copy contains only generic data concepts; a dashboard owns its metric/year wording and surrounding chrome.
 - Regions are keyboard focusable and activate with Enter/Space. Focus and pointer hover have the same inspection callback. CSS includes a reduced-motion mode and public CSS variables.
 
-## Without a framework: one script tag (after the first npm release)
+## Without a framework: one script tag
 
 For plain JavaScript — or any framework that can load a plain JS library — [`bharat-choropleth-js`](./packages/js) needs a single script tag and no build step:
 
@@ -77,7 +77,7 @@ For plain JavaScript — or any framework that can load a plain JS library — [
 
 The stylesheet is injected by the script, boundary data is fetched on construction (never bundled — set `dataBaseUrl` to self-host), and values written before it arrives are applied when it does. Clicking a state drills into its districts. See [packages/js/README.md](./packages/js/README.md).
 
-## React install (after the first npm release)
+## React install
 
 ```bash
 pnpm add bharat-choropleth
@@ -190,4 +190,4 @@ pnpm check
 
 ## Release status
 
-The three public package releases are pending. Their package metadata, package-root documentation, changelog and licence files must be ready before a maintainer follows the [publishing guide](./docs/PUBLISHING.md). The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.
+The three `0.1.0` packages are published. Future releases follow the [publishing guide](./docs/PUBLISHING.md); increment a package's version before publishing because registries do not permit reusing one. The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.

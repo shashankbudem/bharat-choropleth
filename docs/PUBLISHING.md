@@ -8,7 +8,7 @@ This repository ships three independently versioned libraries. They must be vali
 | Plain JavaScript | `packages/js` | npm | `npm publish` |
 | Flutter | `packages/flutter` | pub.dev | `dart pub publish` |
 
-No package is public yet. Do not add a release tag, package-registry link, or a versioned CDN URL to the README until the matching registry confirms publication.
+The initial `0.1.0` release is public for all three packages. Before every subsequent release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
 
 ## Preflight
 
@@ -62,7 +62,7 @@ The publish command authenticates the uploader with a Google account. Create or 
 ## After publishing
 
 1. Confirm the exact published versions on npm and pub.dev.
-2. Update the root README’s availability section from “pending” to the verified package links and add the released versions.
+2. Update the root README’s availability section with the verified package links and released versions.
 3. Tag the matching source commit, create GitHub release notes, and record user-facing changes in each package changelog.
 4. Keep the next release version ahead of the published one; registries do not allow reusing a published version.
 
