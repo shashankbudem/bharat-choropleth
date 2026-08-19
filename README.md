@@ -6,6 +6,20 @@ The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, the
 
 ![Bharat Choropleth reference dashboard](./previews/country-full-claimed-outline-desktop.png)
 
+## Examples
+
+### National view
+
+![National state and union-territory choropleth](./previews/country-desktop.png)
+
+### District drill-down
+
+![Maharashtra district choropleth drill-down](./previews/maharashtra-districts-desktop.png)
+
+### Responsive layout
+
+![Mobile national choropleth view](./previews/country-mobile.png)
+
 ## Package layout
 
 ```text
@@ -48,6 +62,25 @@ pip install bharat-choropleth
 
 Maintainers: see [Publishing the packages](./docs/PUBLISHING.md) for the release checklist. Do not put registry credentials in this repository or in committed configuration.
 
+## Persistent hosted parity demos (Cloudflare Pages)
+
+Build the three current-vintage parity demos as one static Cloudflare Pages
+artifact; unlike a Quick Tunnel, it remains online after the local
+`cloudflared` process exits:
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build:pages
+pnpm dlx wrangler@4 login
+pnpm dlx wrangler@4 pages project create bharat-choropleth-demos --production-branch main
+CLOUDFLARE_PAGES_PROJECT_NAME=bharat-choropleth-demos pnpm deploy:pages -- --branch=main
+```
+
+The artifact is `dist/cloudflare-pages/`, with stable `/react/`, `/js/`, and
+`/flutter/` routes. A Direct Upload project is separate from Cloudflare Pages
+Git integration; use a separate Git-integrated project if automatic GitHub or
+GitLab builds are needed.
+
 The code and boundary data have different licences. The React renderer is MIT licensed. The included Census-2011 geometry is derived from DataMeet’s district dataset and is licensed CC BY 2.5 India; it requires attribution and is not a current administrative register. See [data/README.md](./data/README.md), [data/ATTRIBUTION.md](./data/ATTRIBUTION.md), and [the generated manifest](./data/generated/census-2011/manifest.json) before redistributing it.
 
 An optional political-claim context overlay is a separate contemporary DataMeet state-derived asset, attributed under DataMeet’s CC BY 4.0 repository terms and checked against the [Survey of India political-map depiction](https://surveyofindia.gov.in/pages/political-map-of-india). It is a non-statistical reference layer—not Survey of India geometry, not a statement of administrative control, and not an input to any metric or total. The package does not reproduce or redistribute Survey of India geometry; see [the boundary-source note](./data/official-outline.md).
@@ -71,7 +104,7 @@ For plain JavaScript — or any framework that can load a plain JS library — [
 
 ```html
 <div id="map"></div>
-<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js@0.1.0"></script>
 <script>
   var map = new BharatChoropleth("#map");
   map.fontColor = "maroon";
