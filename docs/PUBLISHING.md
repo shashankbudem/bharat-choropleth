@@ -1,14 +1,15 @@
 # Publishing the packages
 
-This repository ships three independently versioned libraries. They must be validated and released separately:
+This repository ships four independently versioned libraries. They must be validated and released separately:
 
 | Package | Directory | Registry | Command |
 | --- | --- | --- | --- |
 | React | `packages/react` | npm | `npm publish` |
 | Plain JavaScript | `packages/js` | npm | `npm publish` |
 | Flutter | `packages/flutter` | pub.dev | `dart pub publish` |
+| Python | `packages/python` | PyPI | `python3 -m twine upload dist/*` |
 
-The initial `0.1.0` release is public for all three packages. Before every subsequent release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
+The initial `0.1.0` release is public for the React, plain-JS, and Flutter packages. The Python package is ready for its first PyPI release. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
 
 ## Preflight
 
@@ -27,6 +28,11 @@ pnpm --dir packages/js exec npm pack --dry-run
 
 cd packages/flutter
 dart pub publish --dry-run
+
+cd ../python
+python3 -m unittest discover -s tests -v
+uv run --isolated --with build --with twine python -m build
+uv run --isolated --with twine twine check dist/*
 ```
 
 Never publish secrets, local `.env` files, credentials, private test data, or generated boundary data whose redistribution terms have not been reviewed. The map packages intentionally do not need to bundle boundary data; consumers must retain the attribution for any data bundle they host.
@@ -59,9 +65,23 @@ dart pub publish
 
 The publish command authenticates the uploader with a Google account. Create or transfer the package to a verified publisher for a domain controlled by the project before relying on a personal uploader. A pub.dev release is effectively permanent: publish a new version to correct a problem instead of treating unpublishing as a normal rollback path.
 
+## PyPI: Python
+
+The Python package has no required runtime dependencies; Matplotlib is an optional extra. Build and inspect its wheel and source distribution before uploading:
+
+```bash
+cd packages/python
+python3 -m unittest discover -s tests -v
+uv run --isolated --with build --with twine python -m build
+uv run --isolated --with twine twine check dist/*
+uv run --isolated --with twine twine upload dist/*
+```
+
+Create a PyPI account and use a trusted publisher or an account-scoped upload token outside this repository. The upload action is irreversible for a given version: update `pyproject.toml` before attempting a subsequent release.
+
 ## After publishing
 
-1. Confirm the exact published versions on npm and pub.dev.
+1. Confirm the exact published versions on npm, pub.dev, and PyPI as applicable.
 2. Update the root README’s availability section with the verified package links and released versions.
 3. Tag the matching source commit, create GitHub release notes, and record user-facing changes in each package changelog.
 4. Keep the next release version ahead of the published one; registries do not allow reusing a published version.

@@ -1,0 +1,45 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bharat-choropleth"
+version = "0.1.0"
+description = "Dependency-light static SVG choropleths for India boundary data."
+readme = "README.md"
+requires-python = ">=3.9"
+license = "MIT"
+license-files = ["LICENSE"]
+authors = [{ name = "Bharat Choropleth contributors" }]
+keywords = ["choropleth", "india", "map", "svg", "topojson", "matplotlib"]
+classifiers = [
+  "Development Status :: 4 - Beta",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.9",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Topic :: Scientific/Engineering :: Visualization",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+]
+dependencies = []
+
+[project.optional-dependencies]
+matplotlib = ["matplotlib>=3.7"]
+
+[project.urls]
+Homepage = "https://github.com/shashankbudem/bharat-choropleth"
+Documentation = "https://github.com/shashankbudem/bharat-choropleth/tree/main/packages/python"
+Repository = "https://github.com/shashankbudem/bharat-choropleth.git"
+Issues = "https://github.com/shashankbudem/bharat-choropleth/issues"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+bharat_choropleth = ["py.typed"]

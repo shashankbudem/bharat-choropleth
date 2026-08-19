@@ -1,6 +1,6 @@
 # Bharat Choropleth
 
-`bharat-choropleth` is an open-source React renderer for accessible India state-to-district choropleths, with a framework-free `bharat-choropleth-js` port for non-React use — same behavior, same CSS, either an ES module or a single `<script>` tag. A native `bharat_choropleth` Flutter package provides the same map interaction without a WebView. This workspace also includes a separately documented, historical Census-2011 state/UT-to-district boundary bundle for the reference implementation.
+`bharat-choropleth` is an open-source React renderer for accessible India state-to-district choropleths, with a framework-free `bharat-choropleth-js` port for non-React use — same behavior, same CSS, either an ES module or a single `<script>` tag. A native `bharat_choropleth` Flutter package provides the same map interaction without a WebView, and the Python `bharat_choropleth` package produces static SVG or optional Matplotlib output. This workspace also includes a separately documented, historical Census-2011 state/UT-to-district boundary bundle for the reference implementation.
 
 The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, then loads a selected state's district layer on demand. It follows the approved Atlas UX: hover/focus inspection, activation/drill-down, a breadcrumb return, optional legend and host-owned insight content. The legend also filters — picking a swatch highlights the regions painted in it and dulls the rest, picked again or Escape to clear.
 
@@ -12,21 +12,23 @@ The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, the
 packages/react    Published SVG React renderer, styles, types, and tests
 packages/js       Framework-free library: `new BharatChoropleth("#map")` from a <script> tag, or ESM
 packages/flutter  Native Dart/Flutter renderer (CustomPainter) — full parity with the web packages, no WebView
+packages/python   Dependency-light Python renderer: accessible SVG by default, optional Matplotlib
 data              Reproducible Census-2011 boundary preparation, manifest, and attribution
 apps/demo         Documentation/demo application using the included historical bundle
 ```
 
-`pnpm check` covers the JavaScript workspace only. The Flutter package is a pub package outside it — run `pnpm check:flutter` (or `pnpm check:all` for both), which needs the Flutter SDK on your PATH.
+`pnpm check` covers the JavaScript workspace only. The Flutter and Python packages are independently packaged — run their checks from `packages/flutter` and `packages/python` respectively.
 
 ## Availability
 
-Version `0.1.0` is publicly available for all three packages.
+Version `0.1.0` is publicly available for the React, plain-JS, and Flutter packages. The Python package is ready for its first PyPI release.
 
 | Target | Package | Registry | Source |
 | --- | --- | --- | --- |
 | React | [`bharat-choropleth@0.1.0`](https://www.npmjs.com/package/bharat-choropleth) | npm | [`packages/react`](./packages/react) |
 | Plain JavaScript | [`bharat-choropleth-js@0.1.0`](https://www.npmjs.com/package/bharat-choropleth-js) | npm | [`packages/js`](./packages/js) |
 | Flutter | [`bharat_choropleth@0.1.0`](https://pub.dev/packages/bharat_choropleth) | pub.dev | [`packages/flutter`](./packages/flutter) |
+| Python | `bharat-choropleth@0.1.0` (pending) | PyPI | [`packages/python`](./packages/python) |
 
 Install with:
 
@@ -39,6 +41,9 @@ npm add bharat-choropleth-js
 
 # Flutter
 flutter pub add bharat_choropleth
+
+# Python — available after the first PyPI release
+pip install bharat-choropleth
 ```
 
 Maintainers: see [Publishing the packages](./docs/PUBLISHING.md) for the release checklist. Do not put registry credentials in this repository or in committed configuration.
@@ -190,4 +195,4 @@ pnpm check
 
 ## Release status
 
-The three `0.1.0` packages are published. Future releases follow the [publishing guide](./docs/PUBLISHING.md); increment a package's version before publishing because registries do not permit reusing one. The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.
+The React, plain-JS, and Flutter `0.1.0` packages are published; the matching Python package is awaiting its first PyPI release. Future releases follow the [publishing guide](./docs/PUBLISHING.md); increment a package's version before publishing because registries do not permit reusing one. The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.
