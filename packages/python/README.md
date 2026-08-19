@@ -17,6 +17,9 @@ pip install bharat-choropleth
 
 # Only when you need a Matplotlib axes rather than SVG:
 pip install 'bharat-choropleth[matplotlib]'
+
+# Only when you need interactive state-to-district controls in Jupyter:
+pip install 'bharat-choropleth[notebook]'
 ```
 
 ## Generate an SVG
@@ -70,6 +73,32 @@ ax.figure.savefig("states.png", dpi=180, bbox_inches="tight")
 The Matplotlib adapter is an extra, so importing `bharat_choropleth` does not
 pull in Matplotlib or any other rendering dependency.
 
+## Jupyter drill-down
+
+Install the `notebook` extra for an `ipywidgets` state selector and lazy
+district loader. The control updates its inline SVG when a state is selected;
+it has no browser-map or JavaScript runtime dependency.
+
+```python
+from pathlib import Path
+from bharat_choropleth.notebook import notebook_drilldown
+
+root = Path.cwd()
+states = root / "data/generated/current-2019-states/states.topo.json"
+district_dir = root / "data/generated/current-2019-districts/districts"
+
+map_control = notebook_drilldown(
+    states,
+    {"in-cs-30-goa": 6, "in-cs-31-lakshadweep": 43},
+    district_loader=lambda state_id: district_dir / f"{state_id}.topo.json",
+    states_object_name="states",
+)
+map_control.widget  # Display this as the last Jupyter cell expression.
+```
+
+Pass `district_values` as either a `{state_id: {district_id: value}}` mapping
+or a `state_id -> {district_id: value}` callable to colour the district view.
+
 ## API
 
 | Item | Purpose |
@@ -79,6 +108,7 @@ pull in Matplotlib or any other rendering dependency.
 | `ColorScale.fit(values)` | Fit the shared low-to-high colour ramp to finite values. |
 | `render_svg(source, values, ...)` | Create a complete static, accessible SVG string. |
 | `bharat_choropleth.matplotlib.render_matplotlib(...)` | Optional static Matplotlib renderer. |
+| `bharat_choropleth.notebook.notebook_drilldown(...)` | Optional ipywidgets state-to-district SVG control. |
 
 ## Develop and package
 

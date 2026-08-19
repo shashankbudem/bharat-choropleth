@@ -3,7 +3,8 @@
 The package deliberately has no mandatory rendering dependency.  Use
 :func:`render_svg` to create a self-contained SVG for a web page, report, or
 file.  Install ``bharat-choropleth[matplotlib]`` only when a Matplotlib axes is
-needed.
+needed. Install ``bharat-choropleth[notebook]`` for an ipywidgets-based
+state-to-district notebook control.
 """
 
 from .scale import DEFAULT_COLORS, EMPTY_COLOR, ColorScale

@@ -28,6 +28,7 @@ dependencies = []
 
 [project.optional-dependencies]
 matplotlib = ["matplotlib>=3.7"]
+notebook = ["ipywidgets>=8"]
 
 [project.urls]
 Homepage = "https://github.com/shashankbudem/bharat-choropleth"
