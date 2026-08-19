@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bharat Choropleth — plain JS example (2019 edition)</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1.5rem; color: #081435; }
+    h1 { font-size: 1.5rem; }
+    p.hint { color: #53617b; font-size: .9rem; }
+    #map { max-width: 640px; }
+    #rail { margin-top: 1rem; padding: .75rem 1rem; border: 1px solid #dce3e7; border-radius: .5rem; font-size: .9rem; }
+  </style>
+</head>
+<body>
+  <h1>Bharat Choropleth — plain JS (Current, 2019 boundaries)</h1>
+  <p class="hint">No React, no bundler. Loaded via a plain &lt;script&gt; tag from <code>dist/bharat-choropleth.min.js</code>. Serve the <strong>repo root</strong> over HTTP (not <code>file://</code>) so the absolute <code>/packages/...</code> and <code>/data/...</code> paths below resolve — e.g. <code>python3 -m http.server</code> from the repo root, then open <code>/packages/js/example/index.html</code>.</p>
+  <div id="map"></div>
+  <div id="rail">Hover or Tab into a state to see details here.</div>
+
+  <script src="/packages/js/dist/bharat-choropleth.min.js"></script>
+  <script>
+    const YEARS = { 2024: 0.83, 2025: 0.92, 2026: 1 };
+    const year = 2026;
+    function hash(value) {
+      let total = 17;
+      for (const char of value) total = ((total * 31) + char.charCodeAt(0)) >>> 0;
+      return total;
+    }
+    function sampleValue(id) {
+      return Math.round((360 + (hash(id) % 6000)) * YEARS[year]);
+    }
+    const formatter = new Intl.NumberFormat("en-IN");
+
+    function makeLayer(topology, object) {
+      return {
+        geometry: { topology, object },
+        getId: (feature) => String(feature.properties.id),
+        getLabel: (feature) => String(feature.properties.name),
+        getValue: (feature) => sampleValue(String(feature.properties.id)),
+      };
+    }
+
+    async function main() {
+      const statesTopology = await fetch("/data/generated/current-2019-states/states.topo.json").then((response) => response.json());
+      const map = new IndiaChoropleth("#map", {
+        states: makeLayer(statesTopology, "states"),
+        defaultSelectedId: "in-cs-27-maharashtra",
+        loadDistricts: async (stateId) => {
+          const topology = await fetch(`/data/generated/current-2019-districts/districts/${stateId}.topo.json`).then((response) => response.json());
+          return makeLayer(topology, "districts");
+        },
+        loadDistrictReferenceOverlay: async (stateId) => {
+          const response = await fetch(`/data/generated/current-2019-districts/district-reference-overlays/${stateId}.topo.json`);
+          if (!response.ok) return null;
+          const topology = await response.json();
+          return {
+            geometry: { topology, object: "outline" },
+            getId: (feature) => String(feature.properties.id),
+            getLabel: (feature) => String(feature.properties.name),
+            getDescription: () => "Pakistan-administered districts; not Indian territory and have no metric or district coverage.",
+          };
+        },
+        formatValue: (value) => formatter.format(value),
+        showRegionValues: true,
+        renderInsights: (context, container) => {
+          const rail = document.getElementById("rail");
+          if (!context) { rail.textContent = "Hover or Tab into a state to see details here."; return; }
+          rail.innerHTML = "";
+          const heading = document.createElement("strong");
+          heading.textContent = `${context.label} — ${context.value === null ? "No data" : formatter.format(context.value)}`;
+          rail.append(heading);
+        },
+      });
+      window.__map = map; // for manual console poking
+    }
+
+    main().catch((error) => {
+      document.getElementById("map").textContent = `Failed to load: ${error.message}`;
+      console.error(error);
+    });
+  </script>
+</body>
+</html>

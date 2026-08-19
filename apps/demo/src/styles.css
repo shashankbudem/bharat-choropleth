@@ -5,9 +5,10 @@ button, select { font: inherit; }
 .app-shell { min-height: 100vh; }
 .app-header { height: 74px; padding: 0 clamp(1.5rem, 4vw, 4rem); border-bottom: 1px solid #dce3e7; display: flex; align-items: center; justify-content: space-between; gap: 1rem; }
 .brand { color: #081435; font-size: 1.35rem; font-weight: 760; letter-spacing: -.045em; text-decoration: none; white-space: nowrap; }
-.year-control { display: flex; align-items: center; gap: 1rem; font-size: .875rem; font-weight: 600; }
-.year-control select { min-width: 6.75rem; min-height: 2.75rem; padding: 0 .75rem; border: 1px solid #b8c2ce; border-radius: .625rem; color: #081435; background: #fff; cursor: pointer; }
-.year-control select:focus-visible { outline: 3px solid rgb(20 123 113 / .25); outline-offset: 2px; }
+.header-controls { display: flex; align-items: center; gap: 1.5rem; }
+.year-control, .edition-control { display: flex; align-items: center; gap: 1rem; font-size: .875rem; font-weight: 600; }
+.year-control select, .edition-control select { min-width: 6.75rem; min-height: 2.75rem; padding: 0 .75rem; border: 1px solid #b8c2ce; border-radius: .625rem; color: #081435; background: #fff; cursor: pointer; }
+.year-control select:focus-visible, .edition-control select:focus-visible { outline: 3px solid rgb(20 123 113 / .25); outline-offset: 2px; }
 main { max-width: 1540px; margin: 0 auto; padding: 2.2rem clamp(1.5rem, 4vw, 4rem) 2rem; }
 .intro { margin-bottom: 1.25rem; }
 .eyebrow { margin: 0 0 .4rem; color: #147b71; font-size: .75rem; font-weight: 750; letter-spacing: .08em; text-transform: uppercase; }
@@ -34,4 +35,4 @@ dd { margin: 0; font-weight: 700; text-align: right; }
 .rail-hint { margin-top: 1.2rem !important; font-size: .8125rem; }
 footer { padding: 1.2rem clamp(1.5rem, 4vw, 4rem) 1.5rem; border-top: 1px solid #dce3e7; color: #53617b; font-size: .75rem; line-height: 1.5; }
 footer a { color: #0d65c8; }
-@media (max-width: 720px) { .app-header { height: auto; min-height: 4.5rem; padding-top: .8rem; padding-bottom: .8rem; } .year-control span { display: none; } main { padding-top: 1.8rem; } .dashboard-grid { display: flex; flex-direction: column; } .map-workspace { padding-right: 0; } .insight-rail { border-top: 1px solid #dce3e7; border-left: 0; padding: 1.75rem 0; } .map-toolbar { min-height: 2.75rem; } .helper { font-size: .73rem; } .india-choropleth__back { min-height: 2.75rem; } }
+@media (max-width: 720px) { .app-header { height: auto; min-height: 4.5rem; padding-top: .8rem; padding-bottom: .8rem; } .year-control span, .edition-control span { display: none; } main { padding-top: 1.8rem; } .dashboard-grid { display: flex; flex-direction: column; } .map-workspace { padding-right: 0; } .insight-rail { border-top: 1px solid #dce3e7; border-left: 0; padding: 1.75rem 0; } .map-toolbar { min-height: 2.75rem; } .helper { font-size: .73rem; } .india-choropleth__back { min-height: 2.75rem; } }

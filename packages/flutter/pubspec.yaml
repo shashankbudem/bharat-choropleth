@@ -1,0 +1,18 @@
+name: bharat_choropleth
+description: Accessible India state and district choropleth maps for Flutter, rendered natively with CustomPainter.
+version: 0.1.0
+repository: https://github.com/shashankbudem/bharat-choropleth
+issue_tracker: https://github.com/shashankbudem/bharat-choropleth/issues
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.27.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0

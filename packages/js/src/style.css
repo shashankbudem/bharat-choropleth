@@ -1,0 +1,124 @@
+.india-choropleth {
+  --india-map-stroke: #fff;
+  --india-map-stroke-active: #0f1b38;
+  /* Border widths, in screen pixels (the strokes are non-scaling). Override any
+     of these to retheme without touching the renderer. */
+  --india-map-border-width: 2.5;
+  --india-map-border-width-active: 2;
+  --india-map-selection-width: 3;
+  --india-map-small-marker-stroke: #53617b;
+  --india-map-focus: #0f766e;
+  --india-map-active: #ff725f;
+  --india-map-empty: #e7edf0;
+  --india-map-tooltip-bg: #fff;
+  --india-map-tooltip-border: #b8c2ce;
+  --india-map-text: #081435;
+  --india-map-muted: #53617b;
+  --india-map-line: #dce3e7;
+  --india-map-reference-bg: #eef1f3;
+  --india-map-reference-hatch: #9ba8af;
+  --india-map-reference-stroke: #6f7d85;
+  position: relative;
+  color: var(--india-map-text);
+}
+
+.india-choropleth__toolbar { min-height: 40px; display: flex; align-items: center; justify-content: flex-end; }
+.india-choropleth__breadcrumb { display: flex; align-items: center; gap: .5rem; font: 500 .875rem/1.3 system-ui, sans-serif; }
+.india-choropleth__back { border: 0; padding: .375rem; background: transparent; color: var(--india-map-focus); font: inherit; cursor: pointer; }
+.india-choropleth__back:hover { text-decoration: underline; }
+.india-choropleth__back:focus-visible { outline: 3px solid color-mix(in srgb, var(--india-map-focus) 35%, transparent); outline-offset: 2px; }
+.india-choropleth__canvas { position: relative; width: 100%; }
+.india-choropleth__status { min-height: 16rem; padding: 2rem; border: 1px dashed var(--india-map-line); display: grid; place-items: center; color: var(--india-map-muted); font: 500 .9375rem/1.5 system-ui, sans-serif; text-align: center; }
+.india-choropleth__svg { display: block; width: 100%; height: auto; overflow: visible; }
+.india-choropleth__region { stroke: var(--india-map-stroke); stroke-width: var(--india-map-border-width); stroke-linejoin: round; vector-effect: non-scaling-stroke; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: filter 160ms ease, opacity 160ms ease, stroke 160ms ease, stroke-width 160ms ease, transform 160ms ease; transform-box: fill-box; transform-origin: center; }
+/* An SVG outline draws a rectangle around the path's bounding box, not its actual
+   shape. Suppress it here (both our own prior rule and the browser default) and
+   rely on the shape-following stroke/shadow/lift below as the focus indicator.
+   `:focus` and `:focus-visible` are separate rules (not a comma list) so a browser
+   that doesn't parse `:focus-visible` still applies the plain `:focus` one instead
+   of silently dropping the whole rule and falling back to its own default ring. */
+.india-choropleth__region:focus { outline: none; }
+.india-choropleth__region:focus-visible { outline: none; }
+.india-choropleth__region--reference-merged { stroke: transparent; }
+.india-choropleth--static .india-choropleth__region { cursor: default; }
+.india-choropleth__region:is(:hover, :focus-visible), .india-choropleth__region--inspected { stroke: var(--india-map-stroke-active); stroke-width: var(--india-map-border-width-active); filter: drop-shadow(0 5px 4px rgb(8 20 53 / .14)); transform: translateY(-2px); }
+/* Selection is a ring, never a fill: on a choropleth the fill carries the value,
+   so recoloring the picked region made its color stop meaning anything. The halo
+   sits under the ring so the accent stays legible on pale and saturated fills alike. */
+.india-choropleth__selection { pointer-events: none; transition: transform 160ms ease; }
+.india-choropleth__selection--lifted { transform: translateY(-2px); }
+.india-choropleth__selection-halo { stroke: var(--india-map-stroke); stroke-width: calc(var(--india-map-selection-width) * 2); stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.india-choropleth__selection-ring { stroke: var(--india-map-active); stroke-width: var(--india-map-selection-width); stroke-linejoin: round; vector-effect: non-scaling-stroke; }
+.india-choropleth__reference-fill path { pointer-events: none; stroke: var(--india-map-reference-stroke); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.india-choropleth__reference-outline path { pointer-events: none; stroke: var(--india-map-reference-stroke); stroke-width: 1.6; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+/* Dulled by a legend filter — the regions outside the picked band, plus their
+   markers, values and leader lines. Dulled rather than hidden, so the map keeps
+   its shape and a dimmed region can still be hovered for its number. The
+   reference overlay is left alone: it is non-statistical context, in no band.
+
+   Greyed as well as faded, because fading alone does not separate the pale end
+   of a ramp: a dark fill at low opacity lands on roughly the same light grey as
+   a pale fill at full opacity, so picking the lightest band left the map reading
+   as though nothing had been picked. Draining the colour instead makes "in the
+   band" mean "still coloured", whichever band it is. */
+.india-choropleth__dimmed { opacity: .25; filter: grayscale(1); }
+/* The region's own hover rule outranks this one on `filter`, so pointing at a
+   dulled region brings its colour back along with the usual lift. */
+.india-choropleth__region.india-choropleth__dimmed:is(:hover, :focus-visible) { opacity: .6; }
+/* And the survivors are lifted off the page, so the picked band reads as a group
+   even where its own colour is nearly white. A shadow rather than a heavier
+   outline: strokes here are non-scaling, so a 2px dark edge around one of
+   Lakshadweep's one-unit islands swallows the island whole. */
+.india-choropleth__svg--filtered .india-choropleth__region:not(.india-choropleth__dimmed) { filter: drop-shadow(0 2px 3px rgb(8 20 53 / .28)); }
+/* The water an island group encloses, hoverable as part of the group. Invisible
+   by design and painted under every region, so it only ever picks up a pointer
+   that would otherwise have hit nothing. */
+.india-choropleth__hit-areas path { cursor: pointer; }
+/* A dot standing in for a region too small to see at this scale (Puducherry's
+   enclaves). Filled with the region's own ramp colour by the renderer, so it
+   still reads as data rather than decoration — and hoverable, because the dot
+   is what the reader can see and aim at. */
+.india-choropleth__small-markers circle { cursor: pointer; stroke: var(--india-map-small-marker-stroke); stroke-width: var(--india-map-border-width); vector-effect: non-scaling-stroke; }
+.india-choropleth--static .india-choropleth__small-markers circle { pointer-events: none; cursor: default; }
+/* Leader from a small region to its value label, which sits outside the shape. */
+.india-choropleth__value-leaders line { pointer-events: none; stroke: var(--india-map-small-marker-stroke); stroke-width: 1; vector-effect: non-scaling-stroke; }
+.india-choropleth__region-values { pointer-events: none; fill: var(--india-map-text); font: 700 11px/1 system-ui, sans-serif; paint-order: stroke; stroke: rgb(255 255 255 / .82); stroke-width: 3px; stroke-linejoin: round; }
+.india-choropleth__region-values--district { font-size: 9px; }
+/* --india-map-tooltip-dx/dy are set by the renderer to keep the box inside the map:
+   dx nudges it away from a left/right edge, dy flips it below a region near the top. */
+.india-choropleth__tooltip-anchor { position: absolute; z-index: 1; pointer-events: none; transform: translate(calc(-50% + var(--india-map-tooltip-dx, 0px)), var(--india-map-tooltip-dy, calc(-100% - .75rem))); }
+.india-choropleth__tooltip { min-width: 8rem; padding: .75rem .875rem; border: 1px solid var(--india-map-tooltip-border); border-radius: .625rem; display: grid; gap: .18rem; background: var(--india-map-tooltip-bg); box-shadow: 0 .5rem 1.25rem rgb(8 20 53 / .11); font: 500 .875rem/1.3 system-ui, sans-serif; }
+.india-choropleth__tooltip strong { font-size: .875rem; }
+.india-choropleth__tooltip b { font-size: 1.2rem; }
+.india-choropleth__tooltip small { color: var(--india-map-muted); font-size: .75rem; }
+.india-choropleth__tooltip-bar { display: block; height: .3rem; margin: .1rem 0 .15rem; border-radius: .3rem; background: var(--india-map-empty); overflow: hidden; }
+.india-choropleth__tooltip-bar > span { display: block; height: 100%; border-radius: inherit; background: var(--india-map-active); }
+.india-choropleth__legend { margin-top: .75rem; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: .75rem; color: var(--india-map-muted); font: .8125rem/1.3 system-ui, sans-serif; }
+.india-choropleth__swatches { display: flex; gap: .25rem; }
+.india-choropleth__swatch { width: clamp(1.75rem, 7vw, 4.25rem); height: .75rem; border-radius: .1rem; }
+/* On an interactive map each swatch filters to its own band. The bar stays the
+   same 12px it has always been; a transparent border above and below it lifts
+   the pointer and touch target to 24px, and the negative margin gives that
+   height back so the legend row is unchanged. Deliberately top and bottom only:
+   widening sideways too would push the row out and leave neighbouring targets
+   overlapping in the 4px gap between them, where a click is then decided by
+   paint order rather than by which swatch you aimed at. */
+button.india-choropleth__swatch { box-sizing: content-box; margin: -.375rem 0; padding: 0; border: 0 solid transparent; border-top-width: .375rem; border-bottom-width: .375rem; background-clip: padding-box; cursor: pointer; appearance: none; transition: opacity 160ms ease, box-shadow 160ms ease; }
+button.india-choropleth__swatch:focus-visible { outline: 3px solid color-mix(in srgb, var(--india-map-focus) 35%, transparent); outline-offset: 1px; }
+/* A band no region falls in stays at full strength: the ramp is continuous, and
+   fading one stop out of the middle of it reads as a broken legend rather than
+   as an empty band. It is inert instead — default cursor, and a title saying so
+   — because filtering to nothing would just dim the whole map. */
+button.india-choropleth__swatch[aria-disabled="true"] { cursor: default; }
+/* The picked band, and the bands it is picked over. */
+.india-choropleth__swatch--active { box-shadow: 0 0 0 2px var(--india-map-stroke), 0 0 0 4px var(--india-map-active); }
+.india-choropleth__swatch--muted { opacity: .3; }
+.india-choropleth__reference-key { width: 1rem; height: .75rem; border: 1px solid var(--india-map-reference-stroke); background: repeating-linear-gradient(45deg, var(--india-map-reference-bg) 0 3px, var(--india-map-reference-hatch) 3px 4px); }
+.india-choropleth__reference-key--solid { background: var(--india-map-reference-bg); }
+.india-choropleth__insights { margin-top: 1rem; }
+@media (prefers-reduced-motion: reduce) { .india-choropleth__region, button.india-choropleth__swatch { transition: none; } }
+
+/* Placeholder shown by the `BharatChoropleth` facade while boundary data is
+   being fetched, and for the message if that fetch fails. */
+.bharat-choropleth__status { padding: 1.25rem; border-radius: .625rem; background: var(--india-map-empty, #eef1f7); color: var(--india-map-muted, #53617b); font: 500 .875rem/1.45 system-ui, sans-serif; text-align: center; }
+.bharat-choropleth__status--error { background: #fdeceb; color: #8a1c14; }

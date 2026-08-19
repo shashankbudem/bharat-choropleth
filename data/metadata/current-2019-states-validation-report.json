@@ -1,0 +1,21 @@
+{
+  "validatedAt": "2026-08-19T16:43:37.874Z",
+  "result": "pass",
+  "counts": {
+    "states": 36
+  },
+  "bytes": {
+    "statesTopojson": 46894,
+    "statesTopojsonGzip": 15169
+  },
+  "bounds": {
+    "minLongitude": 68.09381543953333,
+    "minLatitude": 6.755884166907121,
+    "maxLongitude": 97.41149826167937,
+    "maxLatitude": 37.07294248064568,
+    "width": 29.31768282214604,
+    "height": 30.317058313738556
+  },
+  "checksum": "06ce67247f6d809de3d90a70221174f08bd6058e1f5abd8755e378f3c08b0da2",
+  "errors": []
+}

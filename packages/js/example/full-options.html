@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>BharatChoropleth — script tag example</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; color: #081435; background: #fff; }
+    h1 { font-size: 1.5rem; }
+    p.hint { color: #53617b; font-size: .9rem; }
+    #map { max-width: 640px; }
+    footer { margin-top: 2rem; color: #53617b; font-size: .8rem; }
+  </style>
+</head>
+<body>
+  <h1>BharatChoropleth — one script tag, one object</h1>
+  <p class="hint">
+    No stylesheet link, no build step, no <code>await</code>. The script tag injects its own CSS;
+    boundary data is fetched in the background and values set before it lands are applied when it arrives.
+  </p>
+  <p class="hint">
+    <strong>Hover or tab through the map.</strong> The tooltip shows the value, its share of the total and its
+    rank. Values below are made up, for demonstration only. Two states are left unset to show how “no data” reads.
+  </p>
+
+  <div id="map"></div>
+
+  <!-- Local build. Over a CDN this is: https://cdn.jsdelivr.net/npm/bharat-choropleth-js -->
+  <script src="/packages/js/dist/bharat-choropleth.min.js"></script>
+  <script>
+    var map = new BharatChoropleth("#map", {
+      // Serving this repo over HTTP, so read the boundary bundles from the repo itself.
+      // Omit `dataBaseUrl` in a real page to use the published CDN copy.
+      dataBaseUrl: "/data/generated",
+      showRegionValues: true,
+    });
+
+    map.font_color = "maroon"; // snake_case option name
+    map.borderColor = "#800000";
+    map.colorScale = ["#ffffff", "#f4d6d6", "#e0a3a3", "#b35c5c", "#800000"];
+
+    // Every one of these runs before the boundary data has downloaded.
+    map.goa = 6;
+    map.gujarat = 7;
+    map.maharashtra = 41;
+    map.tamil_nadu = 18;
+    map.karnataka = 15;
+    map.kerala = 9;
+    map.rajasthan = 11;
+    map.uttar_pradesh = 25;
+    map.states["Jammu & Kashmir"] = 2;
+    map.states["West Bengal"] = 14;
+    map.orissa = 8; // former name — resolves to Odisha
+
+    // The rest in one batch — a single re-render instead of one per state.
+    // Two are left unset on purpose, to show how "no data" reads.
+    map.setValues({
+      "Madhya Pradesh": 20, Bihar: 17, Telangana: 13, "Andhra Pradesh": 12,
+      Haryana: 10, Punjab: 9, Chhattisgarh: 7, Jharkhand: 7, Assam: 6,
+      Uttarakhand: 4, "Himachal Pradesh": 3, Delhi: 12, Tripura: 2,
+      Meghalaya: 1, Manipur: 1, Nagaland: 1, "Arunachal Pradesh": 1,
+      Mizoram: 1, Sikkim: 1, Puducherry: 2, Chandigarh: 2, Ladakh: 1,
+      "Andaman & Nicobar": 1,
+    });
+
+    window.__map = map; // for manual console poking
+  </script>
+
+  <footer>State/UT and district boundaries derived from datta07/INDIAN-SHAPEFILES (MIT).</footer>
+</body>
+</html>

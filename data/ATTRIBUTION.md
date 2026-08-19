@@ -27,3 +27,25 @@ The separate `datameet-current-claim-outline` overlay must be attributed as:
 > India boundaries by DataMeet India community (CC BY 4.0).
 
 It is derived from DataMeet `States/Admin2.shp` at the pinned revision in that asset's manifest. It is a non-statistical reference overlay checked against the cited Survey of India political-map depiction, not Survey of India geometry and not a statement of administrative control. Do not combine its CC BY 4.0 notice with the Census bundle's CC BY 2.5 India notice.
+
+## Optional current-vintage state/UT bundle
+
+`generated/current-2019-states/states.topo.json` must be attributed as:
+
+> State/UT boundaries derived from datta07/INDIAN-SHAPEFILES (MIT).
+
+Source: [`datta07/INDIAN-SHAPEFILES`](https://github.com/datta07/INDIAN-SHAPEFILES), pinned at commit `2c028f5c30fb4191ca1639ff136b152cecdbb69f`; input `INDIA/INDIA_STATES.geojson`. MIT licensed — do not combine this notice with the Census bundle's CC BY 2.5 India notice or the DataMeet overlays' CC BY 4.0 notice; each asset keeps its own source's terms.
+
+This is a value-bearing, fully interactive current state/UT layer (unlike the two DataMeet reference overlays above), and is not joined to the Census-2011 bundle by id or name.
+
+## Optional current-vintage district bundle
+
+`generated/current-2019-districts/districts/{stateId}.topo.json` uses the same attribution as the current-vintage state bundle above:
+
+> District boundaries derived from datta07/INDIAN-SHAPEFILES (MIT).
+
+Source: same repository and commit; input `INDIA/INDIA_DISTRICTS.geojson`. Joined to the current-states bundle above by LGD-derived id, not to the Census-2011 district bundle. See [README.md](./README.md#optional-current-vintage-district-bundle) for the source data-quality corrections applied (mojibake repair, truncated names, disputed-boundary exclusions) and for the non-interactive reference overlay covering Mirpur and Muzaffarabad — Pakistan-administered J&K districts that are excluded from the value-bearing set, for the same reason the historical bundle's claimed-territory extent is never given a value.
+
+### Lakshadweep detail override
+
+`districts/in-cs-31-lakshadweep.topo.json` uses the Lakshadweep district SVG path from [India Map Studio](https://github.com/nikhilsawantse/india-map-studio), pinned at commit `db2745512365d194a7c4cabdf7ded79e1c777922`. India Map Studio licenses this public SVG layer under MIT and declares `datta07/INDIAN-SHAPEFILES` (MIT) as its upstream source. Its SVG viewBox coordinates are fitted to the existing Lakshadweep geographic envelope before TopoJSON generation, retaining the detailed island outlines while keeping valid longitude/latitude geometry. The district's existing stable id, parent id, values, and attribution remain unchanged.
