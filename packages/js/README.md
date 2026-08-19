@@ -2,12 +2,14 @@
 
 An accessible SVG India state-to-district choropleth with no framework dependency. Drop one `<script>` tag into any HTML page, or import it as an ES module from a bundler. Same behavior, CSS classes, and stylesheet as the React [`bharat-choropleth`](https://www.npmjs.com/package/bharat-choropleth) package.
 
+![Bharat Choropleth national map](https://raw.githubusercontent.com/shashankbudem/bharat-choropleth/main/previews/country-desktop.png)
+
 ## One script tag
 
 ```html
 <div id="map"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js"></script>
+<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js@0.1.0"></script>
 <script>
   var map = new BharatChoropleth("#map");
 
