@@ -1,8 +1,8 @@
 # Bharat Choropleth
 
-`bharat-choropleth` is an open-source React renderer for accessible India state-to-district choropleths. This workspace also includes a separately documented, historical Census-2011 state/UT-to-district boundary bundle for the reference implementation.
+`bharat-choropleth` is an open-source React renderer for accessible India state-to-district choropleths, with a framework-free `bharat-choropleth-js` port for non-React use — same behavior, same CSS, either an ES module or a single `<script>` tag. A native `bharat_choropleth` Flutter package provides the same map interaction without a WebView, and the Python `bharat_choropleth` package produces static SVG or optional Matplotlib output. This workspace also includes a separately documented, historical Census-2011 state/UT-to-district boundary bundle for the reference implementation.
 
-The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, then loads a selected state's district layer on demand. It follows the approved Atlas UX: hover/focus inspection, activation/drill-down, a breadcrumb return, optional legend and host-owned insight content.
+The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, then loads a selected state's district layer on demand. It follows the approved Atlas UX: hover/focus inspection, activation/drill-down, a breadcrumb return, optional legend and host-owned insight content. The legend also filters — picking a swatch highlights the regions painted in it and dulls the rest, picked again or Escape to clear.
 
 ![Bharat Choropleth reference dashboard](./previews/country-full-claimed-outline-desktop.png)
 
@@ -10,13 +10,49 @@ The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, the
 
 ```text
 packages/react    Published SVG React renderer, styles, types, and tests
+packages/js       Framework-free library: `new BharatChoropleth("#map")` from a <script> tag, or ESM
+packages/flutter  Native Dart/Flutter renderer (CustomPainter) — full parity with the web packages, no WebView
+packages/python   Dependency-light Python renderer: accessible SVG by default, optional Matplotlib
 data              Reproducible Census-2011 boundary preparation, manifest, and attribution
 apps/demo         Documentation/demo application using the included historical bundle
 ```
 
+`pnpm check` covers the JavaScript workspace only. The Flutter and Python packages are independently packaged — run their checks from `packages/flutter` and `packages/python` respectively.
+
+## Availability
+
+Version `0.1.0` is publicly available for the React, plain-JS, and Flutter packages. The Python package is ready for its first PyPI release.
+
+| Target | Package | Registry | Source |
+| --- | --- | --- | --- |
+| React | [`bharat-choropleth@0.1.0`](https://www.npmjs.com/package/bharat-choropleth) | npm | [`packages/react`](./packages/react) |
+| Plain JavaScript | [`bharat-choropleth-js@0.1.0`](https://www.npmjs.com/package/bharat-choropleth-js) | npm | [`packages/js`](./packages/js) |
+| Flutter | [`bharat_choropleth@0.1.0`](https://pub.dev/packages/bharat_choropleth) | pub.dev | [`packages/flutter`](./packages/flutter) |
+| Python | `bharat-choropleth@0.1.0` (pending) | PyPI | [`packages/python`](./packages/python) |
+
+Install with:
+
+```bash
+# React
+npm add bharat-choropleth
+
+# Framework-free JavaScript
+npm add bharat-choropleth-js
+
+# Flutter
+flutter pub add bharat_choropleth
+
+# Python — available after the first PyPI release
+pip install bharat-choropleth
+```
+
+Maintainers: see [Publishing the packages](./docs/PUBLISHING.md) for the release checklist. Do not put registry credentials in this repository or in committed configuration.
+
 The code and boundary data have different licences. The React renderer is MIT licensed. The included Census-2011 geometry is derived from DataMeet’s district dataset and is licensed CC BY 2.5 India; it requires attribution and is not a current administrative register. See [data/README.md](./data/README.md), [data/ATTRIBUTION.md](./data/ATTRIBUTION.md), and [the generated manifest](./data/generated/census-2011/manifest.json) before redistributing it.
 
 An optional political-claim context overlay is a separate contemporary DataMeet state-derived asset, attributed under DataMeet’s CC BY 4.0 repository terms and checked against the [Survey of India political-map depiction](https://surveyofindia.gov.in/pages/political-map-of-india). It is a non-statistical reference layer—not Survey of India geometry, not a statement of administrative control, and not an input to any metric or total. The package does not reproduce or redistribute Survey of India geometry; see [the boundary-source note](./data/official-outline.md).
+
+An optional current-vintage state/UT and district bundle (`data/generated/current-2019-states/` and `data/generated/current-2019-districts/`) is a separately versioned, MIT-licensed asset derived from [`datta07/INDIAN-SHAPEFILES`](https://github.com/datta07/INDIAN-SHAPEFILES) — the same source and commit used by [india-map-studio](https://github.com/nikhilsawantse/india-map-studio). It has 36 fully interactive, value-bearing current state/UT regions (including Jammu & Kashmir and Ladakh as separate UTs) with no separate reference-overlay treatment needed at that level, plus a full 788-district drill-down, and is not joined to the Census-2011 bundle by id or name. Two Pakistan-administered J&K district features (Mirpur, Muzaffarabad) are excluded from the value-bearing set and rendered as a non-interactive reference overlay instead, for the same reason the historical bundle never assigns a value to claimed-but-unadministered territory. See [data/README.md](./data/README.md#optional-current-vintage-stateut-bundle).
 
 ## Design decisions
 
@@ -29,7 +65,24 @@ An optional political-claim context overlay is a separate contemporary DataMeet 
 - Tooltip and insight UI are slots. Default copy contains only generic data concepts; a dashboard owns its metric/year wording and surrounding chrome.
 - Regions are keyboard focusable and activate with Enter/Space. Focus and pointer hover have the same inspection callback. CSS includes a reduced-motion mode and public CSS variables.
 
-## Install
+## Without a framework: one script tag
+
+For plain JavaScript — or any framework that can load a plain JS library — [`bharat-choropleth-js`](./packages/js) needs a single script tag and no build step:
+
+```html
+<div id="map"></div>
+<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js"></script>
+<script>
+  var map = new BharatChoropleth("#map");
+  map.fontColor = "maroon";
+  map.goa = 6;
+  map.gujarat = 7;
+</script>
+```
+
+The stylesheet is injected by the script, boundary data is fetched on construction (never bundled — set `dataBaseUrl` to self-host), and values written before it arrives are applied when it does. Clicking a state drills into its districts. See [packages/js/README.md](./packages/js/README.md).
+
+## React install
 
 ```bash
 pnpm add bharat-choropleth
@@ -140,8 +193,6 @@ pnpm validate:data
 pnpm check
 ```
 
-## Before public release
+## Release status
 
-- Publish the renderer and the historical data bundle as separately versioned artifacts, retaining the data manifest and CC BY 2.5 India attribution.
-- Add visual regression and screen-reader testing using the included Census-2011 bundle and every future source edition.
-- Establish public package scope, release automation, security reporting, and a policy for future official/current boundary editions.
+The React, plain-JS, and Flutter `0.1.0` packages are published; the matching Python package is awaiting its first PyPI release. Future releases follow the [publishing guide](./docs/PUBLISHING.md); increment a package's version before publishing because registries do not permit reusing one. The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.

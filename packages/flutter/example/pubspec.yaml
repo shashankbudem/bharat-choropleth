@@ -1,0 +1,33 @@
+name: bharat_choropleth_example
+description: Minimal example app for the bharat_choropleth package.
+publish_to: none
+version: 0.1.0
+
+environment:
+  sdk: ^3.5.0
+  flutter: ">=3.24.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+  bharat_choropleth:
+    path: ../
+
+dev_dependencies:
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  assets:
+    # Copy all three before running:
+    #   cp ../../../data/generated/current-2019-states/states.topo.json assets/
+    #   cp ../../../examples/parity-config.json assets/
+    #   cp ../../../data/generated/current-2019-districts/districts/*.topo.json assets/districts/
+    #   cp ../../../data/generated/current-2019-districts/district-reference-overlays/*.topo.json assets/overlays/
+    # The overlay files share their state's filename, so they need their own
+    # directory — copied over the districts they belong to, a drill-down would
+    # silently render a claim outline as if it were the state's districts.
+    - assets/states.topo.json
+    - assets/parity-config.json
+    - assets/districts/
+    - assets/overlays/

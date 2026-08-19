@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>BharatChoropleth — minimum</title>
+</head>
+<body>
+
+<div id="map"></div>
+
+<script src="/packages/js/dist/bharat-choropleth.min.js"></script>
+<script>
+  var map = new BharatChoropleth({
+    dataBaseUrl: "/data/generated",
+    // Keeps the SVG/dashboard and state geometry unchanged; only tiny drilled
+    // island paths grow about their own centres.
+    minDistrictPartExtent: 14,
+  });
+
+  map.goa = 6;
+  map.gujarat = 7;
+  map.maharashtra = 41;
+  map.states["Lakshadweep"] = 43; // visibility experiment: test the high-end fill in its district view
+</script>
+
+</body>
+</html>

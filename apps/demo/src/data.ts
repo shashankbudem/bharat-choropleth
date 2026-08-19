@@ -1,6 +1,9 @@
-import type { MapFeature, MapLayer, ReferenceOverlay } from "bharat-choropleth";
+import type { MapFeature, MapFeatureCollection, MapLayer, ReferenceOverlay } from "bharat-choropleth";
+import { feature as topoFeature } from "topojson-client";
 import statesTopology from "../../../data/generated/census-2011/states.topo.json";
 import currentContextTopology from "../../../data/generated/datameet-current-claim-outline/outline.topo.json";
+import jkCurrentClaimTopology from "../../../data/generated/datameet-current-claim-outline/historical-parent-overlays/in-hs-01-jammu-and-kashmir.topo.json";
+import currentStatesTopology from "../../../data/generated/current-2019-states/states.topo.json";
 
 type FeatureProperties = { id: string; name: string };
 
@@ -29,12 +32,50 @@ export function makeLayer(geometry: MapLayer["geometry"], year: DemoYear): MapLa
   };
 }
 
+const JK_STATE_ID = "in-hs-01-jammu-and-kashmir";
+
+/**
+ * The Census-2011 J&K feature only covers Indian-administered districts. For the
+ * top-level state view we swap in DataMeet's current-claim outline (J&K + Ladakh,
+ * matching the Survey of India political-map extent) so J&K renders as one normal
+ * interactive state, same as every other state — no separate reference patch.
+ * District drill-down still uses the Census-2011 boundary; only the 22 historical
+ * districts carry real values there.
+ */
+function statesWithJkCurrentClaimExtent(): MapFeatureCollection {
+  const statesTopo = statesTopology as never as { objects: Record<string, never> };
+  const claimTopo = jkCurrentClaimTopology as never as { objects: Record<string, never> };
+  const states = topoFeature(statesTopo as never, statesTopo.objects.states) as unknown as MapFeatureCollection;
+  const claim = topoFeature(claimTopo as never, claimTopo.objects.outline) as unknown as MapFeatureCollection;
+  const claimGeometry = claim.features[0]?.geometry;
+  if (!claimGeometry) return states;
+  return {
+    ...states,
+    features: states.features.map((stateFeature) =>
+      properties(stateFeature).id === JK_STATE_ID
+        ? { ...stateFeature, geometry: claimGeometry }
+        : stateFeature,
+    ),
+  };
+}
+
 export function stateLayer(year: DemoYear) {
-  return makeLayer({ topology: statesTopology as never, object: "states" }, year);
+  return makeLayer(statesWithJkCurrentClaimExtent(), year);
+}
+
+/**
+ * The independently sourced current-vintage (~2019) state/UT bundle: J&K and Ladakh
+ * are already separate, full-extent regions in the source geometry, so no reference
+ * overlay or id swap is needed here.
+ */
+export function currentStateLayer(year: DemoYear) {
+  return makeLayer({ topology: currentStatesTopology as never, object: "states" }, year);
 }
 
 const districtModules = import.meta.glob("../../../data/generated/census-2011/districts/*.topo.json");
 const districtReferenceModules = import.meta.glob("../../../data/generated/datameet-current-claim-outline/historical-parent-overlays/*.topo.json");
+const currentDistrictModules = import.meta.glob("../../../data/generated/current-2019-districts/districts/*.topo.json");
+const currentDistrictReferenceModules = import.meta.glob("../../../data/generated/current-2019-districts/district-reference-overlays/*.topo.json");
 
 /** DataMeet CC BY 4.0 contemporary context geometry; it is not SoI geometry. */
 export function currentContextOverlay(): ReferenceOverlay {
@@ -53,6 +94,13 @@ export async function loadDistrictLayer(stateId: string, _state: { id: string },
   return makeLayer({ topology: (module as { default: unknown }).default as never, object: "districts" }, year);
 }
 
+export async function loadCurrentDistrictLayer(stateId: string, _state: { id: string }, year: DemoYear): Promise<MapLayer> {
+  const load = currentDistrictModules[`../../../data/generated/current-2019-districts/districts/${stateId}.topo.json`];
+  if (!load) return makeLayer({ type: "FeatureCollection", features: [] }, year);
+  const module = await load();
+  return makeLayer({ topology: (module as { default: unknown }).default as never, object: "districts" }, year);
+}
+
 /** Only historical J&K gets extra DataMeet current-context geometry behind its Census districts. */
 export async function loadDistrictReferenceOverlay(stateId: string): Promise<ReferenceOverlay | null> {
   const load = districtReferenceModules[`../../../data/generated/datameet-current-claim-outline/historical-parent-overlays/${stateId}.topo.json`];
@@ -63,5 +111,22 @@ export async function loadDistrictReferenceOverlay(stateId: string): Promise<Ref
     getId: (feature) => properties(feature).id,
     getLabel: (feature) => properties(feature).name,
     getDescription: () => "Current reference outline; hatched portions outside the Census-2011 district layer have no data.",
+  };
+}
+
+/**
+ * Only current-edition J&K gets this: Mirpur and Muzaffarabad are Pakistan-administered
+ * districts in the source, not Indian districts, so they're kept out of the value-bearing
+ * district set and rendered here as non-interactive reference context instead.
+ */
+export async function loadCurrentDistrictReferenceOverlay(stateId: string): Promise<ReferenceOverlay | null> {
+  const load = currentDistrictReferenceModules[`../../../data/generated/current-2019-districts/district-reference-overlays/${stateId}.topo.json`];
+  if (!load) return null;
+  const module = await load();
+  return {
+    geometry: { topology: (module as { default: unknown }).default as never, object: "outline" },
+    getId: (feature) => properties(feature).id,
+    getLabel: (feature) => properties(feature).name,
+    getDescription: () => "Pakistan-administered districts; not Indian territory and have no metric or district coverage.",
   };
 }

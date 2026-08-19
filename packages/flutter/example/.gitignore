@@ -1,0 +1,4 @@
+assets/*.topo.json
+assets/parity-config.json
+.dart_tool/
+build/

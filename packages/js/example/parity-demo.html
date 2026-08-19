@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bharat Choropleth — plain JS parity demo</title>
+  <style>
+    body { margin: 0; padding: 2rem 1.5rem; background: #fff; color: #0f1b38; font: 16px/1.5 system-ui, sans-serif; }
+    header { max-width: 720px; margin: 0 auto 1.5rem; }
+    h1 { margin: 0 0 .25rem; font-size: 1.25rem; }
+    p { margin: 0; color: #53617b; font-size: .875rem; }
+    /* Fixed width so all three demos render the map at exactly the same size. */
+    #map { width: 720px; max-width: 100%; margin: 0 auto; }
+    footer { max-width: 720px; margin: 1.5rem auto 0; color: #53617b; font-size: .75rem; }
+    code { font-size: .8125rem; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Plain JS — <code>bharat-choropleth-js</code></h1>
+    <p>Every option the library exposes is switched on. Hover or tab for the tooltip, click a state to drill into its districts, click the sea to clear the selection.</p>
+  </header>
+
+  <div id="map"></div>
+
+  <footer id="status">Loading…</footer>
+
+  <script src="/packages/js/dist/bharat-choropleth.min.js"></script>
+  <script>
+    fetch("/examples/parity-config.json").then(function (response) { return response.json(); }).then(function (config) {
+      var map = new BharatChoropleth("#map", {
+        dataBaseUrl: "/data/generated",
+
+        // Shared appearance — identical in all three demos.
+        colorScale: config.colorScale,
+        fontColor: config.fontColor,
+        borderColor: config.borderColor,
+        borderWidth: config.borderWidth,
+        selectionWidth: config.selectionWidth,
+        values: config.values,
+
+        // Everything else this renderer supports.
+        showRegionValues: true,
+        // Keep state geometry true to scale; grow tiny drilled island parts
+        // about their own centres so Lakshadweep remains visible and clickable.
+        minDistrictPartExtent: 14,
+        showLegend: true,
+        showBreadcrumb: true,
+        legendLabels: config.legendLabels,
+        ariaLabel: config.ariaLabel,
+        districts: true,
+        // Districts need their own values or every one renders as "no data" —
+        // a near-white fill with white borders, which is invisible on this page.
+        // Deterministic sample numbers, so the drill-down is a real choropleth.
+        loadDistricts: function (stateId) {
+          return fetch("/data/generated/current-2019-districts/districts/" + stateId + ".topo.json")
+            .then(function (response) { return response.json(); })
+            .then(function (topology) {
+              return {
+                geometry: { topology: topology, object: "districts" },
+                getId: function (feature) { return String(feature.properties.id); },
+                getLabel: function (feature) { return String(feature.properties.name); },
+                getValue: function (feature) { return sampleValue(String(feature.properties.id)); },
+              };
+            });
+        },
+        interactive: true,
+        formatValue: function (value) { return new Intl.NumberFormat("en-IN").format(value); },
+        renderInsights: function (context, container) {
+          container.textContent = context
+            ? context.label + " · " + (context.value === null ? "No data" : context.value)
+            : "Hover a region";
+        },
+        onRegionClick: function (region) { report("Clicked " + region.label); },
+        onSelectedChange: function (region) { report(region ? "Selected " + region.label : "Selection cleared"); },
+        onDrillDownChange: function (stateId, state) { report(state ? "Drilled into " + state.label : "Back to all states"); },
+        onBackgroundClick: function () { report("Clicked open sea"); },
+      });
+
+      // A stable pseudo-random number per id, so the demo looks the same on every
+      // load without shipping a second data file.
+      function sampleValue(id) {
+        var hash = 0;
+        for (var i = 0; i < id.length; i++) hash = (hash * 31 + id.charCodeAt(i)) % 997;
+        return 1 + (hash % 40);
+      }
+
+      function report(message) { document.getElementById("status").textContent = message; }
+      map.ready.then(function () { report("Ready — 36 states and union territories"); });
+      window.__map = map;
+    });
+  </script>
+</body>
+</html>

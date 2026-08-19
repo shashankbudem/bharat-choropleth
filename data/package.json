@@ -5,11 +5,16 @@
   "description": "Reproducible, versioned boundary preparation for Bharat Choropleth.",
   "type": "module",
   "scripts": {
-    "prepare": "node src/prepare-boundaries.mjs",
+    "generate:census": "node src/prepare-boundaries.mjs",
     "prepare:claim-outline": "node src/prepare-datameet-claim-outline.mjs",
     "validate:claim-outline": "node src/validate-datameet-claim-outline.mjs",
-    "validate": "node src/validate-boundaries.mjs && node src/validate-datameet-claim-outline.mjs",
-    "build": "npm run prepare && npm run prepare:claim-outline && npm run validate"
+    "prepare:current-states": "node src/prepare-current-states.mjs",
+    "validate:current-states": "node src/validate-current-states.mjs",
+    "prepare:current-districts": "node src/prepare-current-districts.mjs",
+    "import:map-studio-lakshadweep": "node src/import-map-studio-lakshadweep.mjs",
+    "validate:current-districts": "node src/validate-current-districts.mjs",
+    "validate": "node src/validate-boundaries.mjs && node src/validate-datameet-claim-outline.mjs && node src/validate-current-states.mjs && node src/validate-current-districts.mjs",
+    "build": "npm run generate:census && npm run prepare:claim-outline && npm run prepare:current-states && npm run prepare:current-districts && npm run import:map-studio-lakshadweep && npm run validate"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
