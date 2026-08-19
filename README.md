@@ -1,22 +1,80 @@
 # Bharat Choropleth
 
-`bharat-choropleth` is an open-source React renderer for accessible India state-to-district choropleths. This workspace also includes a separately documented, historical Census-2011 state/UT-to-district boundary bundle for the reference implementation.
+`bharat-choropleth` is an open-source React renderer for accessible India state-to-district choropleths, with a framework-free `bharat-choropleth-js` port for non-React use — same behavior, same CSS, either an ES module or a single `<script>` tag. This workspace also includes a separately documented, historical Census-2011 state/UT-to-district boundary bundle for the reference implementation.
 
-The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, then loads a selected state's district layer on demand. It follows the approved Atlas UX: hover/focus inspection, activation/drill-down, a breadcrumb return, optional legend and host-owned insight content.
+The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, then loads a selected state's district layer on demand. It follows the approved Atlas UX: hover/focus inspection, activation/drill-down, a breadcrumb return, optional legend and host-owned insight content. The legend also filters — picking a swatch highlights the regions painted in it and dulls the rest, picked again or Escape to clear.
 
 ![Bharat Choropleth reference dashboard](./previews/country-full-claimed-outline-desktop.png)
+
+## Examples
+
+### National view
+
+![National state and union-territory choropleth](./previews/country-desktop.png)
+
+### District drill-down
+
+![Maharashtra district choropleth drill-down](./previews/maharashtra-districts-desktop.png)
+
+### Responsive layout
+
+![Mobile national choropleth view](./previews/country-mobile.png)
 
 ## Package layout
 
 ```text
 packages/react    Published SVG React renderer, styles, types, and tests
+packages/js       Framework-free library: `new BharatChoropleth("#map")` from a <script> tag, or ESM
+packages/flutter  Native Dart/Flutter renderer (CustomPainter) — full parity with the web packages, no WebView
 data              Reproducible Census-2011 boundary preparation, manifest, and attribution
 apps/demo         Documentation/demo application using the included historical bundle
 ```
 
+## Persistent hosted parity demos (Cloudflare Pages)
+
+The three current-vintage parity demos can be published as one static Cloudflare
+Pages site. This is deliberately different from `cloudflared tunnel --url`:
+Quick Tunnels are tied to a local `cloudflared` process, so closing that process
+produces Cloudflare 1033/530 errors. Pages uploads the finished static assets to
+Cloudflare and does not depend on this computer remaining online.
+
+Build the deployable site locally (requires Node, pnpm, and the Flutter SDK):
+
+```bash
+pnpm install --frozen-lockfile
+pnpm build:pages
+```
+
+The artifact is `dist/cloudflare-pages/` and contains these stable routes:
+
+- `/react/`
+- `/js/`
+- `/flutter/`
+
+To make the first deployment, sign in to the Cloudflare account that should own
+the site, create a Direct Upload Pages project, then deploy it:
+
+```bash
+pnpm dlx wrangler@4 login
+pnpm dlx wrangler@4 pages project create bharat-choropleth-demos --production-branch main
+CLOUDFLARE_PAGES_PROJECT_NAME=bharat-choropleth-demos pnpm deploy:pages -- --branch=main
+```
+
+For later releases, rebuild and run the last command again. In CI, provide
+Cloudflare's documented `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID` as
+encrypted environment variables rather than committing them. A Direct Upload
+project is intentionally separate from Cloudflare Pages Git integration; if you
+want automatic GitHub/GitLab builds instead, create a separate Git-integrated
+Pages project and configure `pnpm build:pages` with
+`dist/cloudflare-pages` as its output directory.
+
+`pnpm check` covers the JavaScript workspace only. The Flutter package is a pub package outside it — run `pnpm check:flutter` (or `pnpm check:all` for both), which needs the Flutter SDK on your PATH.
+
 The code and boundary data have different licences. The React renderer is MIT licensed. The included Census-2011 geometry is derived from DataMeet’s district dataset and is licensed CC BY 2.5 India; it requires attribution and is not a current administrative register. See [data/README.md](./data/README.md), [data/ATTRIBUTION.md](./data/ATTRIBUTION.md), and [the generated manifest](./data/generated/census-2011/manifest.json) before redistributing it.
 
 An optional political-claim context overlay is a separate contemporary DataMeet state-derived asset, attributed under DataMeet’s CC BY 4.0 repository terms and checked against the [Survey of India political-map depiction](https://surveyofindia.gov.in/pages/political-map-of-india). It is a non-statistical reference layer—not Survey of India geometry, not a statement of administrative control, and not an input to any metric or total. The package does not reproduce or redistribute Survey of India geometry; see [the boundary-source note](./data/official-outline.md).
+
+An optional current-vintage state/UT and district bundle (`data/generated/current-2019-states/` and `data/generated/current-2019-districts/`) is a separately versioned, MIT-licensed asset derived from [`datta07/INDIAN-SHAPEFILES`](https://github.com/datta07/INDIAN-SHAPEFILES) — the same source and commit used by [india-map-studio](https://github.com/nikhilsawantse/india-map-studio). It has 36 fully interactive, value-bearing current state/UT regions (including Jammu & Kashmir and Ladakh as separate UTs) with no separate reference-overlay treatment needed at that level, plus a full 788-district drill-down, and is not joined to the Census-2011 bundle by id or name. Two Pakistan-administered J&K district features (Mirpur, Muzaffarabad) are excluded from the value-bearing set and rendered as a non-interactive reference overlay instead, for the same reason the historical bundle never assigns a value to claimed-but-unadministered territory. See [data/README.md](./data/README.md#optional-current-vintage-stateut-bundle).
 
 ## Design decisions
 
@@ -28,6 +86,23 @@ An optional political-claim context overlay is a separate contemporary DataMeet 
 - `referenceOverlay` accepts separate national-only reference geometry—such as an outline or claimed area—that must never be coloured, selected, drilled into, or counted. It renders in a neutral hatch; the host provides its exact accessible description instead of the renderer assuming the whole outline lacks data.
 - Tooltip and insight UI are slots. Default copy contains only generic data concepts; a dashboard owns its metric/year wording and surrounding chrome.
 - Regions are keyboard focusable and activate with Enter/Space. Focus and pointer hover have the same inspection callback. CSS includes a reduced-motion mode and public CSS variables.
+
+## Without a framework: one script tag
+
+For plain JavaScript — or any framework that can load a plain JS library — [`bharat-choropleth-js`](./packages/js) needs a single script tag and no build step:
+
+```html
+<div id="map"></div>
+<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js@0.1.0"></script>
+<script>
+  var map = new BharatChoropleth("#map");
+  map.fontColor = "maroon";
+  map.goa = 6;
+  map.gujarat = 7;
+</script>
+```
+
+The stylesheet is injected by the script, boundary data is fetched on construction (never bundled — set `dataBaseUrl` to self-host), and values written before it arrives are applied when it does. Clicking a state drills into its districts. See [packages/js/README.md](./packages/js/README.md).
 
 ## Install
 

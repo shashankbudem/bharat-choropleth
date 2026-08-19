@@ -5,13 +5,17 @@
   "description": "Open-source, accessible India state-to-district choropleth components.",
   "packageManager": "pnpm@10.0.0",
   "scripts": {
-    "build": "pnpm --filter bharat-choropleth build",
+    "build": "pnpm --filter bharat-choropleth build && pnpm --filter bharat-choropleth-js build",
     "build:data": "pnpm --dir data run build",
-    "test": "pnpm --filter bharat-choropleth test",
-    "typecheck": "pnpm --filter bharat-choropleth typecheck && pnpm --filter @bharat-choropleth/demo exec tsc --noEmit",
-    "build:demo": "pnpm --filter @bharat-choropleth/demo build",
+    "test": "pnpm --filter bharat-choropleth test && pnpm --filter bharat-choropleth-js test",
+    "typecheck": "pnpm --filter bharat-choropleth typecheck && pnpm --filter bharat-choropleth-js typecheck && pnpm --filter @bharat-choropleth/demo exec tsc --noEmit && pnpm --filter @bharat-choropleth/parity-demo exec tsc --noEmit",
+    "build:demo": "pnpm --filter @bharat-choropleth/demo build && pnpm --filter @bharat-choropleth/parity-demo build",
+    "build:pages": "node scripts/build-cloudflare-pages.mjs",
+    "deploy:pages": "node scripts/deploy-cloudflare-pages.mjs",
     "validate:data": "pnpm --dir data run validate",
-    "check": "pnpm typecheck && pnpm test && pnpm build && pnpm build:demo && pnpm validate:data"
+    "check": "pnpm build && pnpm typecheck && pnpm test && pnpm build:demo && pnpm validate:data",
+    "check:flutter": "cd packages/flutter && flutter analyze && flutter test",
+    "check:all": "pnpm check && pnpm check:flutter"
   },
   "devDependencies": {
     "pnpm": "10.0.0"

@@ -1,4 +1,4 @@
-import { readdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
@@ -65,44 +65,47 @@ async function readJson(path) {
   return JSON.parse(await readFile(path, "utf8"));
 }
 
-async function validateTopoJson(path, objectName, expectedFeatures, label, errors) {
+async function validateTopoJson(path, objectName, expectedFeatureCount, label, errors) {
   const topo = await readJson(path);
   if (topo.type !== "Topology" || !topo.objects?.[objectName]) {
     errors.push(`${label}: missing expected Topology object ${objectName}.`);
-    return;
+    return [];
   }
   const converted = topojsonFeature(topo, topo.objects[objectName]);
   const features = converted.type === "FeatureCollection" ? converted.features : [converted];
-  if (features.length !== expectedFeatures.length) {
-    errors.push(`${label}: TopoJSON feature count ${features.length} differs from GeoJSON ${expectedFeatures.length}.`);
+  if (features.length !== expectedFeatureCount) {
+    errors.push(`${label}: TopoJSON feature count ${features.length} differs from manifest ${expectedFeatureCount}.`);
   }
-  const expectedIds = new Set(expectedFeatures.map((item) => item.properties.id));
   for (const item of features) {
-    if (!expectedIds.has(item.properties?.id)) errors.push(`${label}: converted TopoJSON has an unknown/missing id.`);
+    if (!item.properties?.id) errors.push(`${label}: converted TopoJSON has a missing id.`);
     if (item.geometry?.type === "GeometryCollection") {
       for (const child of item.geometry.geometries) validateGeometry(child, `${label} ${item.properties?.id || "unknown"}`, errors);
     } else {
       validateGeometry(item.geometry, `${label} ${item.properties?.id || "unknown"}`, errors);
     }
   }
+  return features;
 }
 
 async function main() {
   const errors = [];
   const manifest = await readJson(join(generated, "manifest.json"));
-  const states = await readJson(join(generated, "states.geojson"));
+  const statesTopoPath = join(generated, manifest.assets.states.topojson);
+  const decodedStates = await validateTopoJson(
+    statesTopoPath,
+    "states",
+    manifest.assets.states.featureCount,
+    "states TopoJSON",
+    errors,
+  );
   const stateIds = new Set();
-  for (const feature of states.features) {
+  for (const feature of decodedStates) {
     const { id, name, slug } = feature.properties || {};
     if (!id || !name || !slug) errors.push(`State feature missing identity fields: ${feature.id || "unknown"}.`);
     if (stateIds.has(id)) errors.push(`Duplicate state id: ${id}.`);
     stateIds.add(id);
     validateGeometry(feature.geometry, `state ${id}`, errors);
   }
-  const statesTopoPath = join(generated, "states.topo.json");
-  await validateTopoJson(statesTopoPath, "states", states.features, "states TopoJSON", errors);
-  const statesTopo = await readJson(statesTopoPath);
-  const decodedStates = topojsonFeature(statesTopo, statesTopo.objects.states).features;
   const nationalBounds = boundsOf({ type: "MultiPolygon", coordinates: decodedStates.flatMap((feature) => feature.geometry.coordinates) });
   for (const feature of decodedStates) {
     const sphericalArea = geoArea(feature);
@@ -118,10 +121,15 @@ async function main() {
   const districtEntries = Object.entries(manifest.assets.districts);
   for (const [stateId, entry] of districtEntries) {
     if (!stateId.startsWith("in-hs-")) errors.push(`District asset key is not a historical parent id: ${stateId}.`);
-    const collection = await readJson(join(generated, entry.geojson));
-    perState[stateId] = collection.features.length;
-    if (collection.features.length !== entry.featureCount) errors.push(`${stateId}: manifest feature count does not match GeoJSON.`);
-    for (const feature of collection.features) {
+    const districtFeatures = await validateTopoJson(
+      join(generated, entry.topojson),
+      "districts",
+      entry.featureCount,
+      `${stateId} TopoJSON`,
+      errors,
+    );
+    perState[stateId] = districtFeatures.length;
+    for (const feature of districtFeatures) {
       const { id, parentId, name, slug } = feature.properties || {};
       if (!id || !parentId || !name || !slug) errors.push(`District feature missing identity fields: ${feature.id || "unknown"}.`);
       if (parentId !== stateId) errors.push(`${id}: parentId ${parentId} conflicts with its lazy-load asset ${stateId}.`);
@@ -129,27 +137,26 @@ async function main() {
       allDistrictIds.add(id);
       validateGeometry(feature.geometry, `district ${id}`, errors);
     }
-    await validateTopoJson(join(generated, entry.topojson), "districts", collection.features, `${stateId} TopoJSON`, errors);
   }
 
-  const stateGeojsonBytes = (await stat(join(generated, "states.geojson"))).size;
-  const stateTopojsonBytes = (await stat(join(generated, "states.topo.json"))).size;
-  const stateTopojsonGzipBytes = gzipSync(await readFile(join(generated, "states.topo.json"))).byteLength;
+  const stateTopojsonBytes = (await stat(statesTopoPath)).size;
+  const stateTopojsonGzipBytes = gzipSync(await readFile(statesTopoPath)).byteLength;
   if (stateTopojsonBytes > maxInitialAssetBytes) errors.push(`Initial states TopoJSON exceeds ${maxInitialAssetBytes} bytes.`);
   if (stateTopojsonGzipBytes > maxInitialAssetGzipBytes) errors.push(`Initial states TopoJSON gzip exceeds ${maxInitialAssetGzipBytes} bytes.`);
-  const diskDistrictFiles = (await readdir(join(generated, "districts"))).filter((file) => file.endsWith(".geojson"));
-  if (diskDistrictFiles.length !== districtEntries.length) errors.push("District GeoJSON files and manifest entries differ.");
+  const diskDistrictFiles = (await readdir(join(generated, "districts"))).filter((file) => file.endsWith(".topo.json"));
+  if (diskDistrictFiles.length !== districtEntries.length) errors.push("District TopoJSON files and manifest entries differ.");
 
-  if (states.features.length !== expectedCensus2011StateRegions) errors.push(`Expected ${expectedCensus2011StateRegions} Census-2011 state/UT regions; found ${states.features.length}.`);
+  if (decodedStates.length !== expectedCensus2011StateRegions) errors.push(`Expected ${expectedCensus2011StateRegions} Census-2011 state/UT regions; found ${decodedStates.length}.`);
   if (allDistrictIds.size !== expectedCensus2011Districts) errors.push(`Expected ${expectedCensus2011Districts} Census-2011 districts; found ${allDistrictIds.size}.`);
   const report = {
     validatedAt: new Date().toISOString(),
     result: errors.length === 0 ? "pass" : "fail",
-    counts: { states: states.features.length, historicalDistrictParents: districtEntries.length, districts: allDistrictIds.size },
-    bytes: { statesGeojson: stateGeojsonBytes, statesTopojson: stateTopojsonBytes, statesTopojsonGzip: stateTopojsonGzipBytes },
+    counts: { states: decodedStates.length, historicalDistrictParents: districtEntries.length, districts: allDistrictIds.size },
+    bytes: { statesTopojson: stateTopojsonBytes, statesTopojsonGzip: stateTopojsonGzipBytes },
     districtsByParent: perState,
     errors,
   };
+  await mkdir(dirname(reportPath), { recursive: true });
   await writeFile(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify(report, null, 2));
   if (errors.length) process.exitCode = 1;

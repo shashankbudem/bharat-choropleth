@@ -1,0 +1,53 @@
+{
+  "validatedAt": "2026-08-19T19:17:35.251Z",
+  "result": "pass",
+  "counts": {
+    "currentStates": 36,
+    "districtParents": 36,
+    "districts": 788
+  },
+  "bytes": {
+    "totalTopojson": 885066,
+    "totalTopojsonGzip": 272342
+  },
+  "districtsByParent": {
+    "in-cs-01-jammu-and-kashmir": 20,
+    "in-cs-02-himachal-pradesh": 12,
+    "in-cs-03-punjab": 23,
+    "in-cs-04-chandigarh": 1,
+    "in-cs-05-uttarakhand": 13,
+    "in-cs-06-haryana": 22,
+    "in-cs-07-delhi": 12,
+    "in-cs-08-rajasthan": 50,
+    "in-cs-09-uttar-pradesh": 75,
+    "in-cs-10-bihar": 38,
+    "in-cs-11-sikkim": 6,
+    "in-cs-12-arunachal-pradesh": 27,
+    "in-cs-13-nagaland": 16,
+    "in-cs-14-manipur": 16,
+    "in-cs-15-mizoram": 11,
+    "in-cs-16-tripura": 8,
+    "in-cs-17-meghalaya": 12,
+    "in-cs-18-assam": 35,
+    "in-cs-19-west-bengal": 23,
+    "in-cs-20-jharkhand": 24,
+    "in-cs-21-odisha": 30,
+    "in-cs-22-chhattisgarh": 33,
+    "in-cs-23-madhya-pradesh": 55,
+    "in-cs-24-gujarat": 33,
+    "in-cs-26-dadra-and-nagar-haveli-and-daman-and-diu": 3,
+    "in-cs-27-maharashtra": 36,
+    "in-cs-28-andhra-pradesh": 26,
+    "in-cs-29-karnataka": 31,
+    "in-cs-30-goa": 2,
+    "in-cs-31-lakshadweep": 1,
+    "in-cs-32-kerala": 14,
+    "in-cs-33-tamil-nadu": 38,
+    "in-cs-34-puducherry": 4,
+    "in-cs-35-andaman-and-nicobar": 3,
+    "in-cs-36-telangana": 33,
+    "in-cs-37-ladakh": 2
+  },
+  "districtReferenceOverlay": "present",
+  "errors": []
+}
