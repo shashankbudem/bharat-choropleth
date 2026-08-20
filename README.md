@@ -4,21 +4,21 @@
 
 The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, then loads a selected state's district layer on demand. It follows the approved Atlas UX: hover/focus inspection, activation/drill-down, a breadcrumb return, optional legend and host-owned insight content. The legend also filters — picking a swatch highlights the regions painted in it and dulls the rest, picked again or Escape to clear.
 
-![Bharat Choropleth reference dashboard](./previews/country-full-claimed-outline-desktop.png)
+![Bharat Choropleth current 2019-boundary dashboard](./previews/country-full-claimed-outline-desktop.png)
 
 ## Examples
 
 ### National view
 
-![National state and union-territory choropleth](./previews/country-desktop.png)
+![National state and union-territory choropleth using the current 2019 boundaries](./previews/country-desktop.png)
 
 ### District drill-down
 
-![Maharashtra district choropleth drill-down](./previews/maharashtra-districts-desktop.png)
+![Maharashtra district choropleth drill-down using the current 2019 boundaries](./previews/maharashtra-districts-desktop.png)
 
 ### Responsive layout
 
-![Mobile national choropleth view](./previews/country-mobile.png)
+![Mobile national choropleth view using the current 2019 boundaries](./previews/country-mobile.png)
 
 ## Package layout
 
