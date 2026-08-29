@@ -234,6 +234,13 @@ export class IndiaChoropleth {
   private inspectedId: string | null = null;
   private loadedDistricts: { stateId: string; layer: MapLayer } | null = null;
   private loadedSubDistricts: { districtId: string; layer: MapLayer } | null = null;
+  /**
+   * Districts the loader has already answered `null` for. The renderer cannot know
+   * which districts are leaves without asking, so the first activation asks — but
+   * after that the region should stop announcing a level it will not open. Cleared
+   * when the loader changes, since a different source may have sub-districts for them.
+   */
+  private leafDistrictIds = new Set<string>();
   private loadedDistrictReferenceOverlay: { stateId: string; overlay: ReferenceOverlay | null } | null = null;
   private loadingState: string | null = null;
   private loadingDistrict: string | null = null;
@@ -311,7 +318,10 @@ export class IndiaChoropleth {
     // A swapped loader should retry for the current drill-down id even if that id
     // itself didn't change (mirrors including the loader in a React effect's deps).
     if ("loadDistricts" in next && next.loadDistricts !== this.options.loadDistricts) this.attemptedDistrictLoadForId = null;
-    if ("loadSubDistricts" in next && next.loadSubDistricts !== this.options.loadSubDistricts) this.attemptedSubDistrictLoadForId = null;
+    if ("loadSubDistricts" in next && next.loadSubDistricts !== this.options.loadSubDistricts) {
+      this.attemptedSubDistrictLoadForId = null;
+      this.leafDistrictIds.clear();
+    }
     if ("loadDistrictReferenceOverlay" in next && next.loadDistrictReferenceOverlay !== this.options.loadDistrictReferenceOverlay) this.attemptedOverlayLoadForId = null;
     this.options = { ...this.options, ...next };
     if ("drillDownId" in next && next.drillDownId !== undefined) {
@@ -566,6 +576,7 @@ export class IndiaChoropleth {
         if (!loaded) {
           // This district is a leaf. Step back to the district view and leave it
           // selected, rather than opening a level with nothing in it.
+          this.leafDistrictIds.add(districtId);
           this.setActiveSubDrillDownId(null);
           this.setActiveSelectedId(sourceDistrict.id);
           options.onSubDistrictDrillDownChange?.(null, sourceDistrict);
@@ -675,7 +686,7 @@ export class IndiaChoropleth {
     // A district is a leaf unless the host offers a level below it. Whether this
     // particular district actually has one is only known once the loader answers,
     // so the drill is entered optimistically and stepped back out if it returns null.
-    if (this.derived.level === "district" && options.loadSubDistricts) {
+    if (this.derived.level === "district" && options.loadSubDistricts && !this.leafDistrictIds.has(region.id)) {
       this.setActiveSelectedId(null);
       this.setActiveSubDrillDownId(region.id);
       options.onSubDistrictDrillDownChange?.(region.id, region);
@@ -928,7 +939,9 @@ export class IndiaChoropleth {
       swatchIndexOf(region.value, this.derived.min, this.derived.max, legendColorsOf(options).length);
 
     for (const region of this.derived.regions) {
-      const action = this.derived.canDrill
+      const canDrillHere = this.derived.canDrill
+        && !(this.derived.level === "district" && this.leafDistrictIds.has(region.id));
+      const action = canDrillHere
         ? this.derived.level === "state" ? "Activate to view districts." : "Activate to view sub-districts."
         : "Activate to select.";
       const textValue = region.value === null ? "No data" : (options.formatValue ?? DEFAULT_FORMAT)(region.value);

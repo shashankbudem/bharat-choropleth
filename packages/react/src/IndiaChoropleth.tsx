@@ -238,6 +238,15 @@ export function IndiaChoropleth({
   const [activeSelectedId, setActiveSelectedId] = useControllableState(selectedId, defaultSelectedId);
   const [loadedDistricts, setLoadedDistricts] = useState<{ stateId: string; layer: MapLayer } | null>(null);
   const [loadedSubDistricts, setLoadedSubDistricts] = useState<{ districtId: string; layer: MapLayer } | null>(null);
+  /**
+   * Districts the loader has already answered `null` for. The renderer cannot know
+   * which districts are leaves without asking, so the first activation asks — but
+   * after that the region should stop announcing a level it will not open. Held as
+   * state rather than a ref so learning it repaints the label, and cleared when the
+   * loader changes, since a different source may well have sub-districts for them.
+   */
+  const [leafDistrictIds, setLeafDistrictIds] = useState<ReadonlySet<string>>(() => new Set());
+  useEffect(() => { setLeafDistrictIds(new Set()); }, [loadSubDistricts]);
   const [loadedDistrictReferenceOverlay, setLoadedDistrictReferenceOverlay] = useState<{ stateId: string; overlay: ReferenceOverlay | null } | null>(null);
   const [loadingState, setLoadingState] = useState<string | null>(null);
   const [loadingDistrict, setLoadingDistrict] = useState<string | null>(null);
@@ -419,6 +428,7 @@ export function IndiaChoropleth({
         if (!loaded) {
           // This district is a leaf. Step back to the district view and leave it
           // selected, rather than opening a level with nothing in it.
+          setLeafDistrictIds((known) => known.has(activeSubDrillDownId) ? known : new Set(known).add(activeSubDrillDownId));
           setActiveSubDrillDownId(null);
           setActiveSelectedId(sourceDistrict.id);
           onSubDistrictDrillDownChange?.(null, sourceDistrict);
@@ -490,7 +500,7 @@ export function IndiaChoropleth({
     // A district is a leaf unless the host offers a level below it. Whether this
     // particular district actually has one is only known once the loader answers,
     // so the drill is entered optimistically and stepped back out if it returns null.
-    if (level === "district" && loadSubDistricts) {
+    if (level === "district" && loadSubDistricts && !leafDistrictIds.has(region.id)) {
       setActiveSelectedId(null);
       setActiveSubDrillDownId(region.id);
       onSubDistrictDrillDownChange?.(region.id, region);
@@ -678,6 +688,7 @@ export function IndiaChoropleth({
 
   const canDrill = level === "state" ? Boolean(loadDistricts) : level === "district" ? Boolean(loadSubDistricts) : false;
   const drillActionLabel = level === "state" ? "Activate to view districts." : "Activate to view sub-districts.";
+  const regionCanDrill = (id: string) => canDrill && !(level === "district" && leafDistrictIds.has(id));
   const visibleReferenceRegions = level === "state" ? referenceRegions : districtReferenceRegions;
   const mergedReferenceIds = useMemo(() => new Set(referenceOverlayMergeIds), [referenceOverlayMergeIds]);
 
@@ -798,7 +809,7 @@ export function IndiaChoropleth({
           {regions.map((region) => {
             const isInspected = region.id === inspected?.id;
             const isSelected = region.id === selected?.id;
-            const action = canDrill ? drillActionLabel : "Activate to select.";
+            const action = regionCanDrill(region.id) ? drillActionLabel : "Activate to select.";
             const textValue = region.value === null ? "No data" : formatValue(region.value);
             return (
               <path

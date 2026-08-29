@@ -733,6 +733,26 @@ describe("IndiaChoropleth sub-district drill-down", () => {
     expect(onSubDistrictDrillDownChange).toHaveBeenLastCalledWith(null, expect.objectContaining({ id: "D1" }));
   });
 
+  it("stops announcing a level it has learned a district does not have", async () => {
+    const loadSubDistricts = vi.fn(async () => null);
+    new IndiaChoropleth(container, {
+      states: stateLayer,
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts,
+    });
+    const delta = await drillToDistricts();
+    // Before asking, the renderer cannot know, so it offers the level.
+    expect(delta.getAttribute("aria-label")).toMatch(/activate to view sub-districts/i);
+    await vi.waitFor(() => {
+      click(byLabel(container, /delta, 9/i));
+      expect(byLabel(container, /delta, 9/i).getAttribute("aria-label")).toMatch(/activate to select/i);
+    });
+    // And it does not ask again for a district it already knows is a leaf.
+    const asked = loadSubDistricts.mock.calls.length;
+    click(byLabel(container, /delta, 9/i));
+    expect(loadSubDistricts).toHaveBeenCalledTimes(asked);
+  });
+
   it("treats a district as a leaf when no sub-district loader is supplied", async () => {
     new IndiaChoropleth(container, { states: stateLayer, loadDistricts: async () => districtLayer });
     const delta = await drillToDistricts();
