@@ -788,6 +788,21 @@ describe("IndiaChoropleth sub-district drill-down", () => {
     expect(() => byLabel(container, /tehsil one, 6/i)).toThrow();
   });
 
+  it("returns to the national map when drillDown(null) is called from the deepest level", async () => {
+    const instance = new IndiaChoropleth(container, {
+      states: stateLayer,
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts: async () => subDistrictLayer,
+    });
+    click(await drillToDistricts());
+    await vi.waitFor(() => byLabel(container, /tehsil one, 6/i));
+    // drillDown is the state-level control, so null means the national map — not
+    // one step up to the district view.
+    instance.drillDown(null);
+    await vi.waitFor(() => byLabel(container, /alpha, 42/i));
+    expect(() => byLabel(container, /delta, 9/i)).toThrow();
+  });
+
   it("reports the deepest level to inspection and selection callbacks", async () => {
     const onInspect = vi.fn();
     const onSelectedChange = vi.fn();

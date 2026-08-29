@@ -343,10 +343,16 @@ export class IndiaChoropleth {
     this.applyInteractionState();
   }
 
-  /** Drill into a state by id, or pass `null` to return to the state view. */
+  /**
+   * Drill into a state by id, or pass `null` to return to the state view.
+   *
+   * `null` returns to the national map from any depth — this is the state-level
+   * control, not a one-step-up control, so it must not stop at the district view
+   * when a sub-district is open.
+   */
   drillDown(id: string | null) {
     if (id === null) {
-      this.goBack();
+      this.goToStates();
       return;
     }
     const region = this.derived.stateRegions.find((candidate) => candidate.id === id);
