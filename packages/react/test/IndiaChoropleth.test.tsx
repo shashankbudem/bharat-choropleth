@@ -81,6 +81,18 @@ const districtLayer: MapLayer = { ...stateLayer, geometry: { type: "FeatureColle
   { type: "Feature", properties: { code: "D1", name: "Delta", value: 9 }, geometry: { type: "Polygon", coordinates: [[[72, 18], [72.5, 18], [72.5, 19], [72, 19], [72, 18]]] } },
 ] } };
 
+// Two districts, so "changing the state clears the district below it" and "one
+// district is a leaf while its sibling is not" are both expressible.
+const twoDistrictLayer: MapLayer = { ...stateLayer, geometry: { type: "FeatureCollection", features: [
+  { type: "Feature", properties: { code: "D1", name: "Delta", value: 9 }, geometry: { type: "Polygon", coordinates: [[[72, 18], [72.5, 18], [72.5, 19], [72, 19], [72, 18]]] } },
+  { type: "Feature", properties: { code: "D2", name: "Echo", value: 4 }, geometry: { type: "Polygon", coordinates: [[[72.5, 18], [73, 18], [73, 19], [72.5, 19], [72.5, 18]]] } },
+] } };
+
+const subDistrictLayer: MapLayer = { ...stateLayer, geometry: { type: "FeatureCollection", features: [
+  { type: "Feature", properties: { code: "S1", name: "Tehsil One", value: 6 }, geometry: { type: "Polygon", coordinates: [[[72, 18], [72.25, 18], [72.25, 19], [72, 19], [72, 18]]] } },
+  { type: "Feature", properties: { code: "S2", name: "Tehsil Two", value: 3 }, geometry: { type: "Polygon", coordinates: [[[72.25, 18], [72.5, 18], [72.5, 19], [72.25, 19], [72.25, 18]]] } },
+] } };
+
 const referenceOverlay = {
   geometry: { type: "FeatureCollection" as const, features: [
     { type: "Feature" as const, properties: { code: "reference", name: "Reference area" }, geometry: { type: "Polygon" as const, coordinates: [[[71, 17], [71.5, 17], [71.5, 17.5], [71, 17.5], [71, 17]]] } },
@@ -612,5 +624,188 @@ describe("IndiaChoropleth", () => {
     expect(container.querySelectorAll("button.india-choropleth__swatch").length).toBe(0);
     expect(container.querySelectorAll(".india-choropleth__swatch").length).toBe(3);
     expect(container.querySelector(".india-choropleth__swatches")!.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+describe("IndiaChoropleth sub-district drill-down", () => {
+  const drillToDistricts = async () => {
+    fireEvent.click(screen.getByRole("button", { name: /alpha, 42/i }));
+    return screen.findByRole("button", { name: /delta, 9/i });
+  };
+
+  it("loads sub-districts only after a district activation, one level at a time", async () => {
+    const loadSubDistricts = vi.fn(async () => subDistrictLayer);
+    const onSubDistrictDrillDownChange = vi.fn();
+    render(
+      <IndiaChoropleth
+        states={stateLayer}
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={loadSubDistricts}
+        onSubDistrictDrillDownChange={onSubDistrictDrillDownChange}
+      />,
+    );
+    const delta = await drillToDistricts();
+    expect(loadSubDistricts).not.toHaveBeenCalled();
+    fireEvent.click(delta);
+    await waitFor(() => expect(loadSubDistricts).toHaveBeenCalledWith("D1", expect.objectContaining({ label: "Delta" }), "27"));
+    expect(await screen.findByRole("button", { name: /tehsil one, 6/i })).toBeInTheDocument();
+    expect(onSubDistrictDrillDownChange).toHaveBeenCalledWith("D1", expect.objectContaining({ id: "D1" }));
+  });
+
+  it("offers a three-level breadcrumb whose back step goes up one level, not to the top", async () => {
+    render(<IndiaChoropleth states={stateLayer} loadDistricts={async () => districtLayer} loadSubDistricts={async () => subDistrictLayer} />);
+    fireEvent.click(await drillToDistricts());
+    expect(await screen.findByRole("button", { name: /tehsil one, 6/i })).toBeInTheDocument();
+    // At the deepest level both ancestors are reachable and the leaf is current.
+    expect(screen.getByRole("button", { name: "All states" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Alpha" })).toBeInTheDocument();
+    expect(screen.getByText("Delta", { selector: "[aria-current='page']" })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Alpha" }));
+    const delta = await screen.findByRole("button", { name: /delta, 9/i });
+    expect(delta).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /tehsil one, 6/i })).not.toBeInTheDocument();
+    // Still inside Alpha rather than back at the national map.
+    expect(screen.getByText("Alpha", { selector: "[aria-current='page']" })).toBeInTheDocument();
+    await waitFor(() => expect(delta).toHaveFocus());
+  });
+
+  it("returns to the national map in one step from the deepest level", async () => {
+    const onDrillDownChange = vi.fn();
+    render(
+      <IndiaChoropleth
+        states={stateLayer}
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => subDistrictLayer}
+        onDrillDownChange={onDrillDownChange}
+      />,
+    );
+    fireEvent.click(await drillToDistricts());
+    expect(await screen.findByRole("button", { name: /tehsil one, 6/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "All states" }));
+    const alpha = await screen.findByRole("button", { name: /alpha, 42/i });
+    expect(alpha).toBeInTheDocument();
+    expect(onDrillDownChange).toHaveBeenLastCalledWith(null, expect.objectContaining({ id: "27" }));
+    await waitFor(() => expect(alpha).toHaveFocus());
+  });
+
+  it("leaves a district that has no sub-districts as a selected leaf", async () => {
+    const onSubDistrictDrillDownChange = vi.fn();
+    render(
+      <IndiaChoropleth
+        states={stateLayer}
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => null}
+        onSubDistrictDrillDownChange={onSubDistrictDrillDownChange}
+      />,
+    );
+    const delta = await drillToDistricts();
+    fireEvent.click(delta);
+    // Never opens an empty level: the district view stays, with the district selected.
+    await waitFor(() => expect(screen.getByRole("button", { name: /delta, 9/i })).toHaveAttribute("aria-pressed", "true"));
+    expect(screen.getByText("Alpha", { selector: "[aria-current='page']" })).toBeInTheDocument();
+    expect(onSubDistrictDrillDownChange).toHaveBeenLastCalledWith(null, expect.objectContaining({ id: "D1" }));
+  });
+
+  it("treats a district as a leaf when no sub-district loader is supplied", async () => {
+    render(<IndiaChoropleth states={stateLayer} loadDistricts={async () => districtLayer} />);
+    const delta = await drillToDistricts();
+    expect(delta).toHaveAccessibleName(/activate to select/i);
+    fireEvent.click(delta);
+    expect(delta).toHaveAttribute("aria-pressed", "true");
+  });
+
+  it("announces the third level as the action a district offers", async () => {
+    render(<IndiaChoropleth states={stateLayer} loadDistricts={async () => districtLayer} loadSubDistricts={async () => subDistrictLayer} />);
+    expect(await drillToDistricts()).toHaveAccessibleName(/activate to view sub-districts/i);
+  });
+
+  it("drops the district level when the state above it changes", async () => {
+    const loadDistricts = vi.fn(async (stateId: string) => (stateId === "27" ? twoDistrictLayer : districtLayer));
+    const { rerender } = render(
+      <IndiaChoropleth
+        states={stateLayer}
+        drillDownId="27"
+        loadDistricts={loadDistricts}
+        loadSubDistricts={async () => subDistrictLayer}
+      />,
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /echo, 4/i }));
+    expect(await screen.findByRole("button", { name: /tehsil one, 6/i })).toBeInTheDocument();
+    // "D2" means nothing inside Beta, so the level below has to be dropped rather
+    // than carried across.
+    rerender(
+      <IndiaChoropleth
+        states={stateLayer}
+        drillDownId="29"
+        loadDistricts={loadDistricts}
+        loadSubDistricts={async () => subDistrictLayer}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: /delta, 9/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /tehsil one, 6/i })).not.toBeInTheDocument();
+  });
+
+  it("reports the deepest level to inspection and selection callbacks", async () => {
+    const onInspect = vi.fn();
+    const onSelectedChange = vi.fn();
+    render(
+      <IndiaChoropleth
+        states={stateLayer}
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => subDistrictLayer}
+        onInspect={onInspect}
+        onSelectedChange={onSelectedChange}
+      />,
+    );
+    fireEvent.click(await drillToDistricts());
+    const tehsil = await screen.findByRole("button", { name: /tehsil one, 6/i });
+    fireEvent.focus(tehsil);
+    expect(onInspect).toHaveBeenLastCalledWith(expect.objectContaining({ id: "S1" }), "subdistrict");
+    fireEvent.click(tehsil);
+    expect(onSelectedChange).toHaveBeenLastCalledWith(expect.objectContaining({ id: "S1" }), "subdistrict");
+  });
+
+  it("honours an initial district drill-down given alongside an initial state", async () => {
+    render(
+      <IndiaChoropleth
+        states={stateLayer}
+        defaultDrillDownId="27"
+        defaultSubDistrictDrillDownId="D1"
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => subDistrictLayer}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: /tehsil one, 6/i })).toBeInTheDocument();
+  });
+
+  it("reports a sub-district loader failure without losing the back path", async () => {
+    render(
+      <IndiaChoropleth
+        states={stateLayer}
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => { throw new Error("Sub-district service unavailable"); }}
+      />,
+    );
+    fireEvent.click(await drillToDistricts());
+    expect(await screen.findByRole("alert")).toHaveTextContent("Sub-district service unavailable");
+    expect(screen.getByRole("button", { name: "Alpha" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "All states" })).toBeInTheDocument();
+  });
+
+  it("scopes share and rank to the sub-district level it is showing", async () => {
+    const { container } = render(
+      <IndiaChoropleth
+        states={stateLayer}
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => subDistrictLayer}
+      />,
+    );
+    fireEvent.click(await drillToDistricts());
+    const tehsil = await screen.findByRole("button", { name: /tehsil one, 6/i });
+    fireEvent.focus(tehsil);
+    // 6 of (6 + 3), against the sub-districts on screen — not the districts above them.
+    expect(container.querySelector(".india-choropleth__tooltip")).toHaveTextContent("66.7% of total");
+    expect(container.querySelector(".india-choropleth__tooltip")).toHaveTextContent("1st of 2");
   });
 });

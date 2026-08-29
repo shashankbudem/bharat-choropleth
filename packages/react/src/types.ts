@@ -61,8 +61,11 @@ export interface MapRegion {
   feature: MapFeature;
 }
 
+/** The map level a region belongs to. Sub-districts are tehsils / taluks / mandals / blocks. */
+export type MapLevel = "state" | "district" | "subdistrict";
+
 export interface TooltipContext extends MapRegion {
-  level: "state" | "district";
+  level: MapLevel;
   total: number;
   share: number | null;
   /** 1-based position among regions that have a value, highest first. Null when this region has no value. */
@@ -78,6 +81,20 @@ export interface InsightContext extends TooltipContext {
 export type DistrictLoader = (stateId: string, state: MapRegion) => Promise<MapLayer>;
 /** Lazily provides non-statistical context geometry for a selected state's district map. */
 export type DistrictReferenceOverlayLoader = (stateId: string, state: MapRegion) => Promise<ReferenceOverlay | null>;
+/**
+ * Called only after a district is activated, so sub-district geometry can be
+ * code-split the same way districts are.
+ *
+ * Return `null` for a district that has no sub-district level. Not every district
+ * has one — a boundary source can omit them, or hold none that fall inside the
+ * district at all — and a district that returns `null` is left as a leaf: the map
+ * stays on the district view and selects it, rather than opening an empty level.
+ */
+export type SubDistrictLoader = (
+  districtId: string,
+  district: MapRegion,
+  stateId: string,
+) => Promise<MapLayer | null>;
 
 export interface IndiaChoroplethProps {
   /** State/UT layer. The library does not bundle any geographic boundaries. */
@@ -90,6 +107,11 @@ export interface IndiaChoroplethProps {
   /** Called only after a state is requested, so district geometry can be code-split. */
   loadDistricts?: DistrictLoader;
   /**
+   * Called only after a district is activated, enabling a third level. Without it
+   * a district is a leaf and activation only selects it, exactly as before.
+   */
+  loadSubDistricts?: SubDistrictLoader;
+  /**
    * Optional lazy non-statistical context geometry for a district view. It is
    * keyed to the drilled state, cancelled safely on navigation, and rendered
    * only with that state's districts.
@@ -100,17 +122,27 @@ export interface IndiaChoroplethProps {
   /** Initial state drill-down when uncontrolled. */
   defaultDrillDownId?: string | null;
   onDrillDownChange?: (stateId: string | null, state?: MapRegion) => void;
-  /** Controlled selected feature (state ID on national level; district ID when drilled in). */
+  /**
+   * Controlled district drill-down, the level below `drillDownId`. Use null for
+   * the district map. It is only meaningful while a state is drilled into, and is
+   * cleared whenever `drillDownId` changes, since a district id from one state
+   * means nothing in another.
+   */
+  subDistrictDrillDownId?: string | null;
+  /** Initial district drill-down when uncontrolled. */
+  defaultSubDistrictDrillDownId?: string | null;
+  onSubDistrictDrillDownChange?: (districtId: string | null, district?: MapRegion) => void;
+  /** Controlled selected feature: the id of a region at whichever level is showing. */
   selectedId?: string | null;
   defaultSelectedId?: string | null;
   /** Fires with null when a click on open sea clears the selection. */
-  onSelectedChange?: (region: MapRegion | null, level: "state" | "district") => void;
+  onSelectedChange?: (region: MapRegion | null, level: MapLevel) => void;
   /** Fires for hover and keyboard focus with the same shape payload. */
-  onInspect?: (region: MapRegion | null, level: "state" | "district") => void;
+  onInspect?: (region: MapRegion | null, level: MapLevel) => void;
   /** Receives tooltip-ready data, including the current scope total and share. */
   onInsight?: (context: InsightContext | null) => void;
   /** Receives every activation before state drill-down / district selection. */
-  onRegionClick?: (region: MapRegion, level: "state" | "district") => void;
+  onRegionClick?: (region: MapRegion, level: MapLevel) => void;
   /**
    * Called for a click that hit no region and was not close enough to a small
    * one. The component also clears its own uncontrolled selection on such a
@@ -161,6 +193,9 @@ export interface IndiaChoroplethProps {
   /**
    * Like [minPartExtent], but applied only after a state has been drilled into.
    * When omitted, district layers inherit minPartExtent for backward compatibility.
+   *
+   * Sub-district layers inherit this same value rather than taking a knob of their
+   * own: they are drawn at the same zoom as districts and want the same treatment.
    */
   minDistrictPartExtent?: number;
   className?: string;
