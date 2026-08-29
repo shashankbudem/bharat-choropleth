@@ -81,7 +81,7 @@ the two files spell and vintage their districts differently (`Bid`/`Beed`,
 So each sub-district is assigned to the district that physically contains it: its
 largest part's centroid plus sampled boundary vertices nudged inward, each point won by
 the **smallest** containing district, and the district holding the most points becomes
-the parent. That places 5,955 of 5,961 candidate features and resolves post-2011
+the parent. That places 5,955 of 5,960 candidate features and resolves post-2011
 district splits correctly — a sub-district of the old Koriya lands in
 Manendragarh-Chirmiri-Bharatpur because that is where it is.
 
@@ -110,10 +110,10 @@ All recorded in `generated/current-2019-subdistricts/manifest.json`:
   district-outline row each. Dropping them from the join index alone would let their
   geometry fall through to a neighbouring Indian district, so they are excluded
   explicitly — the same treatment the district bundle gives the same two features.
-- **Unnamed frontier remainders** (3 features): rows with no sub-district name, LGD code
-  or Census code, in Punch, Kachchh and Leh — the parts of those districts the source
-  never divides into sub-districts. Their districts' sub-districts consequently do not
-  tile them.
+- **Unnamed frontier remainders** (4 features): rows with no sub-district name, LGD code
+  or Census code — one each in Punch and Kachchh, two in Leh — the parts of those
+  districts the source never divides into sub-districts. Their districts' sub-districts
+  consequently do not tile them.
 - **No containing district** (5 features): Lakshadweep's Bitra, two Mumbai Suburban rows
   with `Subdt_LGD=0`, and two stray West Bengal duplicates mislabelled under South 24
   Parganas.

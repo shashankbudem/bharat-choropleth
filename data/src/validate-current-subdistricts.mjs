@@ -13,6 +13,9 @@ const districtsDir = join(dataDir, "generated", "current-2019-districts", "distr
 const reportPath = join(dataDir, "metadata", "current-2019-subdistricts-validation-report.json");
 const expectedSubDistrictCount = 5950;
 const expectedParentCount = 785;
+// Features in INDIA/INDIAN_SUB_DISTRICTS.geojson at the pinned commit. Every one must
+// end up emitted, merged into a sibling, or named by an exclusion rule.
+const expectedSourceFeatureCount = 5966;
 // Delhi's NAZUL is a land-tenure artifact rather than a district; Rajasthan's urban
 // JAIPUR and JODHPUR are the smaller halves of the source's overlapping urban/rural
 // district pairs, and the Census-2011 sub-district layer predates that split. These
@@ -110,6 +113,23 @@ async function main() {
     }
     const checksum = await sha256(topoPath);
     if (entry.sha256 !== checksum) errors.push(`${parentId}: checksum does not match manifest.`);
+  }
+
+  // Every source feature must be accounted for: emitted, merged into a sibling, or
+  // named by an exclusion rule. Without this the documented rule counts can drift
+  // from what the pipeline actually dropped, silently.
+  const exclusions = manifest.source?.excludedSourceFeatures;
+  const ruleSum = (exclusions?.rules ?? []).reduce((sum, rule) => sum + (rule.count ?? 0), 0);
+  if (ruleSum !== exclusions?.totalCount) {
+    errors.push(`Exclusion rules sum to ${ruleSum} but totalCount is ${exclusions?.totalCount}.`);
+  }
+  const merged = manifest.join?.mergedDuplicateFeatures?.length ?? 0;
+  const accountedFor = allSubDistrictIds.size + merged + (exclusions?.totalCount ?? 0);
+  if (manifest.join?.assignedCount !== allSubDistrictIds.size + merged) {
+    errors.push(`Assigned ${manifest.join?.assignedCount} features but emitted ${allSubDistrictIds.size} plus ${merged} merged.`);
+  }
+  if (accountedFor !== expectedSourceFeatureCount) {
+    errors.push(`Only ${accountedFor} of ${expectedSourceFeatureCount} source features are accounted for (emitted + merged + excluded).`);
   }
 
   const diskFiles = (await readdir(join(generated, "subdistricts"))).filter((file) => file.endsWith(".topo.json"));

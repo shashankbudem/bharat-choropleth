@@ -246,7 +246,12 @@ export function IndiaChoropleth({
    * loader changes, since a different source may well have sub-districts for them.
    */
   const [leafDistrictIds, setLeafDistrictIds] = useState<ReadonlySet<string>>(() => new Set());
-  useEffect(() => { setLeafDistrictIds(new Set()); }, [loadSubDistricts]);
+  const priorSubDistrictLoader = useRef(loadSubDistricts);
+  useEffect(() => {
+    if (priorSubDistrictLoader.current === loadSubDistricts) return;
+    priorSubDistrictLoader.current = loadSubDistricts;
+    setLeafDistrictIds(new Set());
+  }, [loadSubDistricts]);
   const [loadedDistrictReferenceOverlay, setLoadedDistrictReferenceOverlay] = useState<{ stateId: string; overlay: ReferenceOverlay | null } | null>(null);
   const [loadingState, setLoadingState] = useState<string | null>(null);
   const [loadingDistrict, setLoadingDistrict] = useState<string | null>(null);

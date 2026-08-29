@@ -367,6 +367,10 @@ export class IndiaChoropleth {
    * Drill into a district by id, or pass `null` to return to the district view.
    * Only meaningful while a state is drilled into; the id must be one of that
    * state's districts, which means its layer has to have loaded first.
+   *
+   * Unlike an activation, this deliberately ignores the leaf memo and asks the
+   * loader again: an explicit imperative call is the host saying "ask now", which
+   * is also the only way to recheck a district whose data has since arrived.
    */
   drillDownSubDistrict(id: string | null) {
     if (id === null) {

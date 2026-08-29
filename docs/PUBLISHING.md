@@ -79,6 +79,35 @@ uv run --isolated --with twine twine upload dist/*
 
 Create a PyPI account and use a trusted publisher or an account-scoped upload token outside this repository. The upload action is irreversible for a given version: update `pyproject.toml` before attempting a subsequent release.
 
+## Boundary data must ship with the tag
+
+`packages/js` defaults `dataBaseUrl` to a jsDelivr copy of this repository's
+`data/generated` **at a pinned release tag** (`DEFAULT_DATA_BASE_URL` in
+`packages/js/src/data-source.ts`). The zero-config `BharatChoropleth` fetches every
+level from there, so a release is only complete when the tag it points at actually
+contains the generated bundles:
+
+| Bundle | Needed for |
+| --- | --- |
+| `data/generated/current-2019-states/` | The initial country map |
+| `data/generated/current-2019-districts/` | State drill-down |
+| `data/generated/current-2019-subdistricts/` | District drill-down into sub-districts |
+
+Before tagging, bump `DEFAULT_DATA_BASE_URL` to the tag you are about to create, and
+confirm each directory is committed at that commit. A branch ref is not an
+alternative: jsDelivr caches it for hours, so a data change would silently alter
+every consumer's map at a time nobody chose.
+
+A missing sub-district directory fails **silently** rather than loudly. The loader
+treats a 404 as "this district has no sub-district level" — which is a real case for
+three districts — so a wholly absent bundle looks exactly like every district being a
+leaf: no console error, no status message, drill-down just quietly stops one level
+short. Verify by fetching one file from the tag before announcing the release:
+
+```bash
+curl -sI "https://cdn.jsdelivr.net/gh/shashankbudem/bharat-choropleth@vX.Y.Z/data/generated/current-2019-subdistricts/subdistricts/in-cd-27-398.topo.json" | head -1
+```
+
 ## After publishing
 
 1. Confirm the exact published versions on npm, pub.dev, and PyPI as applicable.
