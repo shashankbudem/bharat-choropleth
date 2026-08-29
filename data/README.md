@@ -63,11 +63,32 @@ To regenerate, run `npm run prepare:current-districts` followed by `npm run impo
 level: **5,950** sub-districts (tehsil / taluk / mandal / block) across **785** of the
 788 current districts, from the same source and commit
 (`INDIA/INDIAN_SUB_DISTRICTS.geojson`). It is lazy-loaded per district — the largest
-single file is 22.8 KB — and IDs use their own `in-csd-` namespace:
+single file is 37.6 KB — and IDs use their own `in-csd-` namespace:
 
 ```text
 sub-district: in-csd-{source D_CODE of the parent district}-{Subdt_LGD, or c{sdtcode11} where the source has no LGD code}
 ```
+
+### Quantised, deliberately not simplified
+
+Unlike the state and district bundles, this one applies **no simplification**. Those
+sources are heavy — around 2,160 vertices per district — so retaining 5% of their
+vertices still leaves a recognisable district. This source is a different animal: a
+median of 70 vertices per sub-district, and sub-districts are drawn at a tighter zoom
+than districts, so they need at least as much detail, not less.
+
+Running the district pipeline's 5%-retention step over it reduced the average feature
+to 9 vertices and **2,793 of 5,950 features to bare quadrilaterals** — blobs in roughly
+the right place rather than places. The bundle now keeps 98.8% of the source's 475,256
+vertices (a mean of 80 per feature), costing 6.5 MB raw / 2.3 MB gzip across all 785
+files, which is 2× the simplified size for geometry that actually reads as itself.
+
+Interior rings are preserved too: 45 sub-districts enclose 52 holes between them, and
+filling those in would swallow enclaves that are genuinely not part of the sub-district.
+
+`validate:current-subdistricts` guards this directly, with a floor on total vertices and
+a cap on how many features may be near-degenerate. Nothing else would notice: counts,
+ids, checksums and bounds all stay valid while shapes degrade.
 
 ### The parent is decided by geometry, not by a key or a name
 

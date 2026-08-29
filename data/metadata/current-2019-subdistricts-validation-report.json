@@ -1,5 +1,5 @@
 {
-  "validatedAt": "2026-08-29T09:49:21.057Z",
+  "validatedAt": "2026-08-29T09:59:22.996Z",
   "result": "pass",
   "counts": {
     "districts": 788,
@@ -8,9 +8,15 @@
     "districtsWithoutSubDistricts": 3
   },
   "bytes": {
-    "totalTopojson": 3725882,
-    "totalTopojsonGzip": 1058727,
-    "largestAsset": 22795
+    "totalTopojson": 6829701,
+    "totalTopojsonGzip": 2340372,
+    "largestAsset": 37624
+  },
+  "geometry": {
+    "totalVertices": 475256,
+    "meanVerticesPerFeature": 80,
+    "featuresAtOrBelow8Vertices": 24,
+    "simplified": false
   },
   "join": {
     "assigned": 5955,

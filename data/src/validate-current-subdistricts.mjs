@@ -16,6 +16,18 @@ const expectedParentCount = 785;
 // Features in INDIA/INDIAN_SUB_DISTRICTS.geojson at the pinned commit. Every one must
 // end up emitted, merged into a sibling, or named by an exclusion rule.
 const expectedSourceFeatureCount = 5966;
+// The source carries 475,256 vertices across the features that ship. This floor sits
+// just under that, and exists because nothing else here would notice geometry being
+// simplified away: counts, ids, checksums and bounds all stay valid while the shapes
+// degrade into blobs. An earlier revision of the prepare script reused the district
+// bundle's 5%-retention step — correct for a source with ~2,160 vertices per district,
+// ruinous for one with ~70 per sub-district — and reduced 2,793 features to bare
+// quadrilaterals without tripping a single check.
+const MIN_TOTAL_VERTICES = 450_000;
+// Individual features that small are legitimate — the source itself has some — but a
+// large jump means simplification crept back in.
+const MAX_DEGENERATE_FEATURES = 60;
+const DEGENERATE_VERTEX_COUNT = 8;
 // Delhi's NAZUL is a land-tenure artifact rather than a district; Rajasthan's urban
 // JAIPUR and JODHPUR are the smaller halves of the source's overlapping urban/rural
 // district pairs, and the Census-2011 sub-district layer predates that split. These
@@ -84,6 +96,15 @@ async function main() {
   const entries = Object.entries(manifest.assets.subDistricts);
   const allSubDistrictIds = new Set();
   const perDistrict = {};
+  let totalVertices = 0;
+  let degenerateFeatures = 0;
+
+  const countVertices = (geometry) => {
+    const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates ?? [];
+    let total = 0;
+    for (const polygon of polygons) for (const ring of polygon) total += ring.length;
+    return total;
+  };
 
   for (const [parentId, entry] of entries) {
     if (!parentId.startsWith("in-cd-")) errors.push(`Sub-district asset key is not a current-district id: ${parentId}.`);
@@ -109,6 +130,9 @@ async function main() {
       allSubDistrictIds.add(id);
       const sphericalArea = geoArea(item);
       if (sphericalArea > 1) errors.push(`sub-district ${id}: implausibly large spherical area (${sphericalArea}); likely inverted ring winding.`);
+      const vertices = countVertices(item.geometry);
+      totalVertices += vertices;
+      if (vertices <= DEGENERATE_VERTEX_COUNT) degenerateFeatures += 1;
       validateGeometry(item.geometry, `sub-district ${id}`, errors);
     }
     const checksum = await sha256(topoPath);
@@ -130,6 +154,18 @@ async function main() {
   }
   if (accountedFor !== expectedSourceFeatureCount) {
     errors.push(`Only ${accountedFor} of ${expectedSourceFeatureCount} source features are accounted for (emitted + merged + excluded).`);
+  }
+
+  // Shape fidelity. See MIN_TOTAL_VERTICES — this is the only check that can see
+  // the difference between a sub-district and a quadrilateral standing in for one.
+  if (totalVertices < MIN_TOTAL_VERTICES) {
+    errors.push(`Bundle holds ${totalVertices} vertices, under the ${MIN_TOTAL_VERTICES} floor; geometry has been simplified away.`);
+  }
+  if (degenerateFeatures > MAX_DEGENERATE_FEATURES) {
+    errors.push(`${degenerateFeatures} features have ${DEGENERATE_VERTEX_COUNT} or fewer vertices, over the ${MAX_DEGENERATE_FEATURES} allowed.`);
+  }
+  if (manifest.transformation?.simplified !== false) {
+    errors.push("manifest.transformation.simplified must be false; this bundle is quantised but deliberately not simplified.");
   }
 
   const diskFiles = (await readdir(join(generated, "subdistricts"))).filter((file) => file.endsWith(".topo.json"));
@@ -190,6 +226,12 @@ async function main() {
       totalTopojson: totalBytes.reduce((sum, value) => sum + value, 0),
       totalTopojsonGzip: totalGzipBytes.reduce((sum, value) => sum + value, 0),
       largestAsset: largest,
+    },
+    geometry: {
+      totalVertices,
+      meanVerticesPerFeature: Math.round(totalVertices / Math.max(1, allSubDistrictIds.size)),
+      featuresAtOrBelow8Vertices: degenerateFeatures,
+      simplified: manifest.transformation?.simplified ?? null,
     },
     join: {
       assigned: manifest.join?.assignedCount ?? null,

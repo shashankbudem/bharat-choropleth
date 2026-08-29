@@ -3,8 +3,6 @@ import { createHash } from "node:crypto";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { topology } from "topojson-server";
-import { feature as topoFeature } from "topojson-client";
-import { presimplify, simplify } from "topojson-simplify";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = resolve(here, "..");
@@ -106,7 +104,16 @@ function ringArea(ring) {
   }, 0) / 2;
 }
 
-function cleanExteriorRing(ring) {
+// Fine enough that quantisation is below the source's own coordinate precision:
+// over a single district's extent this is roughly a ten-metre grid.
+const QUANTIZATION = 20000;
+
+/**
+ * Drop consecutive duplicate points, close the ring, and reject anything that is
+ * not a real polygon. Winding is normalised so exteriors and holes are opposites:
+ * exteriors negative-area (clockwise in this coordinate order), holes positive.
+ */
+function cleanRing(ring, { hole = false } = {}) {
   const deduplicated = ring.reduce((points, point) => {
     const prior = points.at(-1);
     if (!prior || prior[0] !== point[0] || prior[1] !== point[1]) points.push(point);
@@ -116,61 +123,52 @@ function cleanExteriorRing(ring) {
   const last = deduplicated.at(-1);
   if (first && (first[0] !== last[0] || first[1] !== last[1])) deduplicated.push([...first]);
   if (new Set(deduplicated.slice(0, -1).map((point) => point.join(","))).size < 3) return null;
-  if (Math.abs(ringArea(deduplicated)) < 1e-8) return null;
-  return ringArea(deduplicated) > 0 ? deduplicated.reverse() : deduplicated;
+  const area = ringArea(deduplicated);
+  if (Math.abs(area) < 1e-12) return null;
+  const wantsPositive = hole;
+  return (area > 0) === wantsPositive ? deduplicated : deduplicated.reverse();
 }
 
-function cleanSimplifiedGeometry(geometry) {
-  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates;
+/**
+ * Clean a source geometry without discarding anything that carries shape.
+ *
+ * Unlike the district pipeline's equivalent, this keeps interior rings. 45
+ * sub-districts enclose 54 holes between them, and dropping them would fill in
+ * enclaves that are genuinely not part of the sub-district.
+ */
+function cleanGeometry(geometry) {
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates ?? [];
   const cleaned = polygons
     .map((polygon) => {
-      const exterior = cleanExteriorRing(polygon[0]);
-      return exterior ? [exterior] : null;
+      const exterior = cleanRing(polygon[0] ?? [], { hole: false });
+      if (!exterior) return null;
+      const holes = polygon.slice(1)
+        .map((ring) => cleanRing(ring, { hole: true }))
+        .filter(Boolean);
+      return [exterior, ...holes];
     })
     .filter(Boolean);
   return { type: "MultiPolygon", coordinates: cleaned };
 }
 
-function totalRingArea(geometry) {
-  if (!geometry) return 0;
-  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates ?? [];
-  return polygons.reduce((total, polygon) => total + Math.abs(ringArea(polygon[0] ?? [])), 0);
-}
-
-/** Same guard as the district bundle: never simplify a feature into a speck. */
-const MIN_RETAINED_AREA_SHARE = 0.5;
-
-function optimizedTopology(objects, retainedVertexShare) {
-  const raw = topology(objects, 20000);
-  const weighted = presimplify(raw);
-  const finiteWeights = weighted.arcs
-    .flat()
-    .map((point) => point[2])
-    .filter(Number.isFinite)
-    .sort((a, b) => a - b);
-  const threshold = finiteWeights[Math.max(0, Math.floor(finiteWeights.length * (1 - retainedVertexShare)) - 1)] || 0;
-  const simplified = simplify(weighted, threshold);
+/**
+ * Quantise, but do not simplify.
+ *
+ * The district bundle simplifies hard because its source carries ~2,160 vertices
+ * per district. This source is a different animal: a median of 70 vertices per
+ * sub-district, and they are drawn at a tighter zoom than districts are. Putting
+ * the district pipeline's 5%-retention step on top of that reduced the average
+ * feature to 9 vertices and 2,793 of them to bare quadrilaterals — recognisable
+ * as blobs, not as places. Quantisation alone still gives TopoJSON's compact
+ * delta encoding, at a grid finer than the geometry's own precision.
+ */
+function quantizedTopology(objects) {
   const objectName = Object.keys(objects)[0];
-
-  const unsimplifiedById = new Map(
-    (() => {
-      const unpacked = topoFeature(raw, raw.objects[objectName]);
-      return (unpacked.type === "FeatureCollection" ? unpacked.features : [unpacked])
-        .map((feature) => [feature.properties.id, feature.geometry]);
-    })(),
+  const collection = objects[objectName];
+  const cleaned = featureCollection(
+    collection.features.map((feature) => ({ ...feature, geometry: cleanGeometry(feature.geometry) })),
   );
-
-  const unpacked = topoFeature(simplified, simplified.objects[objectName]);
-  const features = (unpacked.type === "FeatureCollection" ? unpacked.features : [unpacked]).map((feature) => {
-    let geometry = cleanSimplifiedGeometry(feature.geometry);
-    const original = unsimplifiedById.get(feature.properties.id);
-    const originalArea = totalRingArea(original);
-    if (originalArea > 0 && totalRingArea(geometry) < originalArea * MIN_RETAINED_AREA_SHARE) {
-      geometry = cleanSimplifiedGeometry(original);
-    }
-    return { ...feature, geometry };
-  });
-  return topology({ [objectName]: featureCollection(features) }, 20000);
+  return topology({ [objectName]: cleaned }, QUANTIZATION);
 }
 
 /* ------------------------------------------------------------------ *
@@ -536,9 +534,10 @@ async function main() {
       districtsWithoutSubDistricts,
     },
     transformation: {
-      method: "Per-district topojson-server topology → topology-preserving simplification → degenerate-ring removal and exterior-winding cleanup → final topology output",
-      quantization: 20000,
-      retainedVertexShare: 0.05,
+      method: "Per-district topojson-server topology at the quantisation below, with degenerate-ring removal and winding normalisation. Deliberately not simplified.",
+      quantization: QUANTIZATION,
+      simplified: false,
+      simplificationNote: "The district bundle simplifies because its source carries ~2,160 vertices per district. This source has a median of 70 vertices per sub-district and is drawn at a tighter zoom, so simplifying it costs shape without buying meaningful size. Interior rings are preserved: 45 sub-districts enclose 54 holes.",
     },
     identity: {
       subDistrict: "in-csd-{source D_CODE of the parent district}-{Subdt_LGD, or c{sdtcode11} where the source has no LGD code}",
@@ -551,7 +550,7 @@ async function main() {
   for (const [parentId, unsortedChildren] of [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     const children = unsortedChildren.sort((a, b) => a.id.localeCompare(b.id));
     const topojsonPath = join(subDistrictDir, `${parentId}.topo.json`);
-    await writeJson(topojsonPath, optimizedTopology({ subdistricts: featureCollection(children) }, 0.05));
+    await writeJson(topojsonPath, quantizedTopology({ subdistricts: featureCollection(children) }));
     manifest.assets.subDistricts[parentId] = {
       topojson: `subdistricts/${parentId}.topo.json`,
       featureCount: children.length,
