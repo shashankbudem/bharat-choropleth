@@ -36,6 +36,17 @@ const districtLayer: MapLayer = { ...stateLayer, geometry: { type: "FeatureColle
   { type: "Feature", properties: { code: "D1", name: "Delta", value: 9 }, geometry: { type: "Polygon", coordinates: [[[72, 18], [72.5, 18], [72.5, 19], [72, 19], [72, 18]]] } },
 ] } };
 
+// Two districts, so "changing the state clears the district below it" is expressible.
+const twoDistrictLayer: MapLayer = { ...stateLayer, geometry: { type: "FeatureCollection", features: [
+  { type: "Feature", properties: { code: "D1", name: "Delta", value: 9 }, geometry: { type: "Polygon", coordinates: [[[72, 18], [72.5, 18], [72.5, 19], [72, 19], [72, 18]]] } },
+  { type: "Feature", properties: { code: "D2", name: "Echo", value: 4 }, geometry: { type: "Polygon", coordinates: [[[72.5, 18], [73, 18], [73, 19], [72.5, 19], [72.5, 18]]] } },
+] } };
+
+const subDistrictLayer: MapLayer = { ...stateLayer, geometry: { type: "FeatureCollection", features: [
+  { type: "Feature", properties: { code: "S1", name: "Tehsil One", value: 6 }, geometry: { type: "Polygon", coordinates: [[[72, 18], [72.25, 18], [72.25, 19], [72, 19], [72, 18]]] } },
+  { type: "Feature", properties: { code: "S2", name: "Tehsil Two", value: 3 }, geometry: { type: "Polygon", coordinates: [[[72.25, 18], [72.5, 18], [72.5, 19], [72.25, 19], [72.25, 18]]] } },
+] } };
+
 const referenceOverlay = {
   geometry: { type: "FeatureCollection" as const, features: [
     { type: "Feature" as const, properties: { code: "reference", name: "Reference area" }, geometry: { type: "Polygon" as const, coordinates: [[[71, 17], [71.5, 17], [71.5, 17.5], [71, 17.5], [71, 17]]] } },
@@ -631,5 +642,201 @@ describe("IndiaChoropleth (plain JS)", () => {
     expect(container.querySelectorAll("button.india-choropleth__swatch").length).toBe(0);
     expect(container.querySelectorAll(".india-choropleth__swatch").length).toBe(3);
     expect(container.querySelector(".india-choropleth__swatches")!.getAttribute("aria-hidden")).toBe("true");
+  });
+});
+
+describe("IndiaChoropleth sub-district drill-down", () => {
+  let container: HTMLElement;
+
+  beforeEach(() => {
+    container = document.createElement("div");
+    document.body.appendChild(container);
+  });
+
+  afterEach(() => {
+    container.remove();
+  });
+
+  const click = (node: Element) => node.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+  const breadcrumbSteps = () => [...container.querySelectorAll<HTMLElement>(".india-choropleth__back")].map((node) => node.textContent);
+  const currentStep = () => container.querySelector("[aria-current='page']")?.textContent ?? null;
+  const drillToDistricts = async () => {
+    click(byLabel(container, /alpha, 42/i));
+    await vi.waitFor(() => byLabel(container, /delta, 9/i));
+    return byLabel(container, /delta, 9/i);
+  };
+
+  it("loads sub-districts only after a district activation, one level at a time", async () => {
+    const loadSubDistricts = vi.fn(async () => subDistrictLayer);
+    const onSubDistrictDrillDownChange = vi.fn();
+    new IndiaChoropleth(container, {
+      states: stateLayer,
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts,
+      onSubDistrictDrillDownChange,
+    });
+    const delta = await drillToDistricts();
+    expect(loadSubDistricts).not.toHaveBeenCalled();
+    click(delta);
+    await vi.waitFor(() => expect(loadSubDistricts).toHaveBeenCalledWith("D1", expect.objectContaining({ label: "Delta" }), "27"));
+    await vi.waitFor(() => byLabel(container, /tehsil one, 6/i));
+    expect(onSubDistrictDrillDownChange).toHaveBeenCalledWith("D1", expect.objectContaining({ id: "D1" }));
+  });
+
+  it("offers a three-level breadcrumb whose back step goes up one level, not to the top", async () => {
+    new IndiaChoropleth(container, {
+      states: stateLayer,
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts: async () => subDistrictLayer,
+    });
+    click(await drillToDistricts());
+    await vi.waitFor(() => byLabel(container, /tehsil one, 6/i));
+    expect(breadcrumbSteps()).toEqual(["All states", "Alpha"]);
+    expect(currentStep()).toBe("Delta");
+
+    click(container.querySelectorAll(".india-choropleth__back")[1]);
+    await vi.waitFor(() => byLabel(container, /delta, 9/i));
+    // Still inside Alpha rather than back at the national map.
+    expect(currentStep()).toBe("Alpha");
+    expect(() => byLabel(container, /tehsil one, 6/i)).toThrow();
+    await vi.waitFor(() => expect(document.activeElement).toBe(byLabel(container, /delta, 9/i)));
+  });
+
+  it("returns to the national map in one step from the deepest level", async () => {
+    const onDrillDownChange = vi.fn();
+    new IndiaChoropleth(container, {
+      states: stateLayer,
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts: async () => subDistrictLayer,
+      onDrillDownChange,
+    });
+    click(await drillToDistricts());
+    await vi.waitFor(() => byLabel(container, /tehsil one, 6/i));
+    click(container.querySelector(".india-choropleth__back")!);
+    await vi.waitFor(() => byLabel(container, /alpha, 42/i));
+    expect(onDrillDownChange).toHaveBeenLastCalledWith(null, expect.objectContaining({ id: "27" }));
+    await vi.waitFor(() => expect(document.activeElement).toBe(byLabel(container, /alpha, 42/i)));
+  });
+
+  it("leaves a district that has no sub-districts as a selected leaf", async () => {
+    const onSubDistrictDrillDownChange = vi.fn();
+    new IndiaChoropleth(container, {
+      states: stateLayer,
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts: async () => null,
+      onSubDistrictDrillDownChange,
+    });
+    click(await drillToDistricts());
+    // Never opens an empty level: the district view stays, with the district selected.
+    await vi.waitFor(() => expect(byLabel(container, /delta, 9/i).getAttribute("aria-pressed")).toBe("true"));
+    expect(currentStep()).toBe("Alpha");
+    expect(onSubDistrictDrillDownChange).toHaveBeenLastCalledWith(null, expect.objectContaining({ id: "D1" }));
+  });
+
+  it("treats a district as a leaf when no sub-district loader is supplied", async () => {
+    new IndiaChoropleth(container, { states: stateLayer, loadDistricts: async () => districtLayer });
+    const delta = await drillToDistricts();
+    expect(delta.getAttribute("aria-label")).toMatch(/activate to select/i);
+    click(delta);
+    expect(byLabel(container, /delta, 9/i).getAttribute("aria-pressed")).toBe("true");
+  });
+
+  it("announces the third level as the action a district offers", async () => {
+    new IndiaChoropleth(container, {
+      states: stateLayer,
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts: async () => subDistrictLayer,
+    });
+    expect((await drillToDistricts()).getAttribute("aria-label")).toMatch(/activate to view sub-districts/i);
+  });
+
+  it("drops the district level when the state above it changes", async () => {
+    const loadDistricts = vi.fn(async (stateId: string) => (stateId === "27" ? twoDistrictLayer : districtLayer));
+    const instance = new IndiaChoropleth(container, {
+      states: stateLayer,
+      drillDownId: "27",
+      loadDistricts,
+      loadSubDistricts: async () => subDistrictLayer,
+    });
+    await vi.waitFor(() => byLabel(container, /echo, 4/i));
+    click(byLabel(container, /echo, 4/i));
+    await vi.waitFor(() => byLabel(container, /tehsil one, 6/i));
+    // "D2" means nothing inside Beta, so the level below has to be dropped rather
+    // than carried across.
+    instance.update({ drillDownId: "29" });
+    await vi.waitFor(() => byLabel(container, /delta, 9/i));
+    expect(() => byLabel(container, /tehsil one, 6/i)).toThrow();
+  });
+
+  it("reports the deepest level to inspection and selection callbacks", async () => {
+    const onInspect = vi.fn();
+    const onSelectedChange = vi.fn();
+    new IndiaChoropleth(container, {
+      states: stateLayer,
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts: async () => subDistrictLayer,
+      onInspect,
+      onSelectedChange,
+    });
+    click(await drillToDistricts());
+    await vi.waitFor(() => byLabel(container, /tehsil one, 6/i));
+    const tehsil = byLabel(container, /tehsil one, 6/i);
+    tehsil.dispatchEvent(new FocusEvent("focus", { bubbles: true }));
+    expect(onInspect).toHaveBeenLastCalledWith(expect.objectContaining({ id: "S1" }), "subdistrict");
+    click(tehsil);
+    expect(onSelectedChange).toHaveBeenLastCalledWith(expect.objectContaining({ id: "S1" }), "subdistrict");
+  });
+
+  it("reports a sub-district loader failure without losing the back path", async () => {
+    new IndiaChoropleth(container, {
+      states: stateLayer,
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts: async () => { throw new Error("Sub-district service unavailable"); },
+    });
+    click(await drillToDistricts());
+    await vi.waitFor(() => {
+      const alert = container.querySelector("[role='alert']");
+      expect(alert?.textContent).toBe("Sub-district service unavailable");
+    });
+    expect(breadcrumbSteps()).toEqual(["All states", "Alpha"]);
+  });
+
+  it("scopes share and rank to the sub-district level it is showing", async () => {
+    new IndiaChoropleth(container, {
+      states: stateLayer,
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts: async () => subDistrictLayer,
+    });
+    click(await drillToDistricts());
+    await vi.waitFor(() => byLabel(container, /tehsil one, 6/i));
+    byLabel(container, /tehsil one, 6/i).dispatchEvent(new FocusEvent("focus", { bubbles: true }));
+    // 6 of (6 + 3), against the sub-districts on screen — not the districts above them.
+    expect(tooltipText(container)).toContain("66.7% of total");
+    expect(tooltipText(container)).toContain("1st of 2");
+  });
+
+  it("honours an initial district drill-down given alongside an initial state", async () => {
+    new IndiaChoropleth(container, {
+      states: stateLayer,
+      defaultDrillDownId: "27",
+      defaultSubDistrictDrillDownId: "D1",
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts: async () => subDistrictLayer,
+    });
+    await vi.waitFor(() => byLabel(container, /tehsil one, 6/i));
+  });
+
+  it("drills into a district through the public API", async () => {
+    const instance = new IndiaChoropleth(container, {
+      states: stateLayer,
+      drillDownId: "27",
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts: async () => subDistrictLayer,
+    });
+    await vi.waitFor(() => byLabel(container, /delta, 9/i));
+    instance.drillDownSubDistrict("D1");
+    await vi.waitFor(() => byLabel(container, /tehsil one, 6/i));
+    instance.drillDownSubDistrict(null);
+    await vi.waitFor(() => byLabel(container, /delta, 9/i));
   });
 });
