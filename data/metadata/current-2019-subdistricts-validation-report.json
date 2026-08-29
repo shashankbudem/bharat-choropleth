@@ -1,0 +1,25 @@
+{
+  "validatedAt": "2026-08-29T09:23:37.433Z",
+  "result": "pass",
+  "counts": {
+    "districts": 788,
+    "subDistrictParents": 785,
+    "subDistricts": 5950,
+    "districtsWithoutSubDistricts": 3
+  },
+  "bytes": {
+    "totalTopojson": 3725882,
+    "totalTopojsonGzip": 1058727,
+    "largestAsset": 22795
+  },
+  "join": {
+    "assigned": 5955,
+    "lowConfidence": 106,
+    "districtsWithoutSubDistricts": [
+      "in-cd-07-169",
+      "in-cd-08-569",
+      "in-cd-08-575"
+    ]
+  },
+  "errors": []
+}

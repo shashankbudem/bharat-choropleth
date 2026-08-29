@@ -13,8 +13,10 @@
     "prepare:current-districts": "node src/prepare-current-districts.mjs",
     "import:map-studio-lakshadweep": "node src/import-map-studio-lakshadweep.mjs",
     "validate:current-districts": "node src/validate-current-districts.mjs",
-    "validate": "node src/validate-boundaries.mjs && node src/validate-datameet-claim-outline.mjs && node src/validate-current-states.mjs && node src/validate-current-districts.mjs",
-    "build": "npm run generate:census && npm run prepare:claim-outline && npm run prepare:current-states && npm run prepare:current-districts && npm run import:map-studio-lakshadweep && npm run validate"
+    "validate": "node src/validate-boundaries.mjs && node src/validate-datameet-claim-outline.mjs && node src/validate-current-states.mjs && node src/validate-current-districts.mjs && node src/validate-current-subdistricts.mjs",
+    "build": "npm run generate:census && npm run prepare:claim-outline && npm run prepare:current-states && npm run prepare:current-districts && npm run prepare:current-subdistricts && npm run import:map-studio-lakshadweep && npm run validate",
+    "prepare:current-subdistricts": "node src/prepare-current-subdistricts.mjs",
+    "validate:current-subdistricts": "node src/validate-current-subdistricts.mjs"
   },
   "dependencies": {
     "d3-geo": "^3.1.1",
