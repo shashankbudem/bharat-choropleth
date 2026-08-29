@@ -694,7 +694,7 @@ describe("IndiaChoropleth sub-district drill-down", () => {
     expect(breadcrumbSteps()).toEqual(["All states", "Alpha"]);
     expect(currentStep()).toBe("Delta");
 
-    click(container.querySelectorAll(".india-choropleth__back")[1]);
+    click(container.querySelectorAll(".india-choropleth__back")[1]!);
     await vi.waitFor(() => byLabel(container, /delta, 9/i));
     // Still inside Alpha rather than back at the national map.
     expect(currentStep()).toBe("Alpha");
