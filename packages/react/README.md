@@ -2,7 +2,8 @@
 
 An accessible React SVG choropleth for India state and district dashboards.
 It renders a supplied state layer, supports keyboard and pointer inspection,
-and can lazy-load district layers when a user selects a state.
+and can lazy-load district layers when a user selects a state, then sub-district
+layers when a user selects a district.
 
 ## Install
 
@@ -55,6 +56,39 @@ selected stable state ID and returns another `MapLayer`:
   }}
 />
 ```
+
+Add `loadSubDistricts` for a third level below districts. It receives the district
+ID, the district region, and the state ID it sits in:
+
+```tsx
+<IndiaChoropleth
+  states={states}
+  loadDistricts={loadDistricts}
+  loadSubDistricts={async (districtId) => {
+    const topology = await import(`./subdistricts/${districtId}.topo.json`);
+    return {
+      geometry: { topology: topology.default, object: "subdistricts" },
+      getId: (feature) => String(feature.properties?.id),
+      getLabel: (feature) => String(feature.properties?.name),
+      getValue: (feature) => subDistrictValues[String(feature.properties?.id)] ?? null,
+    };
+  }}
+/>
+```
+
+Return `null` for a district that has no sub-district level. Not every district has
+one, and a district that returns `null` is left as a leaf — the map stays on the
+district view and selects it, rather than opening a level with nothing in it. Once a
+district has answered `null` it stops offering the level and is not asked again.
+
+Without `loadSubDistricts`, a district is a leaf and activation only selects it,
+exactly as before.
+
+The breadcrumb gains a third segment. Its back step goes up exactly one level;
+"All states" is the one-step return to the national map. Controlled usage adds
+`subDistrictDrillDownId` / `onSubDistrictDrillDownChange`, with
+`defaultSubDistrictDrillDownId` as the uncontrolled path — and because a district ID
+means nothing outside the state it came from, changing `drillDownId` clears it.
 
 ## Features
 

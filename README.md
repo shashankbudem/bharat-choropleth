@@ -2,7 +2,7 @@
 
 `bharat-choropleth` is an open-source React renderer for accessible India state-to-district choropleths, with a framework-free `bharat-choropleth-js` port for non-React use — same behavior, same CSS, either an ES module or a single `<script>` tag. A native `bharat_choropleth` Flutter package provides the same map interaction without a WebView, and the Python `bharat_choropleth` package produces static SVG or optional Matplotlib output. This workspace also includes a separately documented, historical Census-2011 state/UT-to-district boundary bundle for the reference implementation.
 
-The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, then loads a selected state's district layer on demand. It follows the approved Atlas UX: hover/focus inspection, activation/drill-down, a breadcrumb return, optional legend and host-owned insight content. The legend also filters — picking a swatch highlights the regions painted in it and dulls the rest, picked again or Escape to clear.
+The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, then loads a selected state's district layer on demand — and, below that, a selected district's sub-districts (tehsils / taluks / mandals / blocks). It follows the approved Atlas UX: hover/focus inspection, activation/drill-down, a breadcrumb return, optional legend and host-owned insight content. The legend also filters — picking a swatch highlights the regions painted in it and dulls the rest, picked again or Escape to clear.
 
 ![Bharat Choropleth current 2019-boundary dashboard](./previews/country-full-claimed-outline-desktop.png)
 
@@ -15,6 +15,8 @@ The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, the
 ### District drill-down
 
 ![Maharashtra district choropleth drill-down using the current 2019 boundaries](./previews/maharashtra-districts-desktop.png)
+
+Activating a district goes one level further, into its sub-districts — see [Sub-district drill-down](#sub-district-drill-down).
 
 ### Responsive layout
 
@@ -85,14 +87,14 @@ The code and boundary data have different licences. The React renderer is MIT li
 
 An optional political-claim context overlay is a separate contemporary DataMeet state-derived asset, attributed under DataMeet’s CC BY 4.0 repository terms and checked against the [Survey of India political-map depiction](https://surveyofindia.gov.in/pages/political-map-of-india). It is a non-statistical reference layer—not Survey of India geometry, not a statement of administrative control, and not an input to any metric or total. The package does not reproduce or redistribute Survey of India geometry; see [the boundary-source note](./data/official-outline.md).
 
-An optional current-vintage state/UT and district bundle (`data/generated/current-2019-states/` and `data/generated/current-2019-districts/`) is a separately versioned, MIT-licensed asset derived from [`datta07/INDIAN-SHAPEFILES`](https://github.com/datta07/INDIAN-SHAPEFILES) — the same source and commit used by [india-map-studio](https://github.com/nikhilsawantse/india-map-studio). It has 36 fully interactive, value-bearing current state/UT regions (including Jammu & Kashmir and Ladakh as separate UTs) with no separate reference-overlay treatment needed at that level, plus a full 788-district drill-down, and is not joined to the Census-2011 bundle by id or name. Two Pakistan-administered J&K district features (Mirpur, Muzaffarabad) are excluded from the value-bearing set and rendered as a non-interactive reference overlay instead, for the same reason the historical bundle never assigns a value to claimed-but-unadministered territory. See [data/README.md](./data/README.md#optional-current-vintage-stateut-bundle).
+An optional current-vintage state/UT and district bundle (`data/generated/current-2019-states/` and `data/generated/current-2019-districts/`) is a separately versioned, MIT-licensed asset derived from [`datta07/INDIAN-SHAPEFILES`](https://github.com/datta07/INDIAN-SHAPEFILES) — the same source and commit used by [india-map-studio](https://github.com/nikhilsawantse/india-map-studio). It has 36 fully interactive, value-bearing current state/UT regions (including Jammu & Kashmir and Ladakh as separate UTs) with no separate reference-overlay treatment needed at that level, plus a full 788-district drill-down and a 5,950-feature sub-district level beneath it, and is not joined to the Census-2011 bundle by id or name. Two Pakistan-administered J&K district features (Mirpur, Muzaffarabad) are excluded from the value-bearing set and rendered as a non-interactive reference overlay instead, for the same reason the historical bundle never assigns a value to claimed-but-unadministered territory. See [data/README.md](./data/README.md#optional-current-vintage-stateut-bundle).
 
 ## Design decisions
 
 - Stable feature IDs are mandatory. The included historical bundle uses deterministic Census-derived IDs; for consumer-supplied contemporary geometry, use its stable identifiers (prefer LGD codes where available). Display names are only labels.
 - The `MapLayer` requires explicit ID, label, and value accessors. It does not assume a provider's property names or a business metric.
-- `drillDownId` and `selectedId` support controlled usage; `defaultDrillDownId` and `defaultSelectedId` are the ergonomic uncontrolled path.
-- `loadDistricts` is lazy and runs only after state activation. The host can use a dynamic import, fetch, or local cache.
+- `drillDownId`, `subDistrictDrillDownId` and `selectedId` support controlled usage; `defaultDrillDownId`, `defaultSubDistrictDrillDownId` and `defaultSelectedId` are the ergonomic uncontrolled path. A district id means nothing outside its state, so changing `drillDownId` clears the level below it.
+- `loadDistricts` is lazy and runs only after state activation. The host can use a dynamic import, fetch, or local cache. `loadSubDistricts` is the same one level down, and may return `null` for a district that has no sub-district level — that district is left as a leaf rather than opening an empty view, and stops offering the level once it has answered. Without the loader, a district is a leaf and activation only selects it.
 - Geometry accepts GeoJSON `FeatureCollection` or TopoJSON with an object key. `d3-geo` projects each level into a responsive SVG viewBox.
 - `referenceOverlay` accepts separate national-only reference geometry—such as an outline or claimed area—that must never be coloured, selected, drilled into, or counted. It renders in a neutral hatch; the host provides its exact accessible description instead of the renderer assuming the whole outline lacks data.
 - Tooltip and insight UI are slots. Default copy contains only generic data concepts; a dashboard owns its metric/year wording and surrounding chrome.
@@ -113,7 +115,7 @@ For plain JavaScript — or any framework that can load a plain JS library — [
 </script>
 ```
 
-The stylesheet is injected by the script, boundary data is fetched on construction (never bundled — set `dataBaseUrl` to self-host), and values written before it arrives are applied when it does. Clicking a state drills into its districts. See [packages/js/README.md](./packages/js/README.md).
+The stylesheet is injected by the script, boundary data is fetched on construction (never bundled — set `dataBaseUrl` to self-host), and values written before it arrives are applied when it does. Clicking a state drills into its districts, and a district into its sub-districts. See [packages/js/README.md](./packages/js/README.md).
 
 ## React install
 
@@ -175,6 +177,36 @@ const [drillDownId, setDrillDownId] = useState<string | null>(null);
   loadDistricts={loadDistrictLayer}
 />
 ```
+
+## Sub-district drill-down
+
+A third level below districts. `loadSubDistricts` receives the district ID, the
+district region, and the state ID it sits in:
+
+```tsx
+<IndiaChoropleth
+  states={stateLayer}
+  loadDistricts={loadDistrictLayer}
+  loadSubDistricts={async (districtId) => {
+    const module = await import(`./data/generated/current-2019-subdistricts/subdistricts/${districtId}.topo.json`)
+      .catch(() => null);
+    // No asset means this district has no sub-district level — leave it a leaf.
+    if (!module) return null;
+    return {
+      geometry: { topology: module.default, object: "subdistricts" },
+      getId: (feature) => String(feature.properties?.id),
+      getLabel: (feature) => String(feature.properties?.name),
+      getValue: (feature) => valuesById[String(feature.properties?.id)] ?? null,
+    };
+  }}
+/>
+```
+
+The bundled current-vintage sub-district layer has 5,950 sub-districts across 785 of
+the 788 districts. Three districts deliberately have no asset — Delhi's Nazul, which is
+a land-tenure artifact rather than a district, and Rajasthan's urban Jaipur and Jodhpur,
+whose source polygons sit inside their own rural halves. See
+[data/README.md](./data/README.md#optional-current-vintage-sub-district-bundle).
 
 ## Non-statistical national reference geometry
 
