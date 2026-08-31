@@ -10,7 +10,9 @@ export type {
   MapFeature,
   MapFeatureCollection,
   MapLayer,
+  MapLevel,
   MapRegion,
   ReferenceOverlay,
+  SubDistrictLoader,
   TooltipContext,
 } from "./types";

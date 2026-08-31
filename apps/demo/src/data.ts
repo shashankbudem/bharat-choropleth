@@ -76,6 +76,7 @@ const districtModules = import.meta.glob("../../../data/generated/census-2011/di
 const districtReferenceModules = import.meta.glob("../../../data/generated/datameet-current-claim-outline/historical-parent-overlays/*.topo.json");
 const currentDistrictModules = import.meta.glob("../../../data/generated/current-2019-districts/districts/*.topo.json");
 const currentDistrictReferenceModules = import.meta.glob("../../../data/generated/current-2019-districts/district-reference-overlays/*.topo.json");
+const currentSubDistrictModules = import.meta.glob("../../../data/generated/current-2019-subdistricts/subdistricts/*.topo.json");
 
 /** DataMeet CC BY 4.0 contemporary context geometry; it is not SoI geometry. */
 export function currentContextOverlay(): ReferenceOverlay {
@@ -99,6 +100,22 @@ export async function loadCurrentDistrictLayer(stateId: string, _state: { id: st
   if (!load) return makeLayer({ type: "FeatureCollection", features: [] }, year);
   const module = await load();
   return makeLayer({ topology: (module as { default: unknown }).default as never, object: "districts" }, year);
+}
+
+/**
+ * Sub-districts (tehsils / taluks / mandals / blocks) for one current-edition
+ * district, or null where the bundle has none.
+ *
+ * Three of the 788 districts have no sub-district asset — Delhi's Nazul, which is
+ * a land-tenure artifact rather than a district, and Rajasthan's urban Jaipur and
+ * Jodhpur, whose source polygons sit inside their own rural halves. Returning null
+ * leaves those as leaves instead of opening an empty view.
+ */
+export async function loadCurrentSubDistrictLayer(districtId: string, _district: { id: string }, _stateId: string, year: DemoYear): Promise<MapLayer | null> {
+  const load = currentSubDistrictModules[`../../../data/generated/current-2019-subdistricts/subdistricts/${districtId}.topo.json`];
+  if (!load) return null;
+  const module = await load();
+  return makeLayer({ topology: (module as { default: unknown }).default as never, object: "subdistricts" }, year);
 }
 
 /** Only historical J&K gets extra DataMeet current-context geometry behind its Census districts. */

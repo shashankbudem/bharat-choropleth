@@ -49,3 +49,11 @@ Source: same repository and commit; input `INDIA/INDIA_DISTRICTS.geojson`. Joine
 ### Lakshadweep detail override
 
 `districts/in-cs-31-lakshadweep.topo.json` uses the Lakshadweep district SVG path from [India Map Studio](https://github.com/nikhilsawantse/india-map-studio), pinned at commit `db2745512365d194a7c4cabdf7ded79e1c777922`. India Map Studio licenses this public SVG layer under MIT and declares `datta07/INDIAN-SHAPEFILES` (MIT) as its upstream source. Its SVG viewBox coordinates are fitted to the existing Lakshadweep geographic envelope before TopoJSON generation, retaining the detailed island outlines while keeping valid longitude/latitude geometry. The district's existing stable id, parent id, values, and attribution remain unchanged.
+
+## Optional current-vintage sub-district bundle
+
+`generated/current-2019-subdistricts/subdistricts/{districtId}.topo.json` uses the same attribution as the current-vintage state and district bundles above:
+
+> Sub-district boundaries derived from datta07/INDIAN-SHAPEFILES (MIT).
+
+Source: same repository and commit; input `INDIA/INDIAN_SUB_DISTRICTS.geojson`. Joined to the current-districts bundle by spatial containment — the district source carries no LGD district code to key on — and not to the Census-2011 bundle at all. The source layer is itself Census-2011 vintage hanging off ~2019-vintage districts; see [README.md](./README.md#optional-current-vintage-sub-district-bundle) for what that means for post-2011 district splits, and for the excluded features (Mirpur and Muzaffarabad's rows, three unnamed frontier remainders, five features with no containing district).

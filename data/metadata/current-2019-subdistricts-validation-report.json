@@ -1,0 +1,31 @@
+{
+  "validatedAt": "2026-08-31T21:09:19.415Z",
+  "result": "pass",
+  "counts": {
+    "districts": 788,
+    "subDistrictParents": 785,
+    "subDistricts": 5950,
+    "districtsWithoutSubDistricts": 3
+  },
+  "bytes": {
+    "totalTopojson": 6829701,
+    "totalTopojsonGzip": 2340372,
+    "largestAsset": 37624
+  },
+  "geometry": {
+    "totalVertices": 475256,
+    "meanVerticesPerFeature": 80,
+    "featuresAtOrBelow8Vertices": 24,
+    "simplified": false
+  },
+  "join": {
+    "assigned": 5955,
+    "lowConfidence": 106,
+    "districtsWithoutSubDistricts": [
+      "in-cd-07-169",
+      "in-cd-08-569",
+      "in-cd-08-575"
+    ]
+  },
+  "errors": []
+}

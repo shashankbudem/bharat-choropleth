@@ -1,12 +1,18 @@
 import { IndiaChoropleth, type InsightContext, type MapRegion, type TooltipContext } from "bharat-choropleth";
 import { useCallback, useMemo, useState } from "react";
-import { currentContextOverlay, currentStateLayer, loadCurrentDistrictLayer, loadCurrentDistrictReferenceOverlay, loadDistrictLayer, loadDistrictReferenceOverlay, sampleValue, stateLayer, type DemoYear } from "./data";
+import { currentContextOverlay, currentStateLayer, loadCurrentDistrictLayer, loadCurrentDistrictReferenceOverlay, loadCurrentSubDistrictLayer, loadDistrictLayer, loadDistrictReferenceOverlay, sampleValue, stateLayer, type DemoYear } from "./data";
 import statesTopology from "../../../data/generated/census-2011/states.topo.json";
 import currentStatesTopology from "../../../data/generated/current-2019-states/states.topo.json";
 
 type BoundaryEdition = "historical" | "current";
 
 const formatter = new Intl.NumberFormat("en-IN");
+
+const LEVEL_LABELS = {
+  state: "Selected state / UT",
+  district: "Selected district",
+  subdistrict: "Selected sub-district",
+} as const;
 
 function statusFor(value: number | null) {
   if (value === null) return "No data";
@@ -21,7 +27,7 @@ function InsightRail({ context }: { context: InsightContext | null }) {
   if (!context) return <aside className="insight-rail"><p className="eyebrow">Inspect a region</p><h2>Explore the map</h2><p>Hover or use Tab to see a clear text summary.</p></aside>;
   return (
     <aside className="insight-rail">
-      <p className="eyebrow">{context.level === "state" ? "Selected state / UT" : "Selected district"}</p>
+      <p className="eyebrow">{LEVEL_LABELS[context.level]}</p>
       <h2>{context.label}</h2>
       <p className="rail-value">{context.value === null ? "—" : formatter.format(context.value)}</p>
       <dl>
@@ -37,6 +43,7 @@ export default function App() {
   const [year, setYear] = useState<DemoYear>(2026);
   const [edition, setEdition] = useState<BoundaryEdition>("historical");
   const [drillDownId, setDrillDownId] = useState<string | null>(null);
+  const [subDistrictDrillDownId, setSubDistrictDrillDownId] = useState<string | null>(null);
   const [insight, setInsight] = useState<InsightContext | null>(null);
   const layer = useMemo(() => edition === "current" ? currentStateLayer(year) : stateLayer(year), [edition, year]);
   const referenceOverlay = useMemo(() => edition === "historical" ? currentContextOverlay() : undefined, [edition]);
@@ -44,15 +51,22 @@ export default function App() {
   const loadCurrentDistricts = useCallback((id: string, state: MapRegion) => loadCurrentDistrictLayer(id, state, year), [year]);
   const loadDistrictContext = useCallback((id: string) => loadDistrictReferenceOverlay(id), []);
   const loadCurrentDistrictContext = useCallback((id: string) => loadCurrentDistrictReferenceOverlay(id), []);
+  // The third level exists only for the current edition: the historical Census-2011
+  // bundle has no sub-district layer, so its districts stay leaves.
+  const loadCurrentSubDistricts = useCallback(
+    (id: string, district: MapRegion, stateId: string) => loadCurrentSubDistrictLayer(id, district, stateId, year),
+    [year],
+  );
   const total = useMemo(() => {
     if (drillDownId) return null;
     return edition === "current" ? currentStatesTotal(year) : statesTotal(year);
   }, [drillDownId, edition, year]);
-  const scopeLabel = drillDownId ? "District performance" : "State-level performance";
+  const scopeLabel = subDistrictDrillDownId ? "Sub-district performance" : drillDownId ? "District performance" : "State-level performance";
 
   const changeEdition = (next: BoundaryEdition) => {
     setEdition(next);
     setDrillDownId(null);
+    setSubDistrictDrillDownId(null);
     setInsight(null);
   };
 
@@ -72,9 +86,9 @@ export default function App() {
         </div>
       </header>
       <main id="map">
-        <section className="intro"><div><h1>Regional performance</h1><p>Explore totals across regions, then select one to see its districts.</p></div><div className="total-block"><span>{drillDownId ? "Selected state / UT" : "Sample Census-coverage aggregate"}</span><strong>{drillDownId ? "District view" : formatter.format(total ?? 0)}</strong></div></section>
+        <section className="intro"><div><h1>Regional performance</h1><p>Explore totals across regions, then select one to see its districts — and, on the current edition, a district to see its sub-districts.</p></div><div className="total-block"><span>{drillDownId ? "Selected state / UT" : "Sample Census-coverage aggregate"}</span><strong>{subDistrictDrillDownId ? "Sub-district view" : drillDownId ? "District view" : formatter.format(total ?? 0)}</strong></div></section>
         <div className="dashboard-grid">
-          <section className="map-workspace" aria-labelledby="map-title"><div className="map-toolbar"><h2 id="map-title">{drillDownId ? "District performance" : "All states"}</h2><span className="helper">Tab · Enter/Space · Esc</span></div>
+          <section className="map-workspace" aria-labelledby="map-title"><div className="map-toolbar"><h2 id="map-title">{scopeLabel === "State-level performance" ? "All states" : scopeLabel}</h2><span className="helper">Tab · Enter/Space · Esc</span></div>
             <IndiaChoropleth
               key={edition}
               states={layer}
@@ -82,8 +96,11 @@ export default function App() {
               defaultSelectedId={edition === "current" ? "in-cs-27-maharashtra" : "in-hs-27-maharashtra"}
               drillDownId={drillDownId}
               onDrillDownChange={(next) => { setDrillDownId(next); setInsight(null); }}
+              subDistrictDrillDownId={subDistrictDrillDownId}
+              onSubDistrictDrillDownChange={(next) => { setSubDistrictDrillDownId(next); setInsight(null); }}
               onInsight={setInsight}
               loadDistricts={edition === "historical" ? loadDistricts : loadCurrentDistricts}
+              loadSubDistricts={edition === "current" ? loadCurrentSubDistricts : undefined}
               loadDistrictReferenceOverlay={edition === "historical" ? loadDistrictContext : loadCurrentDistrictContext}
               referenceOverlayFill="solid"
               showRegionValues

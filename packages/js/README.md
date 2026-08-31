@@ -1,6 +1,6 @@
 # `bharat-choropleth-js`
 
-An accessible SVG India state-to-district choropleth with no framework dependency. Drop one `<script>` tag into any HTML page, or import it as an ES module from a bundler. Same behavior, CSS classes, and stylesheet as the React [`bharat-choropleth`](https://www.npmjs.com/package/bharat-choropleth) package.
+An accessible SVG India state-to-district-to-sub-district choropleth with no framework dependency. Drop one `<script>` tag into any HTML page, or import it as an ES module from a bundler. Same behavior, CSS classes, and stylesheet as the React [`bharat-choropleth`](https://www.npmjs.com/package/bharat-choropleth) package.
 
 ![Bharat Choropleth national map](https://raw.githubusercontent.com/shashankbudem/bharat-choropleth/main/previews/country-desktop.png)
 
@@ -28,7 +28,7 @@ That's the whole setup. No stylesheet link, no build step, no `await`, no bounda
 - **The script tag injects its own CSS.** (Bundler users import `bharat-choropleth-js/style.css` instead, so their pipeline can extract and hash it — see [From a bundler](#from-a-bundler).)
 - **Boundary data is fetched, not bundled.** The package ships no geometry; the prepared current-vintage state bundle is downloaded from `dataBaseUrl` on construction. Set `dataBaseUrl` to self-host — see [Boundary data](#boundary-data).
 - **Values set before the data arrives are applied when it arrives.** Every line above runs while the download is still in flight; nothing is dropped and nothing needs awaiting. `map.ready` is a promise if you want one.
-- **Clicking a state drills into its districts**, fetched from the same base URL. Pass `districts: false` to turn that off.
+- **Clicking a state drills into its districts**, and a district into its sub-districts (tehsils / taluks / mandals / blocks), fetched from the same base URL. Pass `districts: false` or `subDistricts: false` to turn either off.
 
 See the [complete example](https://github.com/shashankbudem/bharat-choropleth/tree/main/packages/js/example) in the repository. To run it locally, serve the **repo root** over HTTP (`npx serve`), then open `/packages/js/example/bharat-choropleth.html`.
 
@@ -68,6 +68,7 @@ var map = new BharatChoropleth({ container: "#map", showRegionValues: true });
 | `geometry` | fetched from `dataBaseUrl` | Inline GeoJSON/TopoJSON, a URL string, or a promise of either. |
 | `dataBaseUrl` | jsDelivr copy of `data/generated` | Base URL for the prepared bundles. Point at your own copy to self-host. |
 | `districts` | `true` with default data, else `false` | Click-to-drill-down into districts. |
+| `subDistricts` | `true` with default data, else `false` | Click-to-drill-down from a district into its sub-districts. Districts the bundle has none for stay leaves. |
 | `fontColor` / `borderColor` | — | Sets the `--india-map-text` / `--india-map-stroke` CSS variables. |
 | `borderWidth` | `2.5` | Region border thickness in px. Sets `--india-map-border-width`. |
 | `selectionWidth` | `3` | Selection ring thickness in px; its halo is drawn at twice this. Sets `--india-map-selection-width`. |
@@ -90,7 +91,7 @@ Every thickness is a CSS variable, so you can theme without touching the rendere
 
 Every other [`IndiaChoroplethOptions`](https://github.com/shashankbudem/bharat-choropleth/blob/main/packages/js/src/types.ts) field (`referenceOverlay`, `loadDistricts`, `onRegionClick`, `formatValue`, `renderTooltip`, `showLegend`, ...) is accepted and forwarded.
 
-Methods: `setValues`, `getValues`, `select(id)`, `drillDown(name | null)`, `getSelected()`, `getInspected()`, `destroy()`. The full engine is at `map.engine` (`null` until the data loads — `await map.ready` first).
+Methods: `setValues`, `getValues`, `select(id)`, `drillDown(name | null)`, `drillDownSubDistrict(id | null)`, `getSelected()`, `getInspected()`, `destroy()`. The full engine is at `map.engine` (`null` until the data loads — `await map.ready` first).
 
 ## Hover and focus detail
 
@@ -114,9 +115,9 @@ var map = new BharatChoropleth("#map", {
 
 The package deliberately bundles no geographic boundaries; it downloads them. By default that means the prepared bundles in this repo's `data/generated`, served over jsDelivr, which must be attributed as:
 
-> State/UT and district boundaries derived from datta07/INDIAN-SHAPEFILES (MIT).
+> State/UT, district and sub-district boundaries derived from datta07/INDIAN-SHAPEFILES (MIT).
 
-For production, offline or air-gapped use, copy `data/generated/current-2019-states/` and `data/generated/current-2019-districts/` next to your app and point at them — no third-party CDN request at runtime:
+For production, offline or air-gapped use, copy `data/generated/current-2019-states/`, `data/generated/current-2019-districts/` and `data/generated/current-2019-subdistricts/` next to your app and point at them — no third-party CDN request at runtime:
 
 ```js
 var map = new BharatChoropleth("#map", { dataBaseUrl: "/maps" });
@@ -166,10 +167,13 @@ It requires an explicit `states` layer with `getId`/`getLabel`/`getValue` access
 - `update(partialOptions)` — merge new options (new data, controlled `selectedId`/`drillDownId`, swapped callbacks) and re-render.
 - `select(id | null)` — select a region at the current level without changing drill-down.
 - `drillDown(id | null)` — drill into a state, or pass `null` to return to the state view.
+- `drillDownSubDistrict(id | null)` — drill into a district's sub-districts, or pass `null` to return to the district view. Only meaningful while a state is drilled into, so its district layer has to have loaded first.
 - `getSelected()` / `getInspected()` — read the current `MapRegion | null`.
 - `destroy()` — remove all DOM content and cancel any in-flight loads. Call this before discarding the instance.
 
-Controlled vs. uncontrolled state works the same way as the React version: pass `selectedId`/`drillDownId` (and keep passing them via `update()`) for controlled usage, or `defaultSelectedId`/`defaultDrillDownId` to let the instance manage its own.
+Controlled vs. uncontrolled state works the same way as the React version: pass `selectedId`/`drillDownId`/`subDistrictDrillDownId` (and keep passing them via `update()`) for controlled usage, or `defaultSelectedId`/`defaultDrillDownId`/`defaultSubDistrictDrillDownId` to let the instance manage its own. A district id means nothing outside the state it came from, so changing `drillDownId` clears the level below it.
+
+`loadSubDistricts` may return `null` for a district with no sub-district level; that district is left as a leaf rather than opening an empty view, and stops offering the level once it has answered.
 
 ## Design notes
 
