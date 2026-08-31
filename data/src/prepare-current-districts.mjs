@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { topology } from "topojson-server";
 import { feature as topoFeature, merge } from "topojson-client";
-import { presimplify, simplify } from "topojson-simplify";
+import { presimplify } from "topojson-simplify";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = resolve(here, "..");
@@ -176,32 +176,108 @@ function totalRingArea(geometry) {
  */
 const MIN_RETAINED_AREA_SHARE = 0.5;
 
+/**
+ * No district may be reduced below this many vertices, or below this share of the
+ * vertices it actually started with — whichever is larger, and never more than it
+ * has. Small, near-convex districts are what a retained-area test cannot see: a
+ * district flattened into a polygon can still hold well over half its area while
+ * having lost its outline entirely.
+ */
+const MIN_FEATURE_VERTICES = 60;
+const MIN_FEATURE_VERTEX_SHARE = 0.08;
+
+function countVertices(geometry) {
+  if (!geometry) return 0;
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates ?? [];
+  return polygons.reduce((total, polygon) => total + polygon.reduce((sum, ring) => sum + ring.length, 0), 0);
+}
+
+/** Arc-index rings of a TopoJSON geometry, lifted out of the polygon nesting. */
+function arcRings(geometryArcs, rings = []) {
+  if (!Array.isArray(geometryArcs) || geometryArcs.length === 0) return rings;
+  if (typeof geometryArcs[0] === "number") rings.push(geometryArcs);
+  else for (const child of geometryArcs) arcRings(child, rings);
+  return rings;
+}
+
+/** topojson-simplify's own simplify(), but taking a threshold per arc rather than one for the file. */
+function simplifyArcs(weighted, thresholds) {
+  return {
+    type: "Topology",
+    bbox: weighted.bbox,
+    objects: weighted.objects,
+    arcs: weighted.arcs.map((arc, index) => arc.filter((point) => point[2] >= thresholds[index]).map(([x, y]) => [x, y])),
+  };
+}
+
+/**
+ * A single retained-vertex share cannot hold the floor above. The share is a
+ * percentile over every arc weight in the file, so it is set by the districts
+ * carrying the most detail and then applied to those carrying the least: this
+ * source averages ~2,250 vertices per district but its median is 564, so at a flat
+ * 5% the light half of that distribution lost its shape (Srinagar kept 10 of its
+ * 166 vertices, and 80 of 788 districts finished at 20 or fewer) while the heavy
+ * tail stayed crisp.
+ *
+ * So each feature solves for the largest threshold that still meets its own floor,
+ * and every arc is then simplified at the smallest threshold any feature touching
+ * it asked for. One threshold per arc is what keeps this safe: a shared boundary is
+ * simplified exactly once, so neighbouring districts continue to agree on it. That
+ * is also why the floor cannot simply be applied to each feature on its own —
+ * simplifying two sides of a shared boundary differently tears it open. Resolving per
+ * arc rather than per file also confines the extra detail to the boundaries that asked
+ * for it, which is most of the difference in the bundle's size.
+ */
 function optimizedTopology(objects, retainedVertexShare) {
   const raw = topology(objects, 20000);
   const weighted = presimplify(raw);
+  const objectName = Object.keys(objects)[0];
   const finiteWeights = weighted.arcs
     .flat()
     .map((point) => point[2])
     .filter(Number.isFinite)
     .sort((a, b) => a - b);
-  const threshold = finiteWeights[Math.max(0, Math.floor(finiteWeights.length * (1 - retainedVertexShare)) - 1)] || 0;
-  const simplified = simplify(weighted, threshold);
-  const objectName = Object.keys(objects)[0];
+  // The share stays the ceiling: no arc is ever simplified less aggressively than this.
+  const shareThreshold = finiteWeights[Math.max(0, Math.floor(finiteWeights.length * (1 - retainedVertexShare)) - 1)] || 0;
 
-  const unsimplifiedById = new Map(
-    (() => {
-      const unpacked = topoFeature(raw, raw.objects[objectName]);
-      return (unpacked.type === "FeatureCollection" ? unpacked.features : [unpacked])
-        .map((feature) => [feature.properties.id, feature.geometry]);
-    })(),
-  );
+  const unsimplified = (() => {
+    const unpacked = topoFeature(raw, raw.objects[objectName]);
+    return unpacked.type === "FeatureCollection" ? unpacked.features : [unpacked];
+  })();
+  const unsimplifiedById = new Map(unsimplified.map((feature) => [feature.properties.id, feature.geometry]));
 
+  const geometries = weighted.objects[objectName].geometries ?? [weighted.objects[objectName]];
+  const arcThresholds = new Array(weighted.arcs.length).fill(shareThreshold);
+  const arcOwners = new Array(weighted.arcs.length).fill(0);
+  const featureArcs = geometries.map((geometry, index) => {
+    const rings = arcRings(geometry.arcs);
+    const available = countVertices(unsimplified[index].geometry);
+    const target = Math.max(Math.ceil(available * MIN_FEATURE_VERTEX_SHARE), Math.min(MIN_FEATURE_VERTICES, available));
+    // Decoding concatenates a ring's arcs and drops each arc's repeated first point,
+    // so `target` decoded vertices means keeping `target` plus one per join — the
+    // nth-largest weight among this feature's own points, no search required.
+    const joins = rings.reduce((sum, ring) => sum + ring.length - 1, 0);
+    const weights = rings.flat().flatMap((arcIndex) => weighted.arcs[arcIndex < 0 ? ~arcIndex : arcIndex].map((point) => point[2])).sort((a, b) => b - a);
+    const threshold = Math.min(shareThreshold, weights[Math.min(target + joins, weights.length) - 1]);
+    const used = new Set(rings.flat().map((arcIndex) => (arcIndex < 0 ? ~arcIndex : arcIndex)));
+    for (const arc of used) {
+      arcThresholds[arc] = Math.min(arcThresholds[arc], threshold);
+      arcOwners[arc] += 1;
+    }
+    return used;
+  });
+
+  const simplified = simplifyArcs(weighted, arcThresholds);
   const unpacked = topoFeature(simplified, simplified.objects[objectName]);
-  const features = (unpacked.type === "FeatureCollection" ? unpacked.features : [unpacked]).map((feature) => {
+  const features = (unpacked.type === "FeatureCollection" ? unpacked.features : [unpacked]).map((feature, index) => {
     let geometry = cleanSimplifiedGeometry(feature.geometry);
     const original = unsimplifiedById.get(feature.properties.id);
     const originalArea = totalRingArea(original);
-    if (originalArea > 0 && totalRingArea(geometry) < originalArea * MIN_RETAINED_AREA_SHARE) {
+    // Substituting a feature's unsimplified outline is only safe where it shares no
+    // boundary: swapping one side of a shared arc would leave a gap against the
+    // neighbour still drawing the simplified one. Lakshadweep's islands qualify.
+    const isolated = [...featureArcs[index]].every((arc) => arcOwners[arc] === 1);
+    if (isolated && originalArea > 0 && totalRingArea(geometry) < originalArea * MIN_RETAINED_AREA_SHARE) {
       geometry = cleanSimplifiedGeometry(original);
     }
     return { ...feature, geometry };
@@ -326,9 +402,12 @@ async function main() {
       },
     },
     transformation: {
-      method: "Per-state topojson-server topology → topology-preserving simplification → degenerate-ring removal and exterior-winding cleanup → final topology output",
+      method: "Per-state topojson-server topology → per-arc topology-preserving simplification, each arc at the lowest threshold any district touching it requires → degenerate-ring removal and exterior-winding cleanup → final topology output",
       quantization: 20000,
       retainedVertexShare: 0.05,
+      minFeatureVertices: MIN_FEATURE_VERTICES,
+      minFeatureVertexShare: MIN_FEATURE_VERTEX_SHARE,
+      statement: "retainedVertexShare is a ceiling, not a quota: it sets the most aggressive threshold any arc may take. Every district additionally retains at least minFeatureVertices vertices, or minFeatureVertexShare of the vertices it started with, whichever is larger — bounded by the vertices it actually has. Thresholds are resolved per arc so a shared boundary is simplified once and adjacent districts still agree on it.",
     },
     identity: {
       district: "in-cd-{zero-padded parent LGD code}-{source D_CODE}",

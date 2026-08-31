@@ -11,6 +11,22 @@ This repository ships four independently versioned libraries. They must be valid
 
 The initial `0.1.0` release is public for the React, plain-JS, and Flutter packages. The Python package is ready for its first PyPI release. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
 
+## Boundary data bundles
+
+`data/` is `private: true` and never reaches a registry: it ships as committed TopoJSON
+that consumers vendor from the repository or fetch from the Cloudflare Pages deploy
+(`scripts/build-cloudflare-pages.mjs` copies `data/generated` wholesale). Regenerating
+it is still a release — every per-state `sha256` in the manifest changes, and anyone
+vendoring the files sees different geometry.
+
+So for a geometry change: bump `version` in `data/package.json` (the only version this
+data carries), record what changed in `data/README.md`, run `pnpm validate:data` and
+confirm the manifest's `inputSha256` still matches the pinned source commit, then tag
+the source commit — the package tags under [After publishing](#after-publishing) are
+package-scoped and do not cover this. Regenerating needs the source checkout
+(`INDIA_SHAPEFILES_DIR`) plus network access for `npm run
+import:map-studio-lakshadweep`; validation reads only the committed output.
+
 ## Preflight
 
 From the repository root, install the JavaScript dependencies and run the full suite:

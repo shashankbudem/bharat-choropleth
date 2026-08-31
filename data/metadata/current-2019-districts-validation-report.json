@@ -1,5 +1,5 @@
 {
-  "validatedAt": "2026-08-19T16:58:03.983Z",
+  "validatedAt": "2026-08-31T20:51:52.878Z",
   "result": "pass",
   "counts": {
     "currentStates": 36,
@@ -7,8 +7,13 @@
     "districts": 788
   },
   "bytes": {
-    "totalTopojson": 890633,
-    "totalTopojsonGzip": 274001
+    "totalTopojson": 1295845,
+    "totalTopojsonGzip": 403543
+  },
+  "shape": {
+    "totalVertices": 164237,
+    "degenerateFeatures": 0,
+    "belowFeatureFloor": 5
   },
   "districtsByParent": {
     "in-cs-01-jammu-and-kashmir": 20,

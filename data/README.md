@@ -55,6 +55,47 @@ The raw source needed real cleanup before shipping, all recorded in `generated/c
 - **Yanam reassigned**: the source tags this Puducherry exclave's `statecode` as Andhra Pradesh; reassigned to its real parent based on the source's own state-name property.
 - **Mirpur and Muzaffarabad excluded from the value-bearing set**: these two J&K district features are Pakistan-administered territory, not Indian districts (the source itself has no real district code for either). They are not given a value, selection, or drill-down — matching this repo's historical-bundle treatment of the same non-administered extent, and [india-map-studio](https://github.com/nikhilsawantse/india-map-studio)'s own documented exclusion of these same two features. Instead they're merged into a small non-interactive reference overlay, `generated/current-2019-districts/district-reference-overlays/in-cs-01-jammu-and-kashmir.topo.json`, loaded only for J&K's district view via `loadDistrictReferenceOverlay` — same mechanism as the historical bundle's claim-outline overlay.
 
+### Simplified to a floor, not to a flat share
+
+This bundle is simplified — the source is genuinely heavy — but simplification is
+bounded per district rather than set by one share for the whole file.
+
+The earlier pipeline retained a flat 5% of vertices per state file. That share is a
+percentile over every arc weight in the file, so it is set by the districts carrying
+the most detail and then applied to the ones carrying the least. This source averages
+~2,250 vertices per district but its **median is 564**, and the light half of that
+distribution lost its outline: 80 of 788 districts shipped at 20 vertices or fewer and
+7 at 8 or fewer, with Jammu & Kashmir, Himachal Pradesh and the north-east worst hit.
+Srinagar kept 10 of its 166 vertices. A retained-*area* test could not see this — a
+district flattened into a polygon keeps most of its area while losing its shape.
+
+Each district now solves for the largest simplification threshold that still leaves it
+at least **60 vertices, or 8% of the vertices it started with**, whichever is larger
+and never more than it actually has. Every arc is then simplified at the lowest
+threshold any district touching it asked for. Resolving thresholds per arc is what
+keeps this safe: a shared boundary is simplified exactly once, so neighbouring
+districts still agree on it. It is also why the floor cannot be applied to each
+district independently — simplifying two sides of a shared boundary differently tears
+it open, so the unsimplified-outline fallback below is now taken only by features that
+share no boundary at all.
+
+Retention goes from 4.9% to 9.3% of the source's 1,770,065 vertices (mean 111 → 208
+per district), districts at 20 vertices or fewer go from 80 to **0**, and the smallest
+district is 35 vertices — Delhi's Shahadara, which has only 35 in the source and is
+kept whole. Cost is 1.3 MB raw / 0.39 MB gzip across 36 files, up from 0.85 MB /
+0.26 MB; the largest single lazy load goes 88.7 KB → 137.3 KB.
+
+The validator guards this directly: a floor on total vertices, a cap on near-degenerate
+features, a cap on features below the per-feature floor, and an assertion that the
+manifest still declares the retention share and both floor constants. Nothing else
+could see it — counts, ids, checksums, winding and bounds all stayed valid while the
+geometry degraded.
+
+The source's two interior rings — one in North and Middle Andaman, one in Jaipur
+(Gramin) — are still dropped: the exterior-winding cleanup keeps one ring per polygon,
+and holes need the opposite winding. That is unchanged behaviour, not a regression
+from this work.
+
 To regenerate, run `npm run prepare:current-districts` followed by `npm run import:map-studio-lakshadweep` (the latter fetches India Map Studio's pinned Lakshadweep SVG), or use `npm run build` which performs both in order. `npm run validate:current-districts` needs no source checkout and is part of the default `npm run validate`.
 
 ## Source, licence, and attribution

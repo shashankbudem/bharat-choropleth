@@ -1,7 +1,7 @@
 {
   "name": "@bharat-choropleth/data-prep",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Reproducible, versioned boundary preparation for Bharat Choropleth.",
   "type": "module",
   "scripts": {
