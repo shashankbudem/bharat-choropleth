@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.2.0
 
 - Added an optional sub-district level below districts, matching the React and
   plain-JS packages: `loadSubDistricts`, `subDistrictDrillDownId` and
