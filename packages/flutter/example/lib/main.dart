@@ -178,6 +178,28 @@ class _MapScreenState extends State<MapScreen> {
                             values: {for (final d in districts) d.id: _sampleValue(d.id)},
                           );
                         },
+                        // One level further, where the source has one. Sub-district
+                        // files are keyed by *district* id, so they need their own
+                        // asset directory — a state-keyed name would collide.
+                        loadSubDistricts: (districtId, district, stateId) async {
+                          final String raw;
+                          try {
+                            raw = await rootBundle.loadString('assets/subdistricts/$districtId.topo.json');
+                          } catch (_) {
+                            // Three districts genuinely have no sub-district level.
+                            // Returning null leaves them as leaves rather than
+                            // opening an empty map.
+                            return null;
+                          }
+                          final subDistricts = decodeTopoJson(
+                            jsonDecode(raw) as Map<String, Object?>,
+                            objectName: 'subdistricts',
+                          );
+                          return ChoroplethLayer(
+                            features: subDistricts,
+                            values: {for (final s in subDistricts) s.id: _sampleValue(s.id)},
+                          );
+                        },
                         // Keyed on the id, not the region: going back reports the
                         // state you came *from*, so testing the region would say
                         // "drilled into" on the way out as well as on the way in.

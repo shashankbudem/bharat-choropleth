@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' show PointerDeviceKind;
 
 import 'package:bharat_choropleth/bharat_choropleth.dart';
 import 'package:flutter/material.dart';
@@ -12,6 +13,10 @@ import 'package:flutter_test/flutter_test.dart';
 File get statesFile => File('../../data/generated/current-2019-states/states.topo.json');
 File get goaDistrictsFile =>
     File('../../data/generated/current-2019-districts/districts/in-cs-30-goa.topo.json');
+File get jkDistrictsFile =>
+    File('../../data/generated/current-2019-districts/districts/in-cs-01-jammu-and-kashmir.topo.json');
+File get jkOverlayFile => File(
+    '../../data/generated/current-2019-districts/district-reference-overlays/in-cs-01-jammu-and-kashmir.topo.json');
 
 Map<String, Object?> readTopology(File file) =>
     jsonDecode(file.readAsStringSync()) as Map<String, Object?>;
@@ -364,6 +369,77 @@ void main() {
       final districts = decodeTopoJson(readTopology(goaDistrictsFile), objectName: 'districts');
       expect(districts, hasLength(2));
       expect(districts.map((d) => d.name), containsAll(['North Goa', 'South Goa']));
+    });
+
+    testWidgets('the pointer refuses the real Pakistan-administered outline', (tester) async {
+      // The synthetic cursor tests prove the rule; this proves it against the
+      // geometry that actually ships, where the overlay is a merged two-ring
+      // outline rather than a tidy box.
+      final districts = decodeTopoJson(readTopology(jkDistrictsFile), objectName: 'districts');
+      final overlayFeatures = decodeTopoJson(readTopology(jkOverlayFile), objectName: 'outline');
+      final overlay = ReferenceOverlay(features: overlayFeatures);
+
+      await tester.pumpWidget(MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: SizedBox(
+              width: kViewBox.width,
+              height: kViewBox.height,
+              child: IndiaChoropleth(features: districts, referenceOverlay: overlay),
+            ),
+          ),
+        ),
+      ));
+      await tester.pumpAndSettle();
+
+      // A view-box point genuinely inside the overlay and outside every district,
+      // found rather than guessed: the outline hugs the districts, so eyeballing
+      // a coordinate picks the wrong side of the boundary.
+      final projection = MercatorProjection.fit([...districts, ...overlayFeatures]);
+      Path pathOf(List<List<Offset>> rings) {
+        final path = Path()..fillType = PathFillType.evenOdd;
+        for (final ring in rings) {
+          if (ring.isEmpty) continue;
+          final points = ring.map(projection.project).toList();
+          path.moveTo(points.first.dx, points.first.dy);
+          for (final point in points.skip(1)) {
+            path.lineTo(point.dx, point.dy);
+          }
+          path.close();
+        }
+        return path;
+      }
+
+      final overlayPath = pathOf(overlayFeatures.first.rings);
+      final districtPaths = districts.map((d) => pathOf(d.rings)).toList();
+      final bounds = overlayPath.getBounds();
+      Offset? target;
+      for (var i = 1; i < 40 && target == null; i++) {
+        for (var j = 1; j < 40 && target == null; j++) {
+          final candidate = Offset(bounds.left + bounds.width * i / 40, bounds.top + bounds.height * j / 40);
+          if (overlayPath.contains(candidate) && !districtPaths.any((p) => p.contains(candidate))) {
+            target = candidate;
+          }
+        }
+      }
+      expect(target, isNotNull, reason: 'the shipped overlay must have interior of its own');
+
+      final fit = ViewBoxFit.of(tester.getSize(find.byKey(kChoroplethSurfaceKey)));
+      final origin = tester.getTopLeft(find.byKey(kChoroplethSurfaceKey));
+      final pointer = TestPointer(1, PointerDeviceKind.mouse);
+      await tester.sendEventToBinding(pointer.hover(
+        origin + Offset(target!.dx * fit.scale + fit.dx, target.dy * fit.scale + fit.dy),
+      ));
+      await tester.pumpAndSettle();
+
+      final cursor = tester
+          .widgetList<MouseRegion>(find.descendant(
+            of: find.byKey(kChoroplethSurfaceKey),
+            matching: find.byType(MouseRegion),
+          ))
+          .first
+          .cursor;
+      expect(cursor, SystemMouseCursors.forbidden);
     });
   });
 }

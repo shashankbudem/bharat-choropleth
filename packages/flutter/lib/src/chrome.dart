@@ -29,10 +29,25 @@ String ordinal(int n) {
 
 /// Where the map sits in the hierarchy, and the way back out.
 class ChoroplethBreadcrumb extends StatelessWidget {
-  const ChoroplethBreadcrumb({super.key, required this.drilledLabel, required this.onBack});
+  const ChoroplethBreadcrumb({
+    super.key,
+    required this.drilledLabel,
+    required this.onBack,
+    this.subDrilledLabel,
+    this.onBackToDistricts,
+  });
 
   final String? drilledLabel;
   final VoidCallback? onBack;
+
+  /// The sub-district being shown, when the map is a level deeper. Null renders
+  /// exactly the two-level trail this widget has always drawn, so a host that
+  /// never drills that far sees no change.
+  final String? subDrilledLabel;
+
+  /// Back to the district level. Null falls back to a plain, unlinked crumb —
+  /// the same way [onBack] does for a non-interactive map.
+  final VoidCallback? onBackToDistricts;
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +74,23 @@ class ChoroplethBreadcrumb extends StatelessWidget {
                 child: const Text('All states', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
               ),
               const Text(' / ', style: TextStyle(color: _muted, fontSize: 14)),
-              Text(label, style: const TextStyle(color: _text, fontSize: 14, fontWeight: FontWeight.w500)),
+              if (subDrilledLabel == null)
+                Text(label, style: const TextStyle(color: _text, fontSize: 14, fontWeight: FontWeight.w500))
+              else ...[
+                TextButton(
+                  onPressed: onBackToDistricts,
+                  style: TextButton.styleFrom(
+                    foregroundColor: _focus,
+                    padding: const EdgeInsets.all(6),
+                    minimumSize: const Size(0, 32),
+                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  ),
+                  child: Text(label, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w500)),
+                ),
+                const Text(' / ', style: TextStyle(color: _muted, fontSize: 14)),
+                Text(subDrilledLabel!,
+                    style: const TextStyle(color: _text, fontSize: 14, fontWeight: FontWeight.w500)),
+              ],
             ],
           ],
         ),
@@ -180,10 +211,15 @@ class _Swatch extends StatelessWidget {
       label: description,
       child: Tooltip(
         message: description,
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onTap: bucket.matches == 0 ? null : onPick,
-          child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: bar),
+        // A band no region falls in is inert — it filters to nothing, so it has
+        // no onTap — and the cursor says so rather than inviting a dead click.
+        child: MouseRegion(
+          cursor: bucket.matches == 0 ? SystemMouseCursors.forbidden : SystemMouseCursors.click,
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: bucket.matches == 0 ? null : onPick,
+            child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: bar),
+          ),
         ),
       ),
     );
