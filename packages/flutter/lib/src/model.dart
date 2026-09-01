@@ -9,8 +9,11 @@ const Key kChoroplethSurfaceKey = ValueKey('bharat_choropleth.surface');
 
 /// Which layer the map is showing. Values, colour bands and the legend's own
 /// filter are all derived per level, because a district's number only means
-/// anything against the other districts in its state.
-enum ChoroplethLevel { state, district }
+/// anything against the other districts in its state — and a sub-district's
+/// only against the others in its district.
+///
+/// Sub-districts are the tehsil / taluk / mandal / block level.
+enum ChoroplethLevel { state, district, subdistrict }
 
 /// A set of regions and the values for them — what a drill-down loader returns.
 ///

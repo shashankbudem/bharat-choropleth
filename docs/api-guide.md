@@ -76,6 +76,56 @@ async function loadDistricts(stateId: string, state: MapRegion): Promise<MapLaye
 
 The reference demo uses a bundler-safe explicit loader map rather than an unrestricted runtime import.
 
+## Lazy sub-district geometry
+
+A third level below districts. `loadSubDistricts` receives the district ID, the
+district region, and the state ID it sits in:
+
+```tsx
+async function loadSubDistricts(districtId: string, district: MapRegion, stateId: string): Promise<MapLayer | null> {
+  const load = subDistrictLoaders[districtId]; // A bundler-safe explicit loader map.
+  // No loader means this district has no sub-district level. Returning null leaves
+  // it a leaf: the map stays on the district view and selects it.
+  if (!load) return null;
+  const module = await load();
+  const values = valuesForDistrict(district.id);
+  return {
+    geometry: { topology: module.default, object: "subdistricts" },
+    getId: (feature) => String(feature.properties?.id),
+    getLabel: (feature) => String(feature.properties?.name),
+    getValue: (feature) => values.get(String(feature.properties?.id)) ?? null,
+  } satisfies MapLayer;
+}
+
+<IndiaChoropleth
+  states={states}
+  loadDistricts={loadDistricts}
+  loadSubDistricts={loadSubDistricts}
+  drillDownId={drillDownId}
+  onDrillDownChange={setDrillDownId}
+  subDistrictDrillDownId={subDistrictDrillDownId}
+  onSubDistrictDrillDownChange={setSubDistrictDrillDownId}
+/>
+```
+
+Omit `loadSubDistricts` and a district stays a leaf, exactly as before. A district
+id means nothing outside the state it came from, so changing `drillDownId` clears
+`subDistrictDrillDownId`; when controlled, mirror that in your own state.
+
+The renderer cannot know which districts are leaves without asking, so every district
+offers the level until its loader answers `null` — after which that district stops
+offering it and is not asked again.
+
+**Renderer parity:** the sub-district level is implemented in the React, plain-JS and
+Flutter packages. In Flutter the loader is `loadSubDistricts`, with the same
+null-means-leaf contract, alongside `subDistrictDrillDownId` and
+`onSubDistrictDrillDownChange`; its breadcrumb gains a third crumb whose middle link
+returns to the districts rather than to the national map. In Python the notebook
+control takes `sub_district_loader` under the same contract, adds a district selector
+beside the state one, and steps `Back` one level at a time. Every renderer in the
+repository now offers the level; each keeps its two-level behaviour when the loader is
+omitted.
+
 ## Supply your own geometry
 
 ```tsx

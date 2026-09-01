@@ -9,7 +9,23 @@ This repository ships four independently versioned libraries. They must be valid
 | Flutter | `packages/flutter` | pub.dev | `dart pub publish` |
 | Python | `packages/python` | PyPI | `python3 -m twine upload dist/*` |
 
-The initial `0.1.0` release is public for the React, plain-JS, and Flutter packages. The Python package is ready for its first PyPI release. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
+Version `0.1.0` is public on all four registries. Verify the intended version against the registry rather than this sentence — it has been stale before. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
+
+## Boundary data bundles
+
+`data/` is `private: true` and never reaches a registry: it ships as committed TopoJSON
+that consumers vendor from the repository or fetch from the Cloudflare Pages deploy
+(`scripts/build-cloudflare-pages.mjs` copies `data/generated` wholesale). Regenerating
+it is still a release — every per-state `sha256` in the manifest changes, and anyone
+vendoring the files sees different geometry.
+
+So for a geometry change: bump `version` in `data/package.json` (the only version this
+data carries), record what changed in `data/README.md`, run `pnpm validate:data` and
+confirm the manifest's `inputSha256` still matches the pinned source commit, then tag
+the source commit — the package tags under [After publishing](#after-publishing) are
+package-scoped and do not cover this. Regenerating needs the source checkout
+(`INDIA_SHAPEFILES_DIR`) plus network access for `npm run
+import:map-studio-lakshadweep`; validation reads only the committed output.
 
 ## Preflight
 
@@ -78,6 +94,35 @@ uv run --isolated --with twine twine upload dist/*
 ```
 
 Create a PyPI account and use a trusted publisher or an account-scoped upload token outside this repository. The upload action is irreversible for a given version: update `pyproject.toml` before attempting a subsequent release.
+
+## Boundary data must ship with the tag
+
+`packages/js` defaults `dataBaseUrl` to a jsDelivr copy of this repository's
+`data/generated` **at a pinned release tag** (`DEFAULT_DATA_BASE_URL` in
+`packages/js/src/data-source.ts`). The zero-config `BharatChoropleth` fetches every
+level from there, so a release is only complete when the tag it points at actually
+contains the generated bundles:
+
+| Bundle | Needed for |
+| --- | --- |
+| `data/generated/current-2019-states/` | The initial country map |
+| `data/generated/current-2019-districts/` | State drill-down |
+| `data/generated/current-2019-subdistricts/` | District drill-down into sub-districts |
+
+Before tagging, bump `DEFAULT_DATA_BASE_URL` to the tag you are about to create, and
+confirm each directory is committed at that commit. A branch ref is not an
+alternative: jsDelivr caches it for hours, so a data change would silently alter
+every consumer's map at a time nobody chose.
+
+A missing sub-district directory fails **silently** rather than loudly. The loader
+treats a 404 as "this district has no sub-district level" — which is a real case for
+three districts — so a wholly absent bundle looks exactly like every district being a
+leaf: no console error, no status message, drill-down just quietly stops one level
+short. Verify by fetching one file from the tag before announcing the release:
+
+```bash
+curl -sI "https://cdn.jsdelivr.net/gh/shashankbudem/bharat-choropleth@vX.Y.Z/data/generated/current-2019-subdistricts/subdistricts/in-cd-27-398.topo.json" | head -1
+```
 
 ## After publishing
 

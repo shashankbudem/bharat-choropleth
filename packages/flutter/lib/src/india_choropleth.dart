@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 
@@ -38,6 +39,9 @@ class IndiaChoropleth extends StatefulWidget {
     this.loadDistricts,
     this.drillDownId,
     this.onDrillDownChange,
+    this.loadSubDistricts,
+    this.subDistrictDrillDownId,
+    this.onSubDistrictDrillDownChange,
     this.loadDistrictReferenceOverlay,
     this.referenceOverlay,
     this.referenceOverlayFill = ReferenceOverlayFill.hatch,
@@ -96,6 +100,22 @@ class IndiaChoropleth extends StatefulWidget {
   /// Drive the drill-down from outside. Leave null to let the widget own it.
   final String? drillDownId;
   final void Function(String? stateId, ChoroplethRegion? state)? onDrillDownChange;
+
+  /// Supply this and tapping a district drills one level further, into its
+  /// sub-districts (tehsils / taluks / mandals / blocks). Called only once a
+  /// district is activated, so that geometry loads lazily the way districts do.
+  ///
+  /// Return null for a district that has no sub-district level. Not every
+  /// district has one — a source can omit them, or hold none falling inside the
+  /// district at all — and such a district is left as a leaf: the map stays on
+  /// the district view and selects it rather than opening an empty level.
+  final Future<ChoroplethLayer?> Function(String districtId, ChoroplethRegion district, String stateId)?
+      loadSubDistricts;
+
+  /// Drive the sub-district drill-down from outside, as [drillDownId] does for
+  /// districts. Only meaningful while a state is drilled into.
+  final String? subDistrictDrillDownId;
+  final void Function(String? districtId, ChoroplethRegion? district)? onSubDistrictDrillDownChange;
 
   /// The reference overlay for a drilled-in state, loaded the same way as its
   /// districts. Optional context: a failure here still leaves a usable map.
@@ -212,6 +232,11 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
   List<ChoroplethRegion> _regions = const [];
   List<ChoroplethReferenceRegion> _referenceRegions = const [];
   List<ChoroplethRegion> _stateRegions = const [];
+
+  /// The drilled state's districts, kept even while sub-districts are on screen:
+  /// the breadcrumb and the drilled-district lookup still need them, and `_regions`
+  /// holds whatever level is currently drawn.
+  List<ChoroplethRegion> _districtRegions = const [];
   List<LegendBucket> _buckets = const [];
   double _min = 0;
   double _max = 0;
@@ -220,6 +245,23 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
   String? _internalDrillDownId;
   ChoroplethLayer? _districts;
   String? _districtsFor;
+  String? _internalSubDrillDownId;
+  ChoroplethLayer? _subDistricts;
+  String? _subDistrictsFor;
+  bool _subLoading = false;
+  Object? _subLoadError;
+  int _subLoadGeneration = 0;
+
+  /// Districts the loader has already answered null for, so a second tap selects
+  /// rather than re-asking, and the semantics say "select" instead of offering a
+  /// level that is not there.
+  ///
+  /// Deliberately not cleared when the loader's identity changes: hosts pass this
+  /// as an inline closure — the example does — which is a new function on every
+  /// build, so identity-clearing would empty the set continuously and re-fetch
+  /// forever. It is cleared with the feature set instead, which is what actually
+  /// marks a different map.
+  final Set<String> _leafDistrictIds = <String>{};
   ReferenceOverlay? _districtOverlay;
   String? _districtOverlayFor;
   bool _loading = false;
@@ -227,14 +269,32 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
   int _loadGeneration = 0;
 
   String? _inspectedId;
+
+  /// What the pointer is over right now. Held in state rather than recomputed in
+  /// build because it follows the pointer, not the widget tree.
+  MouseCursor _cursor = SystemMouseCursors.basic;
   int? _activeBucket;
   String? _bandsKey;
 
   String Function(double value) get _formatValue => widget.formatValue ?? IndiaChoropleth.formatValueDefault;
   String? get _drillDownId => widget.drillDownId ?? _internalDrillDownId;
-  ChoroplethLevel get _level =>
-      _drillDownId != null && _drilledState != null ? ChoroplethLevel.district : ChoroplethLevel.state;
-  bool get _canDrill => widget.loadDistricts != null && _level == ChoroplethLevel.state;
+  String? get _subDrillDownId => widget.subDistrictDrillDownId ?? _internalSubDrillDownId;
+
+  ChoroplethLevel get _level {
+    if (_drillDownId == null || _drilledState == null) return ChoroplethLevel.state;
+    return _subDrillDownId != null && _drilledDistrict != null
+        ? ChoroplethLevel.subdistrict
+        : ChoroplethLevel.district;
+  }
+
+  /// Whether a tap on a region at this level opens another one. Sub-districts are
+  /// the last level, and a district known to be a leaf is excluded per region in
+  /// the painter rather than here, which is level-wide.
+  bool get _canDrill => switch (_level) {
+        ChoroplethLevel.state => widget.loadDistricts != null,
+        ChoroplethLevel.district => widget.loadSubDistricts != null,
+        ChoroplethLevel.subdistrict => false,
+      };
 
   ChoroplethRegion? get _drilledState {
     for (final region in _stateRegions) {
@@ -242,6 +302,10 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
     }
     return null;
   }
+
+  /// The drilled district, found among the loaded district regions rather than
+  /// the ones on screen — at sub-district level the screen holds sub-districts.
+  ChoroplethRegion? get _drilledDistrict => _find(_districtRegions, _subDrillDownId);
 
   ChoroplethRegion? get _selected => _find(_regions, widget.selectedId);
   ChoroplethRegion? get _inspected => _find(_regions, _inspectedId);
@@ -264,10 +328,15 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
   @override
   void didUpdateWidget(IndiaChoropleth oldWidget) {
     super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.features, widget.features)) {
+      // A different map: which districts are leaves is a fact about the old one.
+      _leafDistrictIds.clear();
+    }
     if (!identical(oldWidget.features, widget.features) ||
         !identical(oldWidget.values, widget.values) ||
         !identical(oldWidget.referenceOverlay, widget.referenceOverlay) ||
         oldWidget.drillDownId != widget.drillDownId ||
+        oldWidget.subDistrictDrillDownId != widget.subDistrictDrillDownId ||
         oldWidget.colorScale != widget.colorScale ||
         oldWidget.minPartExtent != widget.minPartExtent ||
         oldWidget.minDistrictPartExtent != widget.minDistrictPartExtent) {
@@ -275,6 +344,13 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
     }
     if (oldWidget.drillDownId != widget.drillDownId && widget.drillDownId != null) {
       _loadDistrictsFor(widget.drillDownId!);
+    }
+    if (oldWidget.subDistrictDrillDownId != widget.subDistrictDrillDownId) {
+      if (widget.subDistrictDrillDownId != null) {
+        _loadSubDistrictsFor(widget.subDistrictDrillDownId!);
+      } else {
+        _clearSubDrill();
+      }
     }
     if (oldWidget.selectedId != widget.selectedId || !identical(oldWidget.values, widget.values)) {
       _scheduleInsight();
@@ -357,20 +433,33 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
     _stateRegions = stateRegions;
 
     final districts = _districtsFor != null && _districtsFor == _drillDownId ? _districts : null;
+    final drilledPartExtent = widget.minDistrictPartExtent ?? widget.minPartExtent;
     if (_drillDownId != null && districts != null) {
       final overlay = _districtOverlayFor == _drillDownId ? _districtOverlay : null;
-      final (regions, references) = _project(
-        districts.features,
-        districts.values,
-        overlay,
-        widget.minDistrictPartExtent ?? widget.minPartExtent,
-      );
-      _regions = regions;
-      _referenceRegions = references;
+      final (regions, references) = _project(districts.features, districts.values, overlay, drilledPartExtent);
+      _districtRegions = regions;
+
+      final subDistricts =
+          _subDrillDownId != null && _subDistrictsFor == _subDrillDownId ? _subDistricts : null;
+      if (subDistricts != null) {
+        // No reference overlay a level down: the one that exists is the state's,
+        // and refitting it to a single district would draw it far off the map.
+        final (subRegions, _) = _project(subDistricts.features, subDistricts.values, null, drilledPartExtent);
+        _regions = subRegions;
+        _referenceRegions = const [];
+      } else if (_subDrillDownId != null && _drilledDistrict != null) {
+        _regions = const [];
+        _referenceRegions = const [];
+      } else {
+        _regions = regions;
+        _referenceRegions = references;
+      }
     } else if (_drillDownId != null && _drilledState != null) {
+      _districtRegions = const [];
       _regions = const [];
       _referenceRegions = const [];
     } else {
+      _districtRegions = const [];
       _regions = stateRegions;
       _referenceRegions = stateReferences;
     }
@@ -393,6 +482,7 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
     final bands = [
       _level.name,
       _drillDownId ?? '',
+      _subDrillDownId ?? '',
       widget.colorScale.colors.map((color) => color.toARGB32()).join(','),
     ].join('|');
     if (bands != _bandsKey) {
@@ -460,19 +550,104 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
     });
   }
 
+  void _loadSubDistrictsFor(String districtId) {
+    final loader = widget.loadSubDistricts;
+    final district = _find(_districtRegions, districtId);
+    final stateId = _drillDownId;
+    if (loader == null || district == null || stateId == null) return;
+
+    final generation = ++_subLoadGeneration;
+    setState(() {
+      _subLoading = true;
+      _subLoadError = null;
+      _subDistricts = null;
+      _subDistrictsFor = null;
+      _prepare();
+    });
+
+    loader(districtId, district, stateId).then((layer) {
+      if (!mounted || generation != _subLoadGeneration) return;
+      if (layer == null) {
+        // A leaf. Fall back to the district view and leave the district selected,
+        // rather than opening a level with nothing in it.
+        _leafDistrictIds.add(districtId);
+        widget.onSubDistrictDrillDownChange?.call(null, district);
+        setState(() {
+          _internalSubDrillDownId = null;
+          _subLoading = false;
+          _inspectedId = districtId;
+          _prepare();
+        });
+        _notifyInsight();
+        return;
+      }
+      setState(() {
+        _subDistricts = layer;
+        _subDistrictsFor = districtId;
+        _subLoading = false;
+        _prepare();
+      });
+    }).catchError((Object error) {
+      if (!mounted || generation != _subLoadGeneration) return;
+      setState(() {
+        _subLoadError = error;
+        _subLoading = false;
+        _prepare();
+      });
+    });
+  }
+
   void _drillInto(ChoroplethRegion region) {
+    if (_level == ChoroplethLevel.district) {
+      if (_leafDistrictIds.contains(region.id)) return;
+      widget.onSubDistrictDrillDownChange?.call(region.id, region);
+      if (widget.subDistrictDrillDownId == null) {
+        setState(() => _internalSubDrillDownId = region.id);
+      }
+      _loadSubDistrictsFor(region.id);
+      return;
+    }
     widget.onDrillDownChange?.call(region.id, region);
     if (widget.drillDownId == null) {
       setState(() => _internalDrillDownId = region.id);
     }
+    _clearSubDrill();
     _loadDistrictsFor(region.id);
   }
 
+  /// Drop everything below the district level, without a rebuild of its own —
+  /// every caller is already inside one or calls `_prepare()` after.
+  void _clearSubDrill() {
+    _subLoadGeneration++;
+    _internalSubDrillDownId = null;
+    _subDistricts = null;
+    _subDistrictsFor = null;
+    _subLoading = false;
+    _subLoadError = null;
+  }
+
+  /// Back out of the sub-district level to the districts, leaving the state
+  /// drill-down and its already-loaded districts untouched.
+  void _goBackToDistricts() {
+    final prior = _drilledDistrict;
+    widget.onSubDistrictDrillDownChange?.call(null, prior);
+    setState(() {
+      _clearSubDrill();
+      _inspectedId = prior?.id;
+      _prepare();
+    });
+    _notifyInsight();
+  }
+
   void _goBack() {
+    // Only ever returns to the national map; the sub-district level backs out
+    // through _goBackToDistricts, which the breadcrumb wires to the middle crumb.
     final prior = _drilledState;
     widget.onDrillDownChange?.call(null, prior);
+    if (_subDrillDownId != null) widget.onSubDistrictDrillDownChange?.call(null, _drilledDistrict);
     _loadGeneration++;
     setState(() {
+      _clearSubDrill();
       _internalDrillDownId = null;
       _districts = null;
       _districtsFor = null;
@@ -560,6 +735,15 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
     return null;
   }
 
+  /// The reference overlay under `point`. Never used to route a tap — the overlay
+  /// is non-statistical and takes none — only to say so with the cursor.
+  ChoroplethReferenceRegion? _referenceAt(Offset point) {
+    for (final reference in _referenceRegions.reversed) {
+      if (reference.path.contains(point)) return reference;
+    }
+    return null;
+  }
+
   void _handleTapUp(TapUpDetails details, Size size) {
     final point = ViewBoxFit.of(size).toViewBox(details.localPosition);
     final hit = _regionAt(point);
@@ -583,7 +767,29 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
   }
 
   void _handleHover(Offset local, Size size) {
-    _inspect(_regionAt(ViewBoxFit.of(size).toViewBox(local)));
+    final point = ViewBoxFit.of(size).toViewBox(local);
+    final region = _regionAt(point);
+    _inspect(region);
+    _setCursor(_cursorAt(point, region));
+  }
+
+  /// Mirrors exactly what a tap here would do, so the pointer never promises an
+  /// interaction the map will not honour.
+  ///
+  /// The small-region buffer counts: a click just off Puducherry selects it, so
+  /// the hand appears there too. Open sea stays the plain arrow rather than
+  /// "forbidden" — clicking it clears the selection, which is a real action.
+  /// Only the reference overlay is genuinely inert: it is drawn and labelled but
+  /// carries no value and takes no tap.
+  MouseCursor _cursorAt(Offset point, ChoroplethRegion? region) {
+    if (region != null || _smallRegionNear(point) != null) return SystemMouseCursors.click;
+    if (_referenceAt(point) != null) return SystemMouseCursors.forbidden;
+    return SystemMouseCursors.basic;
+  }
+
+  void _setCursor(MouseCursor cursor) {
+    if (_cursor == cursor) return;
+    setState(() => _cursor = cursor);
   }
 
   ChoroplethRegion? _smallRegionNear(Offset point) {
@@ -625,18 +831,33 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
   @override
   Widget build(BuildContext context) {
     final drilled = _drilledState;
+    final drilledDistrict = _drilledDistrict;
     final isDrillRequested = drilled != null && _drillDownId != null;
+    final isSubDrillRequested = isDrillRequested && drilledDistrict != null && _subDrillDownId != null;
     final showLoadStatus = isDrillRequested && (_districtsFor != _drillDownId || _loadError != null);
-    final showEmptyStatus = !showLoadStatus && _regions.isEmpty;
+    final showSubLoadStatus =
+        !showLoadStatus && isSubDrillRequested && (_subDistrictsFor != _subDrillDownId || _subLoadError != null);
+    final showEmptyStatus = !showLoadStatus && !showSubLoadStatus && _regions.isEmpty;
 
     final Widget surface;
     if (widget.features.isEmpty) {
       return Semantics(label: 'No map data available.', child: const SizedBox.expand());
+    } else if (showSubLoadStatus) {
+      surface = ChoroplethStatus(
+        isError: _subLoadError != null,
+        message: _subLoadError != null
+            ? 'Unable to load sub-districts.'
+            : _subLoading
+                ? 'Loading sub-districts…'
+                : 'Sub-district data is unavailable for this district.',
+      );
     } else if (showLoadStatus || showEmptyStatus) {
       surface = ChoroplethStatus(
         isError: _loadError != null,
         message: showEmptyStatus
-            ? 'No district data is available for this state.'
+            ? (_level == ChoroplethLevel.subdistrict
+                ? 'No sub-district data is available for this district.'
+                : 'No district data is available for this state.')
             : _loadError != null
                 ? 'Unable to load districts.'
                 : _loading
@@ -658,7 +879,12 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           if (widget.showBreadcrumb)
-            ChoroplethBreadcrumb(drilledLabel: drilled?.label, onBack: widget.interactive ? _goBack : null),
+            ChoroplethBreadcrumb(
+              drilledLabel: drilled?.label,
+              onBack: widget.interactive ? _goBack : null,
+              subDrilledLabel: isSubDrillRequested ? drilledDistrict.label : null,
+              onBackToDistricts: widget.interactive ? _goBackToDistricts : null,
+            ),
           if (bounded)
             Expanded(child: surface)
           else
@@ -697,6 +923,8 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
           inspectedId: _inspectedId,
           activeBucket: _activeBucket,
           canDrill: _canDrill,
+          drillTarget: _level == ChoroplethLevel.state ? 'districts' : 'sub-districts',
+          leafIds: _leafDistrictIds,
           referenceOverlayFill: widget.referenceOverlayFill,
           referenceOverlayMergeIds: widget.referenceOverlayMergeIds.toSet(),
           borderColor: widget.borderColor,
@@ -717,8 +945,12 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
           canvas = MouseRegion(
             // Pointer devices get hover inspection, exactly as the web does.
             // Touch has no hover, which is why a tap inspects as well as selects.
+            cursor: _cursor,
             onHover: (event) => _handleHover(event.localPosition, size),
-            onExit: (_) => _inspect(null),
+            onExit: (_) {
+              _inspect(null);
+              _setCursor(SystemMouseCursors.basic);
+            },
             child: GestureDetector(
               onTapUp: (details) => _handleTapUp(details, size),
               child: canvas,
@@ -809,6 +1041,8 @@ class _ChoroplethPainter extends CustomPainter {
     required this.inspectedId,
     required this.activeBucket,
     required this.canDrill,
+    required this.drillTarget,
+    required this.leafIds,
     required this.referenceOverlayFill,
     required this.referenceOverlayMergeIds,
     required this.borderColor,
@@ -834,6 +1068,13 @@ class _ChoroplethPainter extends CustomPainter {
   final String? inspectedId;
   final int? activeBucket;
   final bool canDrill;
+
+  /// What the level below is called, for the semantics action.
+  final String drillTarget;
+
+  /// Regions that have no level below them even though this one does — districts
+  /// the loader answered null for. They announce as selectable, not drillable.
+  final Set<String> leafIds;
   final ReferenceOverlayFill referenceOverlayFill;
   final Set<String> referenceOverlayMergeIds;
   final Color borderColor;
@@ -1156,7 +1397,8 @@ class _ChoroplethPainter extends CustomPainter {
   @override
   SemanticsBuilderCallback get semanticsBuilder => (Size size) {
         final fit = ViewBoxFit.of(size);
-        final action = canDrill ? 'Activate to view districts.' : 'Activate to select.';
+        String actionFor(ChoroplethRegion region) =>
+            canDrill && !leafIds.contains(region.id) ? 'Activate to view $drillTarget.' : 'Activate to select.';
         return [
           // A region the source has no geometry for has an empty rect. Flutter
           // rejects zero-size semantics nodes, and rightly so: announcing a
@@ -1171,7 +1413,7 @@ class _ChoroplethPainter extends CustomPainter {
               ),
               properties: SemanticsProperties(
                 label: '${region.label}, '
-                    '${region.value == null ? "No data" : formatValue(region.value!)}. $action',
+                    '${region.value == null ? "No data" : formatValue(region.value!)}. ${actionFor(region)}',
                 selected: region.id == selectedId,
                 button: true,
                 textDirection: TextDirection.ltr,
@@ -1206,6 +1448,8 @@ class _ChoroplethPainter extends CustomPainter {
       old.inspectedId != inspectedId ||
       old.activeBucket != activeBucket ||
       old.canDrill != canDrill ||
+      old.drillTarget != drillTarget ||
+      !setEquals(old.leafIds, leafIds) ||
       old.referenceOverlayFill != referenceOverlayFill ||
       old.referenceOverlayMergeIds != referenceOverlayMergeIds ||
       old.colorScale != colorScale ||
@@ -1225,5 +1469,7 @@ class _ChoroplethPainter extends CustomPainter {
       !identical(old.regions, regions) ||
       !identical(old.referenceRegions, referenceRegions) ||
       old.selectedId != selectedId ||
-      old.canDrill != canDrill;
+      old.canDrill != canDrill ||
+      old.drillTarget != drillTarget ||
+      !setEquals(old.leafIds, leafIds);
 }

@@ -4,6 +4,7 @@ import {
   DEFAULT_DATA_BASE_URL,
   isInlineGeometry,
   loadDistrictTopology,
+  loadSubDistrictTopology,
   resolveGeometry,
   statesUrl,
   type GeometryInput,
@@ -49,6 +50,14 @@ export interface BharatChoroplethOptions extends Omit<IndiaChoroplethOptions, "s
    * supplied your own `geometry` — pass `loadDistricts` yourself in that case.
    */
   districts?: boolean;
+  /**
+   * Click-to-drill-down from a district into its sub-districts (tehsils / taluks /
+   * mandals / blocks). Defaults the same way `districts` does: on when the state
+   * layer came from `dataBaseUrl`, off when you supplied your own `geometry`.
+   *
+   * Districts the bundle has no sub-districts for stay leaves rather than erroring.
+   */
+  subDistricts?: boolean;
   /** Reads a feature's stable id. Defaults to `feature.properties.id`. */
   getId?: (feature: MapFeature) => string;
   /** Reads a feature's display name. Defaults to `feature.properties.name`. This is what `.states[...]` is keyed by. */
@@ -302,6 +311,7 @@ export class BharatChoropleth {
       geometry: _geometry,
       dataBaseUrl: _dataBaseUrl,
       districts,
+      subDistricts,
       getId: _getId,
       getLabel: _getLabel,
       values: _values,
@@ -316,11 +326,13 @@ export class BharatChoropleth {
     } = this.options;
 
     const drillDownEnabled = districts ?? this.usingDefaultData;
+    const subDrillDownEnabled = subDistricts ?? this.usingDefaultData;
 
     this.engineInstance = new IndiaChoropleth(this.containerEl, {
       ...rest,
       colorScale,
       loadDistricts: rest.loadDistricts ?? (drillDownEnabled ? this.defaultDistrictLoader : undefined),
+      loadSubDistricts: rest.loadSubDistricts ?? (subDrillDownEnabled ? this.defaultSubDistrictLoader : undefined),
       states: {
         geometry,
         getId: this.getId,
@@ -350,6 +362,24 @@ export class BharatChoropleth {
       // A singleton district can share its parent's name (Lakshadweep). Resolve
       // it through the state registry before looking up the parent value, rather
       // than using its label's bare slug against an id-keyed value map.
+      getValue: (feature) => this.values.get(this.keyFor(this.getLabel(feature))) ?? null,
+    };
+  };
+
+  /**
+   * Sub-districts for the drilled-in district, from the same base URL. Resolves to
+   * null where the bundle has no file, which leaves that district a leaf.
+   *
+   * Values resolve the same way districts' do — through the shared key map — so a
+   * sub-district with nothing written against it reads as "no data".
+   */
+  private defaultSubDistrictLoader = async (districtId: string): Promise<MapLayer | null> => {
+    const geometry = await loadSubDistrictTopology(this.dataBaseUrl, districtId, this.abortController?.signal);
+    if (!geometry) return null;
+    return {
+      geometry,
+      getId: (feature) => String(feature.properties?.id ?? feature.properties?.name),
+      getLabel: (feature) => String(feature.properties?.name ?? feature.properties?.id),
       getValue: (feature) => this.values.get(this.keyFor(this.getLabel(feature))) ?? null,
     };
   };
@@ -479,6 +509,10 @@ export class BharatChoropleth {
   drillDown(id: string | null) {
     const resolved = id === null ? null : (resolveState(id)?.id ?? id);
     this.engineInstance?.drillDown(resolved);
+  }
+  /** Drill from the current district view into one district's sub-districts. */
+  drillDownSubDistrict(id: string | null) {
+    this.engineInstance?.drillDownSubDistrict(id);
   }
   getSelected(): MapRegion | null {
     return this.engineInstance?.getSelected() ?? null;

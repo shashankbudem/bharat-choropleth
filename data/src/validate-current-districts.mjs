@@ -12,6 +12,40 @@ const generated = join(dataDir, "generated", "current-2019-districts");
 const reportPath = join(dataDir, "metadata", "current-2019-districts-validation-report.json");
 const expectedDistrictCount = 788;
 const jkStateId = "in-cs-01-jammu-and-kashmir";
+// The transformation settings the generated bundle is expected to have been built
+// with. Asserted so that changing a simplification constant cannot quietly reshape
+// published geometry while every other check here still passes.
+const expectedMinFeatureVertices = 60;
+const expectedTransformation = { retainedVertexShare: 0.05, minFeatureVertices: expectedMinFeatureVertices, minFeatureVertexShare: 0.08 };
+// Shape fidelity. Nothing else in this file can tell a district from a polygon
+// standing in for one — counts, ids, checksums, winding and bounds all stay valid
+// while an outline degrades. An earlier revision simplified each file at a flat 5%
+// retained-vertex share; because that share is a percentile over the whole file's arc
+// weights, it was set by the districts carrying the most detail and then applied to
+// those carrying the least, and 80 of 788 districts came out at 20 vertices or fewer
+// (7 at 8 or fewer), with J&K and Himachal Pradesh worst hit.
+//
+// A total-vertex floor alone would not have caught that: 87,615 total vertices reads
+// as healthy while a tenth of the features are blobs. The per-feature caps are what
+// encode the floor; the total is a backstop against wholesale loss. The bundle holds
+// 164,237 vertices.
+const MIN_TOTAL_VERTICES = 150_000;
+const DEGENERATE_VERTEX_COUNT = 30;
+const MAX_DEGENERATE_FEATURES = 3;
+// A district may fall below the prepare script's per-feature floor only where the
+// source gives it less to keep. Five do — Shahadara (35), Dimapur (42), North East
+// (43), Diu (49) and Mumbai (52) — and each is retained whole.
+const MAX_BELOW_FEATURE_FLOOR = 12;
+// The J&K reference overlay is built by the same simplification path as the districts,
+// so it can degrade the same way. Its other checks — one feature, parentId, status,
+// checksum — would all pass on a triangle, so its shape needs asserting too. It holds
+// 75 vertices.
+const MIN_OVERLAY_VERTICES = 40;
+
+function countVertices(geometry) {
+  const polygons = geometry.type === "Polygon" ? [geometry.coordinates] : geometry.coordinates ?? [];
+  return polygons.reduce((total, polygon) => total + polygon.reduce((sum, ring) => sum + ring.length, 0), 0);
+}
 
 function walkCoordinates(coordinates, visit) {
   if (typeof coordinates[0] === "number") {
@@ -61,6 +95,9 @@ async function main() {
   const districtEntries = Object.entries(manifest.assets.districts);
   const allDistrictIds = new Set();
   const perState = {};
+  let totalVertices = 0;
+  let degenerateFeatures = 0;
+  let belowFeatureFloor = 0;
 
   for (const [parentId, entry] of districtEntries) {
     if (!parentId.startsWith("in-cs-")) errors.push(`District asset key is not a current-state id: ${parentId}.`);
@@ -85,6 +122,10 @@ async function main() {
       allDistrictIds.add(id);
       const sphericalArea = geoArea(item);
       if (sphericalArea > 1) errors.push(`district ${id}: implausibly large spherical area (${sphericalArea}); likely inverted ring winding.`);
+      const vertices = countVertices(item.geometry);
+      totalVertices += vertices;
+      if (vertices <= DEGENERATE_VERTEX_COUNT) degenerateFeatures += 1;
+      if (vertices < expectedMinFeatureVertices) belowFeatureFloor += 1;
       validateGeometry(item.geometry, `district ${id}`, errors);
     }
     const checksum = await sha256(topoPath);
@@ -131,6 +172,25 @@ async function main() {
     const overlayChecksum = await sha256(overlayPath);
     if (overlayEntry.sha256 !== overlayChecksum) errors.push("J&K district reference overlay checksum does not match manifest.");
     if (!overlayEntry.sourceFeatures?.includes("Mirpur") || !overlayEntry.sourceFeatures?.includes("Muzaffarabad")) errors.push("J&K district reference overlay source features must explicitly include Mirpur and Muzaffarabad.");
+    const overlayVertices = overlayDecoded.geometry ? countVertices(overlayDecoded.geometry) : 0;
+    if (overlayVertices < MIN_OVERLAY_VERTICES) {
+      errors.push(`J&K district reference overlay holds ${overlayVertices} vertices, under the ${MIN_OVERLAY_VERTICES} floor; its outline has been simplified away.`);
+    }
+  }
+
+  // Shape fidelity — see MIN_TOTAL_VERTICES. These are the only checks here that can
+  // see geometry being simplified away underneath an otherwise valid bundle.
+  if (totalVertices < MIN_TOTAL_VERTICES) {
+    errors.push(`Bundle holds ${totalVertices} vertices, under the ${MIN_TOTAL_VERTICES} floor; geometry has been simplified away.`);
+  }
+  if (degenerateFeatures > MAX_DEGENERATE_FEATURES) {
+    errors.push(`${degenerateFeatures} districts have ${DEGENERATE_VERTEX_COUNT} or fewer vertices, over the ${MAX_DEGENERATE_FEATURES} allowed.`);
+  }
+  if (belowFeatureFloor > MAX_BELOW_FEATURE_FLOOR) {
+    errors.push(`${belowFeatureFloor} districts fall below the ${expectedMinFeatureVertices}-vertex per-feature floor, over the ${MAX_BELOW_FEATURE_FLOOR} the source itself accounts for.`);
+  }
+  for (const [field, expected] of Object.entries(expectedTransformation)) {
+    if (manifest.transformation?.[field] !== expected) errors.push(`manifest.transformation.${field} is ${manifest.transformation?.[field]}; expected ${expected}.`);
   }
 
   const report = {
@@ -138,6 +198,7 @@ async function main() {
     result: errors.length === 0 ? "pass" : "fail",
     counts: { currentStates: allCurrentStateIds.size, districtParents: districtEntries.length, districts: allDistrictIds.size },
     bytes: { totalTopojson: totalBytes.reduce((sum, value) => sum + value, 0), totalTopojsonGzip: totalGzipBytes.reduce((sum, value) => sum + value, 0) },
+    shape: { totalVertices, degenerateFeatures, belowFeatureFloor },
     districtsByParent: perState,
     districtReferenceOverlay: manifest.assets.districtReferenceOverlays?.[jkStateId] ? "present" : "missing",
     errors,

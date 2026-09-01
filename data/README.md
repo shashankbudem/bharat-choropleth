@@ -55,7 +55,155 @@ The raw source needed real cleanup before shipping, all recorded in `generated/c
 - **Yanam reassigned**: the source tags this Puducherry exclave's `statecode` as Andhra Pradesh; reassigned to its real parent based on the source's own state-name property.
 - **Mirpur and Muzaffarabad excluded from the value-bearing set**: these two J&K district features are Pakistan-administered territory, not Indian districts (the source itself has no real district code for either). They are not given a value, selection, or drill-down — matching this repo's historical-bundle treatment of the same non-administered extent, and [india-map-studio](https://github.com/nikhilsawantse/india-map-studio)'s own documented exclusion of these same two features. Instead they're merged into a small non-interactive reference overlay, `generated/current-2019-districts/district-reference-overlays/in-cs-01-jammu-and-kashmir.topo.json`, loaded only for J&K's district view via `loadDistrictReferenceOverlay` — same mechanism as the historical bundle's claim-outline overlay.
 
+### Simplified to a floor, not to a flat share
+
+This bundle is simplified — the source is genuinely heavy — but simplification is
+bounded per district rather than set by one share for the whole file.
+
+The earlier pipeline retained a flat 5% of vertices per state file. That share is a
+percentile over every arc weight in the file, so it is set by the districts carrying
+the most detail and then applied to the ones carrying the least. This source averages
+~2,250 vertices per district but its **median is 564**, and the light half of that
+distribution lost its outline: 80 of 788 districts shipped at 20 vertices or fewer and
+7 at 8 or fewer, with Jammu & Kashmir, Himachal Pradesh and the north-east worst hit.
+Srinagar kept 10 of its 166 vertices. A retained-*area* test could not see this — a
+district flattened into a polygon keeps most of its area while losing its shape.
+
+Each district now solves for the largest simplification threshold that still leaves it
+at least **60 vertices, or 8% of the vertices it started with**, whichever is larger
+and never more than it actually has. Every arc is then simplified at the lowest
+threshold any district touching it asked for. Resolving thresholds per arc is what
+keeps this safe: a shared boundary is simplified exactly once, so neighbouring
+districts still agree on it. It is also why the floor cannot be applied to each
+district independently — simplifying two sides of a shared boundary differently tears
+it open, so the unsimplified-outline fallback below is now taken only by features that
+share no boundary at all.
+
+Retention goes from 4.9% to 9.3% of the source's 1,770,065 vertices (mean 111 → 208
+per district), districts at 20 vertices or fewer go from 80 to **0**, and the smallest
+district is 35 vertices — Delhi's Shahadara, which has only 35 in the source and is
+kept whole. Cost is 1.3 MB raw / 0.39 MB gzip across 36 files, up from 0.85 MB /
+0.26 MB; the largest single lazy load goes 88.7 KB → 137.3 KB.
+
+The validator guards this directly: a floor on total vertices, a cap on near-degenerate
+features, a cap on features below the per-feature floor, and an assertion that the
+manifest still declares the retention share and both floor constants. Nothing else
+could see it — counts, ids, checksums, winding and bounds all stayed valid while the
+geometry degraded.
+
+The source's two interior rings — one in North and Middle Andaman, one in Jaipur
+(Gramin) — are still dropped: the exterior-winding cleanup keeps one ring per polygon,
+and holes need the opposite winding. That is unchanged behaviour, not a regression
+from this work.
+
 To regenerate, run `npm run prepare:current-districts` followed by `npm run import:map-studio-lakshadweep` (the latter fetches India Map Studio's pinned Lakshadweep SVG), or use `npm run build` which performs both in order. `npm run validate:current-districts` needs no source checkout and is part of the default `npm run validate`.
+
+## Optional current-vintage sub-district bundle
+
+`generated/current-2019-subdistricts/subdistricts/{districtId}.topo.json` is the third
+level: **5,950** sub-districts (tehsil / taluk / mandal / block) across **785** of the
+788 current districts, from the same source and commit
+(`INDIA/INDIAN_SUB_DISTRICTS.geojson`). It is lazy-loaded per district — the largest
+single file is 37.6 KB — and IDs use their own `in-csd-` namespace:
+
+```text
+sub-district: in-csd-{source D_CODE of the parent district}-{Subdt_LGD, or c{sdtcode11} where the source has no LGD code}
+```
+
+### Quantised, deliberately not simplified
+
+Unlike the state and district bundles, this one applies **no simplification**. Those
+sources are heavy — around 2,160 vertices per district — so retaining 5% of their
+vertices still leaves a recognisable district. This source is a different animal: a
+median of 70 vertices per sub-district, and sub-districts are drawn at a tighter zoom
+than districts, so they need at least as much detail, not less.
+
+Running the district pipeline's 5%-retention step over it reduced the average feature
+to 9 vertices and **2,793 of 5,950 features to bare quadrilaterals** — blobs in roughly
+the right place rather than places. The bundle now keeps 98.8% of the source's 475,256
+vertices (a mean of 80 per feature), costing 6.5 MB raw / 2.3 MB gzip across all 785
+files, which is 2× the simplified size for geometry that actually reads as itself.
+
+Interior rings are preserved too: 45 sub-districts enclose 52 holes between them, and
+filling those in would swallow enclaves that are genuinely not part of the sub-district.
+
+`validate:current-subdistricts` guards this directly, with a floor on total vertices and
+a cap on how many features may be near-degenerate. Nothing else would notice: counts,
+ids, checksums and bounds all stay valid while shapes degrade.
+
+### The parent is decided by geometry, not by a key or a name
+
+The district source carries no LGD district code. Its `dist_code` is a different code
+space, so matching the sub-districts' `Dist_LGD` against it looks like an 80% hit rate
+but 3,578 of those 4,766 pairs disagree on the district name — they are numeric
+coincidences. Joining on district name instead leaves 78 districts unmatched, because
+the two files spell and vintage their districts differently (`Bid`/`Beed`,
+`Bangalore`/`Bengaluru`, `Faizabad`/`Ayodhya`).
+
+So each sub-district is assigned to the district that physically contains it: its
+largest part's centroid plus sampled boundary vertices nudged inward, each point won by
+the **smallest** containing district, and the district holding the most points becomes
+the parent. That places 5,955 of 5,960 candidate features and resolves post-2011
+district splits correctly — a sub-district of the old Koriya lands in
+Manendragarh-Chirmiri-Bharatpur because that is where it is.
+
+"Smallest" is not a tie-break of convenience. The source ships Rajasthan's `JAIPUR`
+inside `JAIPUR(GRAMIN)` and `JODHPUR` inside `JODHPUR GRAMIN` as genuinely overlapping
+polygons, so a first-match rule would assign urban sub-districts by index order.
+
+The manifest records 106 assignments that won with under 60% of their sample points.
+A low share means the sub-district hugs a shared district edge, not that the parent is
+wrong; each was checked against the source's own district label.
+
+### Administrative-vintage limitation
+
+**The source sub-district layer is Census-2011 vintage** (its own `stcode11` /
+`dtcode11` / `sdtcode11` fields) while the district layer it hangs off is ~2019 vintage.
+Districts created by post-2011 splits therefore receive the sub-districts that
+physically sit inside them, which will not always match the sub-district row's own
+`dtname`. That is the intended behaviour of a containment join, but it means
+`sdtname`/`dtname` pairs must not be read as an administrative register.
+
+### Excluded source features
+
+All recorded in `generated/current-2019-subdistricts/manifest.json`:
+
+- **Pakistan-administered** (2 features): Mirpur and Muzaffarabad appear as one nameless
+  district-outline row each. Dropping them from the join index alone would let their
+  geometry fall through to a neighbouring Indian district, so they are excluded
+  explicitly — the same treatment the district bundle gives the same two features.
+- **Unnamed frontier remainders** (4 features): rows with no sub-district name, LGD code
+  or Census code — one each in Punch and Kachchh, two in Leh — the parts of those
+  districts the source never divides into sub-districts. Their districts' sub-districts
+  consequently do not tile them.
+- **No containing district** (5 features): Lakshadweep's Bitra, two Mumbai Suburban rows
+  with `Subdt_LGD=0`, and two stray West Bengal duplicates mislabelled under South 24
+  Parganas.
+
+Five further duplicate rows — one place stored as two features with the same code and
+name inside one district — are merged rather than given a second id. Four Arunachal
+Pradesh pairs are genuinely different places sharing one LGD code inside a district;
+they get a deterministic `-2` suffix.
+
+### Districts with no sub-districts
+
+Three districts deliberately get **no asset at all**, so a renderer can treat them as
+not drillable rather than opening an empty view:
+
+| District | Why |
+| --- | --- |
+| `in-cd-07-169` Nazul (Delhi) | A land-tenure artifact in the source, not a district |
+| `in-cd-08-569` Jaipur (Rajasthan) | Urban half of the source's overlapping urban/rural pair; the Census-2011 tehsil layer predates the split, so every tehsil votes into the rural polygon |
+| `in-cd-08-575` Jodhpur (Rajasthan) | Same as Jaipur |
+
+To regenerate, run `npm run prepare:current-subdistricts` (it needs both
+`INDIA/INDIAN_SUB_DISTRICTS.geojson` and `INDIA/INDIA_DISTRICTS.geojson` from the pinned
+checkout — the join reads district geometry from source, because the generated bundle
+retains only 5% of its vertices and sub-districts would cross its simplified edges).
+`npm run validate:current-subdistricts` needs no source checkout and is part of the
+default `npm run validate`; it asserts the parent of every sub-district is a real
+district, that the three gaps above are exactly the districts without an asset, and that
+no Mirpur/Muzaffarabad geometry reached the value-bearing set.
 
 ## Source, licence, and attribution
 

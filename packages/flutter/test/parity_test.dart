@@ -316,6 +316,140 @@ void main() {
     });
   });
 
+  group('sub-district drill-down', () {
+    final districts = [box('d1', 'Delta', 40, 0, 45, 10), box('d2', 'Echo', 46, 0, 50, 10)];
+    final subDistricts = [box('s1', 'Sierra', 40, 0, 42, 10), box('s2', 'Tango', 43, 0, 45, 10)];
+
+    /// Drill into the "high" state, which the ramp features put at 40..50.
+    Future<void> drillIntoHigh(WidgetTester tester) async {
+      final fit = ViewBoxFit.of(tester.getSize(find.byKey(kChoroplethSurfaceKey)));
+      final origin = tester.getTopLeft(find.byKey(kChoroplethSurfaceKey));
+      final centre = MercatorProjection.fit(rampFeatures).project(const Offset(45, 5));
+      await tester.tapAt(origin + Offset(centre.dx * fit.scale + fit.dx, centre.dy * fit.scale + fit.dy));
+      await tester.pumpAndSettle();
+    }
+
+    /// Then into district "d1", which sits at 40..45 of the district projection.
+    Future<void> drillIntoDelta(WidgetTester tester) async {
+      final fit = ViewBoxFit.of(tester.getSize(find.byKey(kChoroplethSurfaceKey)));
+      final origin = tester.getTopLeft(find.byKey(kChoroplethSurfaceKey));
+      final centre = MercatorProjection.fit(districts).project(const Offset(42.5, 5));
+      await tester.tapAt(origin + Offset(centre.dx * fit.scale + fit.dx, centre.dy * fit.scale + fit.dy));
+      await tester.pumpAndSettle();
+    }
+
+    testWidgets('tapping a district opens its sub-districts, and the trail leads back one level', (tester) async {
+      final subDrilled = <String?>[];
+      await pump(tester, IndiaChoropleth(
+        features: rampFeatures,
+        values: rampValues,
+        colorScale: ramp,
+        loadDistricts: (stateId, state) async =>
+            ChoroplethLayer(features: districts, values: const {'d1': 3.0, 'd2': 4.0}),
+        onSubDistrictDrillDownChange: (id, _) => subDrilled.add(id),
+        loadSubDistricts: (districtId, district, stateId) async =>
+            ChoroplethLayer(features: subDistricts, values: const {'s1': 1.0, 's2': 2.0}),
+      ));
+      await drillIntoHigh(tester);
+      await drillIntoDelta(tester);
+
+      expect(subDrilled, ['d1']);
+      // Three crumbs: the state has become a link of its own rather than the
+      // current page, which is what distinguishes this from the district view.
+      expect(find.widgetWithText(TextButton, 'All states'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'High'), findsOneWidget);
+      expect(find.text('Delta'), findsWidgets);
+
+      // The middle crumb pops one level rather than returning to the nation.
+      await tester.tap(find.widgetWithText(TextButton, 'High'));
+      await tester.pumpAndSettle();
+      expect(subDrilled, ['d1', null]);
+      expect(find.widgetWithText(TextButton, 'High'), findsNothing); // the current page again
+      expect(find.widgetWithText(TextButton, 'All states'), findsOneWidget);
+    });
+
+    testWidgets('a district the loader has no level for stays a leaf', (tester) async {
+      var calls = 0;
+      await pump(tester, IndiaChoropleth(
+        features: rampFeatures,
+        values: rampValues,
+        colorScale: ramp,
+        loadDistricts: (stateId, state) async =>
+            ChoroplethLayer(features: districts, values: const {'d1': 3.0, 'd2': 4.0}),
+        loadSubDistricts: (districtId, district, stateId) async {
+          calls += 1;
+          return null;
+        },
+      ));
+      await drillIntoHigh(tester);
+      await drillIntoDelta(tester);
+
+      // Still the district view — no empty level was opened, so the state stays
+      // the breadcrumb's current page rather than becoming a link back to it.
+      expect(find.widgetWithText(TextButton, 'High'), findsNothing);
+      expect(find.text('High'), findsOneWidget);
+
+      // And asked once: the answer is remembered, so a second tap just selects.
+      await drillIntoDelta(tester);
+      expect(calls, 1);
+    });
+
+    testWidgets('a failed sub-district load reports rather than showing an empty map', (tester) async {
+      await pump(tester, IndiaChoropleth(
+        features: rampFeatures,
+        values: rampValues,
+        colorScale: ramp,
+        loadDistricts: (stateId, state) async =>
+            ChoroplethLayer(features: districts, values: const {'d1': 3.0, 'd2': 4.0}),
+        loadSubDistricts: (districtId, district, stateId) async => throw StateError('nope'),
+      ));
+      await drillIntoHigh(tester);
+      await drillIntoDelta(tester);
+      expect(find.text('Unable to load sub-districts.'), findsOneWidget);
+    });
+
+    testWidgets('offers the level in the semantics only where there is one', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pump(tester, IndiaChoropleth(
+        features: rampFeatures,
+        values: rampValues,
+        colorScale: ramp,
+        loadDistricts: (stateId, state) async =>
+            ChoroplethLayer(features: districts, values: const {'d1': 3.0, 'd2': 4.0}),
+        loadSubDistricts: (districtId, district, stateId) async =>
+            districtId == 'd1' ? ChoroplethLayer(features: subDistricts) : null,
+      ));
+      await drillIntoHigh(tester);
+
+      List<String> labels() {
+        final found = <String>[];
+        void visit(SemanticsNode node) {
+          if (node.label.isNotEmpty) found.add(node.label);
+          node.visitChildren((child) {
+            visit(child);
+            return true;
+          });
+        }
+
+        visit(tester.getSemantics(
+          find.descendant(of: find.byKey(kChoroplethSurfaceKey), matching: find.byType(CustomPaint)),
+        ));
+        return found;
+      }
+
+      expect(labels().where((l) => l.contains('Activate to view sub-districts.')), hasLength(2));
+
+      // Echo answers null, so it stops offering a level it does not have.
+      final fit = ViewBoxFit.of(tester.getSize(find.byKey(kChoroplethSurfaceKey)));
+      final origin = tester.getTopLeft(find.byKey(kChoroplethSurfaceKey));
+      final echo = MercatorProjection.fit(districts).project(const Offset(48, 5));
+      await tester.tapAt(origin + Offset(echo.dx * fit.scale + fit.dx, echo.dy * fit.scale + fit.dy));
+      await tester.pumpAndSettle();
+      expect(labels().where((l) => l.startsWith('Echo')).single, contains('Activate to select.'));
+      handle.dispose();
+    });
+  });
+
   group('reference overlay', () {
     testWidgets('is fitted with the data, so it registers against the map', (tester) async {
       // Fitted on its own, an overlay wider than the data would be scaled to the
@@ -336,6 +470,95 @@ void main() {
       expect(withOverlay.project(const Offset(45, 5)), isNot(dataOnly.project(const Offset(45, 5))));
       // And the legend gains its key.
       expect(find.text('Reference context · data unavailable'), findsOneWidget);
+    });
+  });
+
+  group('cursor', () {
+    /// The cursor the pointer would get at a view-box point, read off the
+    /// MouseRegion that wraps the map surface.
+    Future<MouseCursor> cursorAt(WidgetTester tester, Offset viewBoxPoint, List<MapFeature> fitted) async {
+      final fit = ViewBoxFit.of(tester.getSize(find.byKey(kChoroplethSurfaceKey)));
+      final origin = tester.getTopLeft(find.byKey(kChoroplethSurfaceKey));
+      final projected = MercatorProjection.fit(fitted).project(viewBoxPoint);
+      final pointer = TestPointer(1, ui.PointerDeviceKind.mouse);
+      await tester.sendEventToBinding(pointer.hover(
+        origin + Offset(projected.dx * fit.scale + fit.dx, projected.dy * fit.scale + fit.dy),
+      ));
+      await tester.pumpAndSettle();
+      return tester
+          .widgetList<MouseRegion>(find.descendant(
+            of: find.byKey(kChoroplethSurfaceKey),
+            matching: find.byType(MouseRegion),
+          ))
+          .first
+          .cursor;
+    }
+
+    testWidgets('a region offers the hand, open sea keeps the plain arrow', (tester) async {
+      await pump(tester, IndiaChoropleth(features: rampFeatures, values: rampValues, colorScale: ramp));
+
+      // Inside "high" (40..50), then well outside every region.
+      expect(await cursorAt(tester, const Offset(45, 5), rampFeatures), SystemMouseCursors.click);
+      // Clicking open sea clears the selection, so it is not "forbidden".
+      expect(await cursorAt(tester, const Offset(15, 5), rampFeatures), SystemMouseCursors.basic);
+    });
+
+    testWidgets('the reference overlay refuses the pointer, being drawn but never tappable', (tester) async {
+      final overlay = ReferenceOverlay(features: [box('claim', 'Claimed', 60, 0, 70, 10)]);
+      final fitted = [...rampFeatures, ...overlay.features];
+      await pump(tester, IndiaChoropleth(
+        features: rampFeatures,
+        values: rampValues,
+        colorScale: ramp,
+        referenceOverlay: overlay,
+      ));
+
+      expect(await cursorAt(tester, const Offset(65, 5), fitted), SystemMouseCursors.forbidden);
+      // The data beside it still invites a click.
+      expect(await cursorAt(tester, const Offset(45, 5), fitted), SystemMouseCursors.click);
+    });
+
+    testWidgets('an inert legend band refuses the pointer', (tester) async {
+      // Only "high" carries a value, so the lower bands match nothing and filter
+      // to nothing — they have no onTap, and the cursor has to say so.
+      await pump(tester, IndiaChoropleth(
+        features: rampFeatures,
+        values: const {'high': 10.0},
+        colorScale: ramp,
+      ));
+
+      // The MouseRegion wraps the swatch, so it is an ancestor of the coloured
+      // bar. Nearest first, which is this one rather than Tooltip's own.
+      MouseCursor cursorOfSwatch(int index) => tester
+          .widgetList<MouseRegion>(find.ancestor(of: swatches().at(index), matching: find.byType(MouseRegion)))
+          .first
+          .cursor;
+
+      final matching = <int>[];
+      final inert = <int>[];
+      for (var i = 0; i < tester.widgetList(swatches()).length; i++) {
+        (cursorOfSwatch(i) == SystemMouseCursors.click ? matching : inert).add(i);
+      }
+      expect(matching, isNotEmpty, reason: 'the band holding "high" must be pickable');
+      expect(inert, isNotEmpty, reason: 'bands matching no region must refuse the pointer');
+      for (final index in inert) {
+        expect(cursorOfSwatch(index), SystemMouseCursors.forbidden);
+      }
+    });
+
+    testWidgets('a non-interactive map never wraps the surface at all', (tester) async {
+      await pump(tester, IndiaChoropleth(
+        features: rampFeatures,
+        values: rampValues,
+        colorScale: ramp,
+        interactive: false,
+      ));
+      // Nothing responds, so there is no hover handling and no cursor claim —
+      // a "forbidden" pointer over a whole presentational map would be noise.
+      expect(
+        find.descendant(of: find.byKey(kChoroplethSurfaceKey), matching: find.byType(MouseRegion)),
+        findsNothing,
+      );
     });
   });
 

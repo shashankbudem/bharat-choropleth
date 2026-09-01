@@ -24,6 +24,7 @@ import type {
   MapFeature,
   MapFeatureCollection,
   MapLayer,
+  MapLevel,
   MapRegion,
   ReferenceOverlay,
   TooltipContext,
@@ -196,10 +197,14 @@ export function IndiaChoropleth({
   states,
   referenceOverlay,
   loadDistricts,
+  loadSubDistricts,
   loadDistrictReferenceOverlay,
   drillDownId,
   defaultDrillDownId = null,
   onDrillDownChange,
+  subDistrictDrillDownId,
+  defaultSubDistrictDrillDownId = null,
+  onSubDistrictDrillDownChange,
   selectedId,
   defaultSelectedId = null,
   onSelectedChange,
@@ -229,11 +234,29 @@ export function IndiaChoropleth({
   const tooltipAnchorRef = useRef<HTMLDivElement | null>(null);
   const hatchId = `${useId()}-reference-hatch`;
   const [activeDrillDownId, setActiveDrillDownId] = useControllableState(drillDownId, defaultDrillDownId);
+  const [activeSubDrillDownId, setActiveSubDrillDownId] = useControllableState(subDistrictDrillDownId, defaultSubDistrictDrillDownId);
   const [activeSelectedId, setActiveSelectedId] = useControllableState(selectedId, defaultSelectedId);
   const [loadedDistricts, setLoadedDistricts] = useState<{ stateId: string; layer: MapLayer } | null>(null);
+  const [loadedSubDistricts, setLoadedSubDistricts] = useState<{ districtId: string; layer: MapLayer } | null>(null);
+  /**
+   * Districts the loader has already answered `null` for. The renderer cannot know
+   * which districts are leaves without asking, so the first activation asks — but
+   * after that the region should stop announcing a level it will not open. Held as
+   * state rather than a ref so learning it repaints the label, and cleared when the
+   * loader changes, since a different source may well have sub-districts for them.
+   */
+  const [leafDistrictIds, setLeafDistrictIds] = useState<ReadonlySet<string>>(() => new Set());
+  const priorSubDistrictLoader = useRef(loadSubDistricts);
+  useEffect(() => {
+    if (priorSubDistrictLoader.current === loadSubDistricts) return;
+    priorSubDistrictLoader.current = loadSubDistricts;
+    setLeafDistrictIds(new Set());
+  }, [loadSubDistricts]);
   const [loadedDistrictReferenceOverlay, setLoadedDistrictReferenceOverlay] = useState<{ stateId: string; overlay: ReferenceOverlay | null } | null>(null);
   const [loadingState, setLoadingState] = useState<string | null>(null);
+  const [loadingDistrict, setLoadingDistrict] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<Error | null>(null);
+  const [subLoadError, setSubLoadError] = useState<Error | null>(null);
   const pathRefs = useRef<Record<string, SVGPathElement | null>>({});
   const restoreFocusId = useRef<string | null>(null);
 
@@ -256,7 +279,6 @@ export function IndiaChoropleth({
     [activeDrillDownId, stateRegions],
   );
   const isDrillRequested = Boolean(drilledState && activeDrillDownId);
-  const level = isDrillRequested ? "district" : "state";
   const districtLayer = loadedDistricts?.stateId === activeDrillDownId ? loadedDistricts.layer : null;
   const districtReferenceOverlay = loadedDistrictReferenceOverlay?.stateId === activeDrillDownId
     ? loadedDistrictReferenceOverlay.overlay
@@ -273,12 +295,41 @@ export function IndiaChoropleth({
     () => districtCollection ? makeProjection({ type: "FeatureCollection", features: [...districtCollection.features, ...(districtReferenceCollection?.features ?? [])] }) : null,
     [districtCollection, districtReferenceCollection],
   );
-  const regions = useMemo(
-    () => level === "district" && districtLayer && districtProjection
+  // Districts are prepared whenever their layer is loaded rather than only while
+  // they are the visible level, because the district below them has to be
+  // resolvable — by id, for the breadcrumb and for the loader — from one level down.
+  const districtRegions = useMemo(
+    () => districtLayer && districtProjection
       ? prepareLayer(districtLayer, districtProjection, minDistrictPartExtent ?? minPartExtent)
-      : level === "state" ? stateRegions : [],
-    [districtLayer, districtProjection, level, minDistrictPartExtent, minPartExtent, stateRegions],
+      : [],
+    [districtLayer, districtProjection, minDistrictPartExtent, minPartExtent],
   );
+  const drilledDistrict = useMemo(
+    () => districtRegions.find((region) => region.id === activeSubDrillDownId) ?? null,
+    [activeSubDrillDownId, districtRegions],
+  );
+  const isSubDrillRequested = Boolean(isDrillRequested && drilledDistrict && activeSubDrillDownId);
+  const level: MapLevel = isSubDrillRequested ? "subdistrict" : isDrillRequested ? "district" : "state";
+
+  const subDistrictLayer = loadedSubDistricts?.districtId === activeSubDrillDownId ? loadedSubDistricts.layer : null;
+  const subDistrictCollection = useMemo(
+    () => subDistrictLayer ? asFeatureCollection(subDistrictLayer.geometry) : null,
+    [subDistrictLayer],
+  );
+  const subDistrictProjection = useMemo(
+    () => subDistrictCollection ? makeProjection(subDistrictCollection) : null,
+    [subDistrictCollection],
+  );
+  // Sub-districts share the district knob rather than adding a fourth: they are
+  // drawn at the same zoom as districts and want the same small-part treatment.
+  const subDistrictRegions = useMemo(
+    () => subDistrictLayer && subDistrictProjection
+      ? prepareLayer(subDistrictLayer, subDistrictProjection, minDistrictPartExtent ?? minPartExtent)
+      : [],
+    [minDistrictPartExtent, minPartExtent, subDistrictLayer, subDistrictProjection],
+  );
+
+  const regions = level === "subdistrict" ? subDistrictRegions : level === "district" ? districtRegions : stateRegions;
   const districtReferenceRegions = useMemo(
     () => level === "district" && districtReferenceOverlay && districtProjection ? prepareReferenceOverlay(districtReferenceOverlay, districtProjection) : [],
     [districtProjection, districtReferenceOverlay, level],
@@ -311,7 +362,7 @@ export function IndiaChoropleth({
   const colorScaleKey = typeof colorScale === "function" ? "function" : colorScale.join(",");
   // Bands come from this level's own min and max, and change with the ramp, so an
   // index picked under one of them means something else under another.
-  useEffect(() => { setActiveBucket(null); }, [activeDrillDownId, colorScaleKey, level]);
+  useEffect(() => { setActiveBucket(null); }, [activeDrillDownId, activeSubDrillDownId, colorScaleKey, level]);
 
   const highlighted = useMemo(
     () => filterBucket === null
@@ -362,8 +413,61 @@ export function IndiaChoropleth({
   }, [activeDrillDownId, loadDistrictReferenceOverlay, stateRegions]);
 
   useEffect(() => {
+    let cancelled = false;
+    if (!activeSubDrillDownId || !loadSubDistricts) {
+      setLoadedSubDistricts(null);
+      setLoadingDistrict(null);
+      setSubLoadError(null);
+      return;
+    }
+    const sourceDistrict = districtRegions.find((region) => region.id === activeSubDrillDownId);
+    // The district layer has not arrived yet, so there is nothing to load from.
+    // This effect re-runs once it does.
+    if (!sourceDistrict || !activeDrillDownId) return;
+    setLoadingDistrict(activeSubDrillDownId);
+    setSubLoadError(null);
+    setLoadedSubDistricts(null);
+    loadSubDistricts(activeSubDrillDownId, sourceDistrict, activeDrillDownId)
+      .then((loaded) => {
+        if (cancelled) return;
+        if (!loaded) {
+          // This district is a leaf. Step back to the district view and leave it
+          // selected, rather than opening a level with nothing in it.
+          setLeafDistrictIds((known) => known.has(activeSubDrillDownId) ? known : new Set(known).add(activeSubDrillDownId));
+          setActiveSubDrillDownId(null);
+          setActiveSelectedId(sourceDistrict.id);
+          onSubDistrictDrillDownChange?.(null, sourceDistrict);
+          return;
+        }
+        setLoadedSubDistricts({ districtId: activeSubDrillDownId, layer: loaded });
+      })
+      .catch((error: unknown) => { if (!cancelled) setSubLoadError(error instanceof Error ? error : new Error("Unable to load sub-districts.")); })
+      .finally(() => { if (!cancelled) setLoadingDistrict(null); });
+    return () => { cancelled = true; };
+    // `onSubDistrictDrillDownChange` and the setters are deliberately not
+    // dependencies: a host passing an inline callback would otherwise refetch on
+    // every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDrillDownId, activeSubDrillDownId, districtRegions, loadSubDistricts]);
+
+  // A district id only means something inside the state it came from, so leaving
+  // or changing the state drops the level below it. Seeded with the mount-time
+  // value so an initial state + district pair survives: this must fire on a
+  // change, not on arrival.
+  const priorDrillDownId = useRef(activeDrillDownId);
+  useEffect(() => {
+    if (priorDrillDownId.current === activeDrillDownId) return;
+    priorDrillDownId.current = activeDrillDownId;
+    setActiveSubDrillDownId(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeDrillDownId]);
+
+  useEffect(() => {
     const regionId = restoreFocusId.current;
-    if (!regionId || level !== "state") return;
+    if (!regionId) return;
+    // Focus is restored onto the region that was just stepped out of, so it waits
+    // until the level holding that region is the one being drawn.
+    if (!regions.some((region) => region.id === regionId)) return;
     restoreFocusId.current = null;
     pathRefs.current[regionId]?.focus();
   }, [level, regions]);
@@ -396,16 +500,51 @@ export function IndiaChoropleth({
       setActiveSelectedId(null);
       setActiveDrillDownId(region.id);
       onDrillDownChange?.(region.id, region);
+      return;
+    }
+    // A district is a leaf unless the host offers a level below it. Whether this
+    // particular district actually has one is only known once the loader answers,
+    // so the drill is entered optimistically and stepped back out if it returns null.
+    if (level === "district" && loadSubDistricts && !leafDistrictIds.has(region.id)) {
+      setActiveSelectedId(null);
+      setActiveSubDrillDownId(region.id);
+      onSubDistrictDrillDownChange?.(region.id, region);
     }
   };
 
+  /** Steps up exactly one level, so the breadcrumb and the back button agree. */
   const goBack = () => {
+    if (level === "subdistrict") {
+      const priorDistrict = drilledDistrict ?? undefined;
+      setActiveSubDrillDownId(null);
+      setActiveSelectedId(priorDistrict?.id ?? null);
+      inspectedIdRef.current = priorDistrict?.id ?? null;
+      setInspectedId(priorDistrict?.id ?? null);
+      restoreFocusId.current = priorDistrict?.id ?? null;
+      onSubDistrictDrillDownChange?.(null, priorDistrict);
+      return;
+    }
     const priorState = drilledState ?? undefined;
+    setActiveDrillDownId(null);
+    setActiveSubDrillDownId(null);
+    setActiveSelectedId(priorState?.id ?? null);
+    inspectedIdRef.current = priorState?.id ?? null;
+    setInspectedId(priorState?.id ?? null);
+    restoreFocusId.current = priorState?.id ?? null;
+    onDrillDownChange?.(null, priorState);
+  };
+
+  /** Jumps straight to the national map from any level. */
+  const goToStates = () => {
+    const priorState = drilledState ?? undefined;
+    const wasDrilledDistrict = drilledDistrict ?? undefined;
+    setActiveSubDrillDownId(null);
     setActiveDrillDownId(null);
     setActiveSelectedId(priorState?.id ?? null);
     inspectedIdRef.current = priorState?.id ?? null;
     setInspectedId(priorState?.id ?? null);
     restoreFocusId.current = priorState?.id ?? null;
+    if (wasDrilledDistrict) onSubDistrictDrillDownChange?.(null, wasDrilledDistrict);
     onDrillDownChange?.(null, priorState);
   };
 
@@ -552,7 +691,9 @@ export function IndiaChoropleth({
     }
   };
 
-  const canDrill = Boolean(loadDistricts && level === "state");
+  const canDrill = level === "state" ? Boolean(loadDistricts) : level === "district" ? Boolean(loadSubDistricts) : false;
+  const drillActionLabel = level === "state" ? "Activate to view districts." : "Activate to view sub-districts.";
+  const regionCanDrill = (id: string) => canDrill && !(level === "district" && leafDistrictIds.has(id));
   const visibleReferenceRegions = level === "state" ? referenceRegions : districtReferenceRegions;
   const mergedReferenceIds = useMemo(() => new Set(referenceOverlayMergeIds), [referenceOverlayMergeIds]);
 
@@ -582,22 +723,42 @@ export function IndiaChoropleth({
   }, [tooltipContext?.id, tooltipContext?.value, tooltipContext?.label, renderTooltip]);
 
   return (
-    <section className={["india-choropleth", !interactive && "india-choropleth--static", className].filter(Boolean).join(" ")} aria-busy={loadingState ? "true" : undefined}>
+    <section className={["india-choropleth", !interactive && "india-choropleth--static", className].filter(Boolean).join(" ")} aria-busy={loadingState || loadingDistrict ? "true" : undefined}>
       {showBreadcrumb ? (
         <div className="india-choropleth__toolbar">
           <nav className="india-choropleth__breadcrumb" aria-label="Map hierarchy">
-            {drilledState ? <button className="india-choropleth__back" type="button" onClick={goBack}>All states</button> : <span>All states</span>}
-            {drilledState ? <><span aria-hidden="true">/</span><span aria-current="page">{drilledState.label}</span></> : null}
+            {drilledState
+              ? <button className="india-choropleth__back" type="button" onClick={goToStates}>All states</button>
+              : <span>All states</span>}
+            {drilledState ? (
+              <>
+                <span aria-hidden="true">/</span>
+                {/* The state is a link back only once there is a level below it to
+                    come back from; on the district view it is where you already are. */}
+                {isSubDrillRequested
+                  ? <button className="india-choropleth__back" type="button" onClick={goBack}>{drilledState.label}</button>
+                  : <span aria-current="page">{drilledState.label}</span>}
+              </>
+            ) : null}
+            {isSubDrillRequested && drilledDistrict ? (
+              <><span aria-hidden="true">/</span><span aria-current="page">{drilledDistrict.label}</span></>
+            ) : null}
           </nav>
         </div>
       ) : null}
       <div ref={canvasRef} className="india-choropleth__canvas" onMouseLeave={interactive ? () => inspect(null) : undefined}>
-        {isDrillRequested && (!districtLayer || loadError) ? (
+        {isSubDrillRequested && (!subDistrictLayer || subLoadError) ? (
+          <div className="india-choropleth__status" role={subLoadError ? "alert" : "status"}>
+            {subLoadError ? subLoadError.message : loadingDistrict ? "Loading sub-districts…" : "Sub-district data is unavailable for this district."}
+          </div>
+        ) : isDrillRequested && (!districtLayer || loadError) ? (
           <div className="india-choropleth__status" role={loadError ? "alert" : "status"}>
             {loadError ? loadError.message : loadingState ? "Loading districts…" : "District data is unavailable for this state."}
           </div>
         ) : regions.length === 0 ? (
-          <div className="india-choropleth__status" role="status">No district data is available for this state.</div>
+          <div className="india-choropleth__status" role="status">
+            {level === "subdistrict" ? "No sub-district data is available for this district." : "No district data is available for this state."}
+          </div>
         ) : (
         <svg
           className={`india-choropleth__svg${filterBucket !== null ? " india-choropleth__svg--filtered" : ""}`}
@@ -653,7 +814,7 @@ export function IndiaChoropleth({
           {regions.map((region) => {
             const isInspected = region.id === inspected?.id;
             const isSelected = region.id === selected?.id;
-            const action = canDrill ? "Activate to view districts." : "Activate to select.";
+            const action = regionCanDrill(region.id) ? drillActionLabel : "Activate to select.";
             const textValue = region.value === null ? "No data" : formatValue(region.value);
             return (
               <path
@@ -720,7 +881,7 @@ export function IndiaChoropleth({
                   />
                 ))}
               </g>
-              <g className={`india-choropleth__region-values${level === "district" ? " india-choropleth__region-values--district" : ""}`} aria-hidden="true">
+              <g className={`india-choropleth__region-values${level === "state" ? "" : " india-choropleth__region-values--district"}`} aria-hidden="true">
                 {valuePlacements.map((p) => (
                   <text
                     key={p.region.id}

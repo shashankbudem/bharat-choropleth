@@ -318,6 +318,70 @@ describe("BharatChoropleth with fetched geometry", () => {
     map.destroy();
   });
 
+  it("drills a district into its sub-districts from the same base URL", async () => {
+    const square = geometry.type === "FeatureCollection" ? geometry.features[0]!.geometry : (geometry as never);
+    const stateBundle: GeometrySource = {
+      type: "FeatureCollection",
+      features: [{ type: "Feature", properties: { id: "in-cs-30-goa", name: "Goa" }, geometry: square }],
+    };
+    const districtBundle: GeometrySource = {
+      type: "FeatureCollection",
+      features: [{ type: "Feature", properties: { id: "in-cd-30-476", name: "North Goa" }, geometry: square }],
+    };
+    const subDistrictBundle: GeometrySource = {
+      type: "FeatureCollection",
+      features: [{ type: "Feature", properties: { id: "in-csd-476-4211", name: "Bardez" }, geometry: square }],
+    };
+    const fetchSpy = vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => stateBundle } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => districtBundle } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => subDistrictBundle } as Response);
+
+    const map = new BharatChoropleth(container, {});
+    await map.ready;
+    map.drillDown("Goa");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    map.drillDownSubDistrict("in-cd-30-476");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(fetchSpy).toHaveBeenLastCalledWith(
+      expect.stringContaining("current-2019-subdistricts/subdistricts/in-cd-30-476.topo.json"),
+      expect.anything(),
+    );
+    expect(regionText(container, /^Bardez,/)).toBeTruthy();
+    map.destroy();
+  });
+
+  it("treats a district with no sub-district file as a leaf rather than an error", async () => {
+    const square = geometry.type === "FeatureCollection" ? geometry.features[0]!.geometry : (geometry as never);
+    const stateBundle: GeometrySource = {
+      type: "FeatureCollection",
+      features: [{ type: "Feature", properties: { id: "in-cs-08-rajasthan", name: "Rajasthan" }, geometry: square }],
+    };
+    // Rajasthan's urban Jaipur is one of the three districts the prepared bundle
+    // deliberately ships no sub-district asset for.
+    const districtBundle: GeometrySource = {
+      type: "FeatureCollection",
+      features: [{ type: "Feature", properties: { id: "in-cd-08-569", name: "Jaipur" }, geometry: square }],
+    };
+    vi.spyOn(globalThis, "fetch")
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => stateBundle } as Response)
+      .mockResolvedValueOnce({ ok: true, status: 200, json: async () => districtBundle } as Response)
+      .mockResolvedValueOnce({ ok: false, status: 404, json: async () => ({}) } as Response);
+
+    const map = new BharatChoropleth(container, {});
+    await map.ready;
+    map.drillDown("Rajasthan");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    map.drillDownSubDistrict("in-cd-08-569");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    // Stays on the district view with Jaipur selected; no error surfaces.
+    expect(container.querySelector("[role='alert']")).toBeNull();
+    expect(regionText(container, /^Jaipur,/)).toBeTruthy();
+    map.destroy();
+  });
+
   it("shows the error in the container and rejects `ready` when the fetch fails", async () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue({ ok: false, status: 404, json: async () => ({}) } as Response);
     const onError = vi.fn();
