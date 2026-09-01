@@ -9,9 +9,9 @@ example/build/
 *.iml
 *.log
 
-# The example consumes these copied development assets locally. The library
-# intentionally publishes no boundary data.
-example/assets/states.topo.json
-example/assets/parity-config.json
-example/assets/districts/
-example/assets/overlays/
+# The example consumes copied development assets locally. The library
+# intentionally publishes no boundary data, so the whole directory goes rather
+# than a list of names: pub uses this file *instead of* .gitignore, so anything
+# added to .gitignore alone still ends up in the archive. Enumerating the
+# directories missed example/assets/subdistricts/ exactly that way.
+example/assets/

@@ -4,8 +4,4 @@ build/
 # Boundary data is never bundled with the package, and the example's copies are
 # duplicates of data/generated — copy them in with the commands in
 # example/pubspec.yaml rather than committing a second copy of the same MB.
-example/assets/states.topo.json
-example/assets/parity-config.json
-example/assets/districts/
-example/assets/overlays/
-example/assets/subdistricts/
+example/assets/
