@@ -116,9 +116,15 @@ The renderer cannot know which districts are leaves without asking, so every dis
 offers the level until its loader answers `null` — after which that district stops
 offering it and is not asked again.
 
-**Renderer parity:** the sub-district level is implemented in the React and plain-JS
-packages. The Flutter and Python packages remain two-level; their district views are
-unchanged.
+**Renderer parity:** the sub-district level is implemented in the React, plain-JS and
+Flutter packages. In Flutter the loader is `loadSubDistricts`, with the same
+null-means-leaf contract, alongside `subDistrictDrillDownId` and
+`onSubDistrictDrillDownChange`; its breadcrumb gains a third crumb whose middle link
+returns to the districts rather than to the national map. In Python the notebook
+control takes `sub_district_loader` under the same contract, adds a district selector
+beside the state one, and steps `Back` one level at a time. Every renderer in the
+repository now offers the level; each keeps its two-level behaviour when the loader is
+omitted.
 
 ## Supply your own geometry
 
