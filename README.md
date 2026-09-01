@@ -37,14 +37,14 @@ apps/demo         Documentation/demo application using the included historical b
 
 ## Availability
 
-Version `0.1.0` is publicly available for the React, plain-JS, and Flutter packages. The Python package is ready for its first PyPI release.
+Version `0.1.0` is publicly available for all four packages.
 
 | Target | Package | Registry | Source |
 | --- | --- | --- | --- |
 | React | [`bharat-choropleth@0.1.0`](https://www.npmjs.com/package/bharat-choropleth) | npm | [`packages/react`](./packages/react) |
 | Plain JavaScript | [`bharat-choropleth-js@0.1.0`](https://www.npmjs.com/package/bharat-choropleth-js) | npm | [`packages/js`](./packages/js) |
 | Flutter | [`bharat_choropleth@0.1.0`](https://pub.dev/packages/bharat_choropleth) | pub.dev | [`packages/flutter`](./packages/flutter) |
-| Python | `bharat-choropleth@0.1.0` (pending) | PyPI | [`packages/python`](./packages/python) |
+| Python | [`bharat-choropleth@0.1.0`](https://pypi.org/project/bharat-choropleth/) | PyPI | [`packages/python`](./packages/python) |
 
 Install with:
 
@@ -58,7 +58,7 @@ npm add bharat-choropleth-js
 # Flutter
 flutter pub add bharat_choropleth
 
-# Python — available after the first PyPI release
+# Python
 pip install bharat-choropleth
 ```
 

@@ -9,7 +9,7 @@ This repository ships four independently versioned libraries. They must be valid
 | Flutter | `packages/flutter` | pub.dev | `dart pub publish` |
 | Python | `packages/python` | PyPI | `python3 -m twine upload dist/*` |
 
-The initial `0.1.0` release is public for the React, plain-JS, and Flutter packages. The Python package is ready for its first PyPI release. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
+Version `0.1.0` is public on all four registries. Verify the intended version against the registry rather than this sentence — it has been stale before. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
 
 ## Boundary data bundles
 
