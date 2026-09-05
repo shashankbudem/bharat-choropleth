@@ -1,17 +1,44 @@
-# bharat_choropleth_example
+# `bharat_choropleth` example
 
-A new Flutter project.
+The three-level parity demo: a country choropleth, drill-down into a state's
+districts, and again into a district's sub-districts — the same map, config and
+colours as the React and plain-JavaScript demos in this repository.
 
-## Getting Started
+## Boundary assets are not committed
 
-This project is a starting point for a Flutter application.
+The example loads its boundary data through `rootBundle`, so the files must sit
+inside this directory and be listed in `pubspec.yaml`. They are generated data,
+not source, so `packages/flutter/.gitignore` keeps `example/assets/` out of the
+repository — which means a fresh clone has an empty directory that `pubspec.yaml`
+still declares.
 
-A few resources to get you started if this is your first Flutter project:
+Populate it from the workspace root before running or analyzing anything:
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+```bash
+pnpm prepare:flutter-assets
+```
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+`pnpm check:flutter` and `pnpm build:pages` run this for you. Run it by hand
+before `flutter run`, `flutter analyze` or `flutter test` from inside this
+directory.
+
+Skipping it does not fail gently: `flutter analyze` counts the resulting
+`asset_directory_does_not_exist` warning as an issue and exits non-zero, and a
+build that ignores that warning produces an app whose map silently loads nothing.
+
+The script also replaces what is already there, so an asset left over from an
+older data generation cannot shadow the current bundle.
+
+## Run it
+
+```bash
+pnpm prepare:flutter-assets     # from the workspace root
+cd packages/flutter/example
+flutter run -d chrome
+```
+
+## Attribution
+
+The bundled boundaries carry their source's licence and attribution — see
+[`data/ATTRIBUTION.md`](../../../data/ATTRIBUTION.md). Keep the notice with any
+build you distribute.

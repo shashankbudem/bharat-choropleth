@@ -38,6 +38,18 @@ is the easiest mistake to make here, so tests fail when the copies disagree.
 The Python renderer shares no code and matches values by feature id only; it is
 not part of either arrangement.
 
+## Running the Flutter example
+
+Its boundary assets are generated data, so they are gitignored and a fresh clone
+has none — while `example/pubspec.yaml` still declares the directory. `flutter
+analyze` counts that as an issue and exits non-zero, so populate them first:
+
+```bash
+pnpm prepare:flutter-assets
+```
+
+`pnpm check:flutter` and `pnpm build:pages` already do this for you.
+
 ## Releasing
 
 `DEFAULT_DATA_BASE_URL` pins the boundary bundle to a release tag. Bump it *in*

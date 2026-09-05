@@ -33,7 +33,9 @@ data              Reproducible Census-2011 boundary preparation, manifest, and a
 apps/demo         Documentation/demo application using the included historical bundle
 ```
 
-`pnpm check` covers the JavaScript workspace only. The Flutter and Python packages are independently packaged — run their checks from `packages/flutter` and `packages/python` respectively.
+`pnpm check` covers the JavaScript workspace only. The Flutter and Python packages are independently packaged — run `pnpm check:flutter` for the Dart one, and the Python checks from `packages/python`.
+
+The Flutter example's boundary assets are generated data and are not committed, so a fresh clone has an empty `packages/flutter/example/assets/`. `pnpm check:flutter` and `pnpm build:pages` populate it themselves; run `pnpm prepare:flutter-assets` by hand before invoking `flutter` directly. Without it `flutter analyze` exits non-zero on the missing asset directory.
 
 ## Availability
 
@@ -300,8 +302,12 @@ pnpm verify:data-pin
 # Only needed after changing packages/js/src/states.ts.
 pnpm generate:state-cases
 
-# The Dart package is checked on its own.
+# The Dart package is checked on its own; this populates the example's
+# gitignored boundary assets first, which analyze needs to exist.
 pnpm check:flutter
+
+# Populate packages/flutter/example/assets from data/generated on its own.
+pnpm prepare:flutter-assets
 ```
 
 ## Release status
