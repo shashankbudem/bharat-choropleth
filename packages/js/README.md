@@ -9,7 +9,7 @@ An accessible SVG India state-to-district-to-sub-district choropleth with no fra
 ```html
 <div id="map"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js@0.1.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js@0.2.0"></script>
 <script>
   var map = new BharatChoropleth("#map");
 
@@ -145,7 +145,18 @@ const map = new BharatChoropleth("#map");
 map.states["Goa"] = 6;
 ```
 
-The ESM entry also exports the full `IndiaChoropleth` engine, the `STATES` registry, `resolveState`, `ATTRIBUTION` and `DEFAULT_DATA_BASE_URL`, plus every type.
+The ESM entry also exports the full `IndiaChoropleth` engine, the `STATES` registry, `resolveState`, `normalizeStateKey`, `ATTRIBUTION`, `DEFAULT_DATA_BASE_URL`, and the two bundle loaders `loadDistrictTopology` / `loadSubDistrictTopology`, plus every type.
+
+The loaders are the ones the zero-config map uses, exported so a custom
+`loadDistricts` or `loadSubDistricts` can fetch the prepared bundles without
+re-deriving their URL scheme:
+
+```js
+import { loadSubDistrictTopology, DEFAULT_DATA_BASE_URL } from "bharat-choropleth-js";
+
+const geometry = await loadSubDistrictTopology(DEFAULT_DATA_BASE_URL, districtId);
+// null means the bundle holds no sub-districts for this district — it is a leaf.
+```
 
 ## `IndiaChoropleth` (full-featured engine)
 

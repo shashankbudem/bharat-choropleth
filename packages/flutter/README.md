@@ -8,7 +8,7 @@ The Dart sibling of [`bharat-choropleth-js`](../js) and [`bharat-choropleth`](..
 
 ```yaml
 dependencies:
-  bharat_choropleth: ^0.1.0
+  bharat_choropleth: ^0.2.0
 ```
 
 ## Use

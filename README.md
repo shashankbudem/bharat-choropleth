@@ -25,7 +25,7 @@ Activating a district goes one level further, into its sub-districts — see [Su
 ## Package layout
 
 ```text
-packages/react    Published SVG React renderer, styles, types, and tests
+packages/react    React: zero-config `<BharatChoropleth values={...} />` over the full `IndiaChoropleth` renderer
 packages/js       Framework-free library: `new BharatChoropleth("#map")` from a <script> tag, or ESM
 packages/flutter  Native Dart/Flutter renderer (CustomPainter) — full parity with the web packages, no WebView
 packages/python   Dependency-light Python renderer: accessible SVG by default, optional Matplotlib
@@ -291,8 +291,19 @@ pnpm validate:data
 
 # Runs all of the above release checks.
 pnpm check
+
+# Release preflight: fetches one asset per level from the pinned data source.
+# Network-dependent, so deliberately outside pnpm check.
+pnpm verify:data-pin
+
+# Rebuilds the fixture that holds the Dart state registry to the TypeScript one.
+# Only needed after changing packages/js/src/states.ts.
+pnpm generate:state-cases
+
+# The Dart package is checked on its own.
+pnpm check:flutter
 ```
 
 ## Release status
 
-The React, plain-JS, and Flutter `0.1.0` packages are published; the matching Python package is awaiting its first PyPI release. Future releases follow the [publishing guide](./docs/PUBLISHING.md); increment a package's version before publishing because registries do not permit reusing one. The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.
+All four packages are published at `0.2.0` — see [Availability](#availability) for the registry links. Future releases follow the [publishing guide](./docs/PUBLISHING.md); increment a package's version before publishing because registries do not permit reusing one, and run `pnpm verify:data-pin` so the release does not repeat the 0.2.0 mistake of shipping a renderer whose default data source predates the level it renders. The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.

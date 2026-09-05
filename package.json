@@ -10,6 +10,8 @@
     "test": "pnpm --filter bharat-choropleth test && pnpm --filter bharat-choropleth-js test",
     "typecheck": "pnpm --filter bharat-choropleth typecheck && pnpm --filter bharat-choropleth-js typecheck && pnpm --filter @bharat-choropleth/demo exec tsc --noEmit && pnpm --filter @bharat-choropleth/parity-demo exec tsc --noEmit",
     "build:demo": "pnpm --filter @bharat-choropleth/demo build && pnpm --filter @bharat-choropleth/parity-demo build",
+    "build:pages": "node scripts/build-cloudflare-pages.mjs",
+    "deploy:pages": "node scripts/deploy-cloudflare-pages.mjs",
     "validate:data": "pnpm --dir data run validate",
     "verify:data-pin": "node scripts/verify-data-pin.mjs",
     "generate:state-cases": "pnpm --filter bharat-choropleth-js build && node scripts/generate-state-resolution-cases.mjs",
