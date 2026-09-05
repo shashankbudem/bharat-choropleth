@@ -1,0 +1,91 @@
+# Runs the repository's own checks on every pull request.
+#
+# Salvaged from an earlier unmerged attempt (7a8ba97) and brought up to date:
+# `flutter analyze` now fails without the example's boundary assets, and there
+# is a second Flutter app and a third TypeScript app to cover.
+#
+# Deliberately no network-dependent step. `pnpm verify:data-pin` reaches
+# jsDelivr and `pnpm build:observatory` re-fetches a workbook from data.gov.in;
+# both belong to release preflight, not to a pull request, which should not go
+# red because someone else's server is having a bad afternoon.
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  web:
+    name: Web workspace
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Reads the `packageManager` field from package.json, so the pnpm version
+      # stays pinned in one place. Must run before setup-node for `cache: pnpm`.
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+
+      # build + typecheck + example syntax + tests + demo builds + data validation
+      - run: pnpm check
+
+      # `validate:data` rewrites the timestamps in its own reports. That is
+      # noise in a working tree and would be a silent commit in CI, so fail if
+      # anything else moved.
+      - name: Working tree is unchanged apart from report timestamps
+        run: |
+          git checkout -- data/metadata/ 2>/dev/null || true
+          if ! git diff --quiet; then
+            echo "::error::The build modified tracked files:"
+            git diff --stat
+            exit 1
+          fi
+
+  flutter:
+    name: Flutter packages
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # `stable` satisfies the pubspec constraint of flutter >=3.24.0.
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      # Node, only to run the two asset-provisioning scripts below. Both Flutter
+      # apps load boundary data through `rootBundle`, so it has to sit inside
+      # them; it is generated, so it is gitignored, and a fresh checkout has an
+      # empty directory that each pubspec still declares. `flutter analyze`
+      # counts that as an issue and exits non-zero — which is exactly how this
+      # job failed to be written correctly the first time.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - run: node scripts/prepare-flutter-example-assets.mjs
+      - run: node scripts/prepare-observatory-flutter-assets.mjs
+
+      - name: Package
+        working-directory: packages/flutter
+        run: |
+          flutter analyze
+          flutter test
+
+      - name: Observatory example
+        working-directory: examples/observatory/flutter
+        run: flutter analyze
