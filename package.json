@@ -12,6 +12,7 @@
     "build:demo": "pnpm --filter @bharat-choropleth/demo build && pnpm --filter @bharat-choropleth/parity-demo build",
     "validate:data": "pnpm --dir data run validate",
     "verify:data-pin": "node scripts/verify-data-pin.mjs",
+    "generate:state-cases": "pnpm --filter bharat-choropleth-js build && node scripts/generate-state-resolution-cases.mjs",
     "check": "pnpm build && pnpm typecheck && pnpm test && pnpm build:demo && pnpm validate:data",
     "check:flutter": "cd packages/flutter && flutter analyze && flutter test",
     "check:all": "pnpm check && pnpm check:flutter"

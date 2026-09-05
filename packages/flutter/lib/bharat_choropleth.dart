@@ -32,5 +32,6 @@ export 'src/projection.dart'
         labelPointFor,
         largestRingExtentOf,
         scatteredHitArea;
+export 'src/states.dart' show StateIdentity, kStates, normalizeStateKey, resolveState;
 export 'src/tooltip_position.dart' show TooltipPlacement, TooltipSide, placeTooltip;
 export 'src/topojson.dart' show MapFeature, TopoJsonException, decodeTopoJson;
