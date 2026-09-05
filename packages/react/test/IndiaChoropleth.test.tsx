@@ -240,7 +240,7 @@ describe("IndiaChoropleth", () => {
       if (id === "27") resolveAlpha = resolve;
       else resolveBeta = resolve;
     }));
-    const { rerender } = render(<IndiaChoropleth states={stateLayer} drillDownId="27" loadDistricts={loadDistricts} />);
+    const { rerender } = render(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={loadDistricts} />);
     await waitFor(() => expect(resolveAlpha).toBeDefined());
     resolveAlpha?.(districtLayer);
     expect(await screen.findByRole("button", { name: /delta, 9/i })).toBeInTheDocument();
@@ -820,5 +820,136 @@ describe("IndiaChoropleth sub-district drill-down", () => {
     // 6 of (6 + 3), against the sub-districts on screen — not the districts above them.
     expect(container.querySelector(".india-choropleth__tooltip")).toHaveTextContent("66.7% of total");
     expect(container.querySelector(".india-choropleth__tooltip")).toHaveTextContent("1st of 2");
+  });
+});
+
+describe("repainting values without reloading the level below", () => {
+  /** The same geometry and accessors, with one state's number changed. */
+  function withValues(values: Record<string, number>): MapLayer {
+    return { ...stateLayer, getValue: (feature) => values[String(feature.properties?.code)] ?? null };
+  }
+
+  it("does not call loadDistricts again when only the state values change", async () => {
+    const loadDistricts = vi.fn(async () => districtLayer);
+    const { rerender } = render(
+      <IndiaChoropleth states={withValues({ "27": 42, "29": 18 })} defaultDrillDownId="27" loadDistricts={loadDistricts} />,
+    );
+    expect(await screen.findByRole("button", { name: /delta, 9/i })).toBeInTheDocument();
+    expect(loadDistricts).toHaveBeenCalledTimes(1);
+
+    // A dashboard on a timer hands over a new layer for every tick. The districts
+    // on screen must survive it: reloading them blanks the level mid-flight.
+    rerender(<IndiaChoropleth states={withValues({ "27": 43, "29": 18 })} defaultDrillDownId="27" loadDistricts={loadDistricts} />);
+    rerender(<IndiaChoropleth states={withValues({ "27": 44, "29": 19 })} defaultDrillDownId="27" loadDistricts={loadDistricts} />);
+    expect(loadDistricts).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /delta, 9/i })).toBeInTheDocument();
+  });
+
+  it("does not call loadSubDistricts again when only the state values change", async () => {
+    const loadSubDistricts = vi.fn(async () => subDistrictLayer);
+    // Hoisted, not inline: a loader whose identity changes every render is a
+    // reload trigger in its own right, which would mask what this test measures.
+    const loadDistricts = async () => districtLayer;
+    const { rerender } = render(
+      <IndiaChoropleth
+        states={withValues({ "27": 42 })}
+        defaultDrillDownId="27"
+        defaultSubDistrictDrillDownId="D1"
+        loadDistricts={loadDistricts}
+        loadSubDistricts={loadSubDistricts}
+      />,
+    );
+    expect(await screen.findByRole("button", { name: /tehsil one, 6/i })).toBeInTheDocument();
+    expect(loadSubDistricts).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <IndiaChoropleth
+        states={withValues({ "27": 99 })}
+        defaultDrillDownId="27"
+        defaultSubDistrictDrillDownId="D1"
+        loadDistricts={loadDistricts}
+        loadSubDistricts={loadSubDistricts}
+      />,
+    );
+    expect(loadSubDistricts).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /tehsil one, 6/i })).toBeInTheDocument();
+  });
+
+  it("still reloads districts when the geometry itself changes", async () => {
+    const loadDistricts = vi.fn(async () => districtLayer);
+    const swapped: MapLayer = {
+      ...stateLayer,
+      geometry: { type: "FeatureCollection", features: [
+        { type: "Feature", properties: { code: "27", name: "Alpha", value: 42 }, geometry: { type: "Polygon", coordinates: [[[70, 16], [71, 16], [71, 17], [70, 17], [70, 16]]] } },
+      ] },
+    };
+    const { rerender } = render(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={loadDistricts} />);
+    expect(await screen.findByRole("button", { name: /delta, 9/i })).toBeInTheDocument();
+    expect(loadDistricts).toHaveBeenCalledTimes(1);
+
+    // A different boundary edition is a real change of what the regions are, so
+    // the level below it must not be reused.
+    rerender(<IndiaChoropleth states={swapped} defaultDrillDownId="27" loadDistricts={loadDistricts} />);
+    await waitFor(() => expect(loadDistricts).toHaveBeenCalledTimes(2));
+  });
+
+  it("repaints the state values themselves when the layer changes", () => {
+    const { rerender } = render(<IndiaChoropleth states={withValues({ "27": 42, "29": 18 })} />);
+    expect(screen.getByRole("button", { name: /alpha, 42/i })).toBeInTheDocument();
+    rerender(<IndiaChoropleth states={withValues({ "27": 7, "29": 18 })} />);
+    expect(screen.getByRole("button", { name: /alpha, 7/i })).toBeInTheDocument();
+  });
+});
+
+describe("warning about a loader recreated on every render", () => {
+  it("warns once when loadDistricts keeps changing while the drilled-in state does not", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { rerender } = render(
+      <IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={async () => districtLayer} />,
+    );
+    // Each rerender passes a brand-new arrow, which is what an inline prop does.
+    for (let n = 0; n < 5; n++) {
+      rerender(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={async () => districtLayer} />);
+    }
+    const hits = warn.mock.calls.filter(([message]) => String(message).includes("loadDistricts"));
+    expect(hits).toHaveLength(1);
+    expect(String(hits[0]?.[0])).toMatch(/useCallback/);
+  });
+
+  it("stays quiet for a stable loader, however often the component rerenders", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const loadDistricts = async () => districtLayer;
+    const { rerender } = render(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={loadDistricts} />);
+    for (let n = 0; n < 6; n++) {
+      rerender(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={loadDistricts} ariaLabel={`pass ${n}`} />);
+    }
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet for a memoized loader that changes when its own dependency does", async () => {
+    // The shape of this repo's own demo: the loader is correctly memoized on the
+    // displayed metric, so it changes once per switch with many renders in
+    // between. Warning here would be noise, and noise gets the check ignored.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const loaders = [async () => districtLayer, async () => districtLayer, async () => districtLayer, async () => districtLayer];
+    const { rerender } = render(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={loaders[0]} />);
+    for (const loader of loaders.slice(1)) {
+      // Several renders with the loader held steady, as a real interaction produces.
+      for (let n = 0; n < 6; n++) {
+        rerender(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={loader} ariaLabel={`settle ${n}`} />);
+      }
+    }
+    await waitFor(() => expect(screen.getByRole("button", { name: /delta, 9/i })).toBeInTheDocument());
+    expect(warn.mock.calls.filter(([m]) => String(m).includes("loadDistricts"))).toHaveLength(0);
+  });
+
+  it("stays quiet for a deliberate one-off swap, which must not be mistaken for churn", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const first = async () => districtLayer;
+    const second = async () => districtLayer;
+    const { rerender } = render(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={first} />);
+    rerender(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={second} />);
+    rerender(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={second} />);
+    expect(warn).not.toHaveBeenCalled();
   });
 });

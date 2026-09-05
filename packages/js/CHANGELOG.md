@@ -1,5 +1,46 @@
 # Changelog
 
+## 0.3.0 - 2026-09-05
+
+### Fixed
+
+- Values keyed by a feature id the state registry does not know now match. A
+  feature was keyed by its id only if the registry recognised it, and otherwise
+  fell back to its *label* — so a dataset keyed by id against geometry outside
+  the registry, such as this repo's own historical Census bundle with its
+  `in-hs-*` ids, silently rendered as "No data" on every region while looking
+  perfectly healthy. Each key a caller writes is now recorded against the
+  canonical key it addresses, and a feature is matched by exact id, exact label,
+  then either resolved through the registry. Found by building a dashboard on
+  the historical bundle.
+
+### Changed
+
+- The default data source now points at the `v0.3.0` boundary bundle. A release
+  pins the geometry a consumer receives, not only the renderer that draws it.
+
+### Added
+
+- Exported `loadDistrictTopology` and `loadSubDistrictTopology`, so a custom
+  loader can fetch the prepared bundles without re-deriving their URL scheme.
+
+### Changed
+
+- Repainting no longer re-unpacks the topology or refits the projection. The
+  zero-config facade calls `update({})` for every value written, and both steps
+  ran again each time even though neither reads a value. They are now held
+  against `states.geometry`, and the decoded features are passed into layer
+  preparation rather than unpacked a second time. Mirrors the React renderer.
+
+### Fixed
+
+- The default data source now points at the `v0.2.0` boundary bundle. It was
+  still pinned to `v0.1.0`, which predates `data/generated/current-2019-subdistricts/`,
+  so every sub-district request 404'd — and because a 404 means "this district
+  has no sub-district level", the level 0.2.0 added was silently unreachable for
+  anyone using the default `dataBaseUrl`. Nothing errored; districts simply
+  stayed leaves. Self-hosted `dataBaseUrl` deployments were unaffected.
+
 ## 0.2.0
 
 - Added an optional sub-district level below districts — tehsils, taluks,

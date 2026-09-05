@@ -43,6 +43,12 @@ svg = render_svg(
 open("states.svg", "w", encoding="utf-8").write(svg)
 ```
 
+Key `values` by feature id. Unlike the React, JavaScript and Flutter packages,
+this renderer resolves nothing: a value is looked up by `feature.id` and by
+nothing else, so display names, casing variants and former names such as
+`Orissa` do not match and their regions read as no data. Nothing warns about it,
+so check your keys against the bundle's ids.
+
 `render_svg` returns a complete `<svg>` element with a title, optional
 description, per-region accessible labels, an even-odd fill rule, and a
 lower-to-higher legend. Features with missing, invalid, or non-finite values

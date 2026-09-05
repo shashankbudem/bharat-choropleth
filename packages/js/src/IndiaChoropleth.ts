@@ -18,6 +18,7 @@ import {
 import type {
   ColorContext,
   ColorScale,
+  GeometrySource,
   IndiaChoroplethOptions,
   InsightContext,
   MapFeature,
@@ -112,8 +113,18 @@ function makeProjection(collection: MapFeatureCollection): GeoProjection {
   );
 }
 
-function prepareLayer(layer: MapLayer, projection: GeoProjection, minPartExtent = 0): PreparedRegion[] {
-  const collection = asFeatureCollection(layer.geometry);
+/**
+ * `collection` lets a caller that has already unpacked this layer's geometry
+ * hand the features straight in. Preparing a layer is how values reach the
+ * screen, so it re-runs on every value change — unpacking the same topology
+ * again each time is work whose answer cannot have changed.
+ */
+function prepareLayer(
+  layer: MapLayer,
+  projection: GeoProjection,
+  minPartExtent = 0,
+  collection: MapFeatureCollection = asFeatureCollection(layer.geometry),
+): PreparedRegion[] {
   const path = geoPath(projection);
   return collection.features.map((feature) => {
     const centroid = path.centroid(feature) as [number, number];
@@ -254,6 +265,22 @@ export class IndiaChoropleth {
   // Tracks which drill-down id we've already kicked off a load attempt for — including
   // failed ones — so a render triggered by a *failed* load (which leaves `loadedDistricts`
   // null, same as "never loaded") doesn't read as "still needs loading" and retry forever.
+  /**
+   * The decoded state features and the projection fitted to them, held against
+   * the geometry they came from.
+   *
+   * `recompute()` runs on every `update()`, and the zero-config facade calls
+   * `update({})` for every value written. Unpacking the topology and refitting
+   * the projection each time is work that cannot change its own answer: only the
+   * numbers moved, and neither step reads them. Mirrors the React renderer,
+   * which memoizes the same two steps on `states.geometry`.
+   */
+  private projectionCache: {
+    geometry: GeometrySource;
+    referenceGeometry: GeometrySource | null;
+    collection: MapFeatureCollection;
+    projection: GeoProjection;
+  } | null = null;
   private attemptedDistrictLoadForId: string | null = null;
   private attemptedSubDistrictLoadForId: string | null = null;
   private attemptedOverlayLoadForId: string | null = null;
@@ -442,13 +469,25 @@ export class IndiaChoropleth {
 
   private recompute() {
     const options = this.options;
-    const stateCollection = asFeatureCollection(options.states.geometry);
-    const referenceCollection = options.referenceOverlay ? asFeatureCollection(options.referenceOverlay.geometry) : null;
-    const nationalProjection = makeProjection({
-      type: "FeatureCollection",
-      features: [...stateCollection.features, ...(referenceCollection?.features ?? [])],
-    });
-    const stateRegions = prepareLayer(options.states, nationalProjection, options.minPartExtent ?? 0);
+    const referenceGeometry = options.referenceOverlay?.geometry ?? null;
+    const cached = this.projectionCache;
+    let stateCollection: MapFeatureCollection;
+    let nationalProjection: GeoProjection;
+    if (cached && cached.geometry === options.states.geometry && cached.referenceGeometry === referenceGeometry) {
+      stateCollection = cached.collection;
+      nationalProjection = cached.projection;
+    } else {
+      stateCollection = asFeatureCollection(options.states.geometry);
+      const referenceFeatures = referenceGeometry ? asFeatureCollection(referenceGeometry).features : [];
+      nationalProjection = makeProjection({
+        type: "FeatureCollection",
+        features: [...stateCollection.features, ...referenceFeatures],
+      });
+      this.projectionCache = { geometry: options.states.geometry, referenceGeometry, collection: stateCollection, projection: nationalProjection };
+    }
+    const referenceCollection = referenceGeometry ? asFeatureCollection(referenceGeometry) : null;
+    // Values live on the layer, not the geometry, so this still runs every time.
+    const stateRegions = prepareLayer(options.states, nationalProjection, options.minPartExtent ?? 0, stateCollection);
     const referenceRegions = options.referenceOverlay ? prepareReferenceOverlay(options.referenceOverlay, nationalProjection) : [];
 
     const drilledState = stateRegions.find((region) => region.id === this.activeDrillDownId) ?? null;

@@ -9,7 +9,7 @@ This repository ships four independently versioned libraries. They must be valid
 | Flutter | `packages/flutter` | pub.dev | `dart pub publish` |
 | Python | `packages/python` | PyPI | `python3 -m twine upload dist/*` |
 
-Version `0.1.0` is public on all four registries. Verify the intended version against the registry rather than this sentence — it has been stale before. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
+Version `0.2.0` is public on all four registries (verified 2026-09-05). `0.3.0` is staged in the working tree for React, plain JavaScript and Flutter — manifests, changelogs and the data pin are bumped, but nothing is published and the READMEs still advertise `0.2.0` on purpose, because they describe what a reader can install today. Verify the intended version against the registry rather than this sentence — it has been stale before, and was again between the 0.2.0 release and this line being corrected. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
 
 ## Boundary data bundles
 
@@ -118,11 +118,23 @@ A missing sub-district directory fails **silently** rather than loudly. The load
 treats a 404 as "this district has no sub-district level" — which is a real case for
 three districts — so a wholly absent bundle looks exactly like every district being a
 leaf: no console error, no status message, drill-down just quietly stops one level
-short. Verify by fetching one file from the tag before announcing the release:
+short.
+
+This is not hypothetical, and it is why the check below is a script rather than a
+step to remember: 0.2.0 shipped with the pin still on `v0.1.0`, a tag from before
+`current-2019-subdistricts/` existed, so the sub-district level that release added
+was unreachable for every consumer on the default URL. The instruction to check it
+was already in this document at the time.
+
+After bumping the pin and pushing the tag, and before announcing the release:
 
 ```bash
-curl -sI "https://cdn.jsdelivr.net/gh/shashankbudem/bharat-choropleth@vX.Y.Z/data/generated/current-2019-subdistricts/subdistricts/in-cd-27-398.topo.json" | head -1
+pnpm verify:data-pin
 ```
+
+It fetches one real asset per level from whatever `DEFAULT_DATA_BASE_URL` currently
+says and exits non-zero if any is missing. It is network-dependent, so it is not
+part of `pnpm check`; run it here, where the network is a given anyway.
 
 ## After publishing
 

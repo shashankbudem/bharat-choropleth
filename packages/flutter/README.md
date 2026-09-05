@@ -8,7 +8,7 @@ The Dart sibling of [`bharat-choropleth-js`](../js) and [`bharat-choropleth`](..
 
 ```yaml
 dependencies:
-  bharat_choropleth: ^0.1.0
+  bharat_choropleth: ^0.2.0
 ```
 
 ## Use
@@ -33,6 +33,33 @@ IndiaChoropleth(
 ```
 
 See [`example/lib/main.dart`](./example/lib/main.dart) for a complete app.
+
+### How a value key is matched
+
+An exact id first, then an exact display name — so a layer keyed by the ids in
+its own bundle, which is what a drill-down loader normally returns, is matched
+directly and never goes further.
+
+Failing those, the key is resolved through the state registry, so any spelling of
+a state a reader might reasonably type lands on the right region — the same
+spellings the React and JavaScript packages accept:
+
+```dart
+values: const {
+  'goa': 6,                  // case-insensitive
+  'tamilnadu': 18,           // separator-free
+  'jammu-and-kashmir': 2,    // & normalizes to "and"
+  'Orissa': 8,               // former name, resolves to Odisha
+}
+```
+
+Below the state level there is no registry — district and sub-district names are
+not a fixed set — so those keys fall back to a normalized form, which still makes
+the match case- and separator-insensitive (`'south goa'` finds `South Goa`).
+
+A key that matches nothing is ignored and its region reads as "no data".
+`resolveState`, `normalizeStateKey` and `kStates` are exported if you want to
+resolve names yourself.
 
 ## Boundary data
 

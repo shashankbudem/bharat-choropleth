@@ -23,6 +23,9 @@ function copy(source, destination) {
 // Flutter SDK is available, instead of relying on an ephemeral local tunnel.
 run("pnpm", ["build"]);
 run("pnpm", ["build:demo"]);
+// The example's boundary assets are gitignored, so a clean checkout has none and
+// `flutter build web` would bundle an app that loads nothing.
+run("pnpm", ["prepare:flutter-assets"]);
 run("flutter", ["build", "web", "--base-href", "/flutter/"], {
   cwd: resolve(root, "packages/flutter/example"),
 });

@@ -2,3 +2,6 @@ node_modules
 dist
 coverage
 .DS_Store
+example-sites/
+# Generated boundary data for the observatory's Flutter app.
+examples/observatory/flutter/assets/

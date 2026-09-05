@@ -2,7 +2,46 @@
 
 The component owns map interaction and rendering. Your application owns the metric, labels, colour semantics, and boundary choice.
 
-The snippets below describe the public contract intended for v0.1. Keep the final names aligned with the exported TypeScript declarations.
+The snippets below describe the public contract as published. Keep the names aligned with the exported TypeScript declarations.
+
+There are two React entry points. `BharatChoropleth` is the short path: names to
+numbers, boundary data fetched for you. `IndiaChoropleth` is the renderer under
+it, which you drive yourself — everything from *Country map with a controlled
+drill-down* onward uses it. Neither replaces the other, and moving from one to
+the other is a prop change rather than a rewrite, because the facade forwards
+every `IndiaChoropleth` prop except `states`.
+
+## The short path
+
+```tsx
+import { BharatChoropleth } from "bharat-choropleth";
+import "bharat-choropleth/style.css";
+
+<BharatChoropleth values={{ Telangana: 82, Karnataka: 74, Maharashtra: 91 }} />
+```
+
+Keys go through the state registry, so display names, slugs, LGD ids, former
+names (`Orissa`), separator-free forms (`tamilnadu`) and any casing all land on
+the same region. A key it does not recognize is ignored with one console warning
+naming what you typed, once the boundary data has arrived and the real label set
+is known — never a throw, and never a guess before the data is in.
+
+District numbers nest under the state they belong to, because district names
+repeat across states and, unlike states, have no registry to resolve a bare name
+against:
+
+```tsx
+<BharatChoropleth
+  values={{ Telangana: 82 }}
+  districtValues={{ Telangana: { Hyderabad: 90, "Ranga Reddy": 76 } }}
+/>
+```
+
+There is no `subDistrictValues`; supply those through `loadSubDistricts`.
+
+Row-shaped input is read with `data` + `regionKey` + `valueKey`. When both
+`values` and `data` are given, `values` wins and `data` is ignored — they are not
+merged.
 
 ## Country map with a controlled drill-down
 
@@ -152,3 +191,34 @@ Do not remove the source’s required notices when supplying alternative geometr
 | `null` or omitted | A labelled no-data fill and tooltip/summary text. |
 | Positive number | Sequential scale by default. |
 | Negative number | Caller supplies a divergent scale or explicitly opts into the library’s divergent scale. |
+
+A value only ever means something against the other regions at its own level:
+colour bands and the legend filter are derived per level, so a district's number
+is scaled against the other districts in its state, not against the states.
+
+## Key semantics across the packages
+
+`values` keys resolve identically in React, plain JavaScript and Flutter — the
+same 36 states, the same 15 aliases, the same normalization. React and plain JS
+share one `states.ts` as a byte-identical copy checked by a test; Flutter carries
+a translation held to the same behaviour by a generated fixture of every accepted
+spelling (`pnpm generate:state-cases`). Below the state level there is no
+registry in any package: district and sub-district keys match by id or by a
+normalized name, which is still case- and separator-insensitive.
+
+The Python renderer resolves nothing: `render_svg` looks a value up by
+`feature.id` and by nothing else, not even the display name. Key its `values` by
+id.
+
+| Written | React / JS | Flutter | Python |
+| --- | --- | --- | --- |
+| `in-cs-30-goa` (id) | ✅ | ✅ | ✅ |
+| `Goa` (display name) | ✅ | ✅ | ❌ |
+| `goa`, `GOA` | ✅ | ✅ | ❌ |
+| `tamilnadu`, `tamil_nadu` | ✅ | ✅ | ❌ |
+| `Orissa` → Odisha | ✅ | ✅ | ❌ |
+| `jammu-and-kashmir` for `Jammu & Kashmir` | ✅ | ✅ | ❌ |
+
+In every package an unmatched key is ignored and its region reads as "No data".
+React and plain JS warn on the console when they can tell a state name is
+unrecognized; Flutter and Python do not warn at all, so a typo there is silent.

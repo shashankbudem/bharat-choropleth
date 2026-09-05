@@ -1,0 +1,219 @@
+{
+  "status": "validated_complete_join",
+  "survey": {
+    "name": "NFHS-5",
+    "period": "2019-21",
+    "dhsSurveyId": "IA2020DHS",
+    "nfhsDistrictFrame": "707 districts as of 2017-03-31"
+  },
+  "downloads": {
+    "districtXls": "https://data.gov.in/sites/default/files/datafile/NFHS_5_India_Districts_Factsheet_Data.xls",
+    "stateXls": "https://data.gov.in/sites/default/files/datafile/NFHS_5_Factsheets_Data.xls",
+    "districtResource": "https://www.data.gov.in/resource/india-districts-factsheets-national-family-health-survey-nfhs-5-2019-2021-provisional",
+    "stateResource": "https://www.data.gov.in/resource/all-india-and-stateut-wise-factsheets-national-family-health-survey-nfhs-5-2019-2021"
+  },
+  "sourceFiles": {
+    "districtXlsSha256": "e482b990d74eb46b5ce5a6e10606b745a914d4b1b57838c1c6149e80ec8ad498",
+    "stateXlsSha256": "5e2aaf2694c9a83aee70befc131c282764eccb4e10c2e98892c711981c417a55",
+    "conversion": "LibreOffice Calc -> XLSX XML; negative stored values normalized to absolute value as the source uses parentheses for small-case estimates"
+  },
+  "rowCounts": {
+    "districtTableRows": 707,
+    "stateTotalRowsIncludingIndia": 37,
+    "stateRowsExcludingIndia": 36,
+    "dhsGeometryDistrictRows": 707,
+    "dhsGeometryStateRows": 36,
+    "localCurrent2019DistrictFeatures": 788,
+    "localCensus2011DistrictFeatures": 640
+  },
+  "duplicates": {
+    "districtTableCompositeNameState": 0,
+    "dhsGeometryStateDistrictCode": 0,
+    "dhsGeometryDistrictNamesState": 0,
+    "stateTableTotalNames": 0
+  },
+  "join": {
+    "districtMatched": 707,
+    "districtUnmatched": 0,
+    "stateMatched": 36,
+    "stateUnmatched": 0,
+    "oneToOne": true,
+    "unmatchedDistricts": [],
+    "unmatchedStates": [],
+    "explicitNameAliases": [
+      {
+        "from": [
+          "Sri Potti Sriramulu Nello",
+          "Andhra Pradesh"
+        ],
+        "to": [
+          "sri potti sriramulu nellore",
+          "andhra pradesh"
+        ]
+      },
+      {
+        "from": [
+          "Buxar",
+          "Bihar"
+        ],
+        "to": [
+          "buxer",
+          "bihar"
+        ]
+      },
+      {
+        "from": [
+          "Leh(Ladakh)",
+          "Ladakh"
+        ],
+        "to": [
+          "leh",
+          "ladakh"
+        ]
+      },
+      {
+        "from": [
+          "Chandel",
+          "Mizoram"
+        ],
+        "to": [
+          "saiha",
+          "mizoram"
+        ]
+      },
+      {
+        "from": [
+          "Mahrajganj",
+          "Uttar Pradesh"
+        ],
+        "to": [
+          "maharajganj",
+          "uttar pradesh"
+        ]
+      },
+      {
+        "from": [
+          "Sant Ravidas Nagar (Bhadohi)",
+          "Uttar Pradesh"
+        ],
+        "to": [
+          "sant ravidas nagar",
+          "uttar pradesh"
+        ]
+      },
+      {
+        "from": [
+          "North Twenty Four Pargana",
+          "West Bengal"
+        ],
+        "to": [
+          "north twenty four parganas",
+          "west bengal"
+        ]
+      },
+      {
+        "from": [
+          "South Twenty Four Pargana",
+          "West Bengal"
+        ],
+        "to": [
+          "south twenty four parganas",
+          "west bengal"
+        ]
+      }
+    ]
+  },
+  "publicGeometry": {
+    "provider": "DHS Spatial Data Repository / ICF",
+    "service": "https://gis.dhsprogram.com/arcgis/rest/services/Geometry/SDR_Regions/MapServer/0",
+    "query": "https://gis.dhsprogram.com/arcgis/rest/services/Geometry/SDR_Regions/MapServer/0/query",
+    "filter": "DHSCC='IA' AND SVYID=541 (NFHS-5/2020) AND LEVELRNK in (1,2)",
+    "statsObserved": {
+      "states": 36,
+      "districts": 707
+    },
+    "attributesUsed": [
+      "REGCODE",
+      "REGNAME",
+      "OTHREGCO",
+      "OTHREGNA"
+    ],
+    "vintageEvidence": "DHS survey-boundary metadata and published methodology identify this as the NFHS-2021 707-district frame representing boundaries as of 2017-03-31"
+  },
+  "metricAudit": {
+    "improved_sanitation": {
+      "source_column": "Population living in households that use an improved sanitation facility2 (%)",
+      "numeric_count": 707,
+      "suppressed_count": 0,
+      "blank_count": 0,
+      "nonnumeric_count": 0,
+      "parenthesized_numeric_count": 0,
+      "min": 29.24,
+      "max": 99.85
+    },
+    "stunting": {
+      "source_column": "Children under 5 years who are stunted (height-for-age)18 (%)",
+      "numeric_count": 707,
+      "suppressed_count": 0,
+      "blank_count": 0,
+      "nonnumeric_count": 0,
+      "parenthesized_numeric_count": 1,
+      "min": 13.16,
+      "max": 60.61
+    },
+    "child_anaemia": {
+      "source_column": "Children age 6-59 months who are anaemic (<11.0 g/dl)22 (%)",
+      "numeric_count": 707,
+      "suppressed_count": 0,
+      "blank_count": 0,
+      "nonnumeric_count": 0,
+      "parenthesized_numeric_count": 2,
+      "min": 24.91,
+      "max": 95.48
+    },
+    "full_vaccination": {
+      "source_column": "Children age 12-23 months fully vaccinated based on information from either vaccination card or mother's recall11 (%)",
+      "numeric_count": 694,
+      "suppressed_count": 13,
+      "blank_count": 0,
+      "nonnumeric_count": 0,
+      "parenthesized_numeric_count": 232,
+      "min": 38.25,
+      "max": 100.0
+    }
+  },
+  "stateMetricAudit": {
+    "improved_sanitation": {
+      "source_column": "Population living in households that use an improved sanitation facility2 (%)",
+      "numeric_count": 37,
+      "suppressed_count": 0,
+      "blank_count": 0,
+      "nonnumeric_count": 0,
+      "parenthesized_numeric_count": 0
+    },
+    "stunting": {
+      "source_column": "Children under 5 years who are stunted (height-for-age)18 (%)",
+      "numeric_count": 37,
+      "suppressed_count": 0,
+      "blank_count": 0,
+      "nonnumeric_count": 0,
+      "parenthesized_numeric_count": 0
+    },
+    "child_anaemia": {
+      "source_column": "Children age 6-59 months who are anaemic (<11.0 g/dl)22 (%)",
+      "numeric_count": 37,
+      "suppressed_count": 0,
+      "blank_count": 0,
+      "nonnumeric_count": 0,
+      "parenthesized_numeric_count": 0
+    },
+    "full_vaccination": {
+      "source_column": "Children age 12-23 months fully vaccinated based on information from either vaccination card or mother's recall11 (%)",
+      "numeric_count": 37,
+      "suppressed_count": 0,
+      "blank_count": 0,
+      "nonnumeric_count": 0,
+      "parenthesized_numeric_count": 2
+    }
+  }
+}

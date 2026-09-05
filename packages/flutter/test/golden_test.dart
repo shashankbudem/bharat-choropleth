@@ -1,3 +1,6 @@
+@Tags(['golden'])
+library;
+
 import 'dart:convert';
 import 'dart:io';
 
@@ -9,6 +12,14 @@ import 'package:flutter_test/flutter_test.dart';
 /// the geometry; this one is the check that the numbers add up to a map that
 /// actually looks like India — a flipped axis or a stitching bug survives the
 /// bounds assertions but is obvious the moment it is painted.
+///
+/// Tagged `golden` and excluded from CI. Flutter goldens are not portable: text
+/// rasterisation and antialiasing differ between platforms, so a file recorded
+/// on macOS does not match the same widget painted on a Linux runner. Failing CI
+/// on that would say nothing about the code. Run it where the golden was
+/// recorded, and re-record with:
+///
+///     flutter test --update-goldens test/golden_test.dart
 void main() {
   testWidgets('paints the current-2019 states', (tester) async {
     final raw = File('../../data/generated/current-2019-states/states.topo.json').readAsStringSync();

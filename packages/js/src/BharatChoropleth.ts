@@ -132,6 +132,17 @@ export class BharatChoropleth {
   private readonly dataBaseUrl: string;
   private readonly usingDefaultData: boolean;
   private readonly values = new Map<string, number | null>();
+  /**
+   * Each key the caller wrote, mapped to the canonical key it addresses — never
+   * to a value, so `this.values` stays the single source of truth and a later
+   * write through one spelling is seen through every other.
+   *
+   * It exists because not every id belongs to the registry: the historical
+   * Census bundle in this repository uses `in-hs-*` ids it does not know, so a
+   * feature keyed on its id would fall through to being keyed on its *label*,
+   * and values written against ids would silently never match.
+   */
+  private readonly exactKeys = new Map<string, string>();
   private readonly labelByKey = new Map<string, string>();
   /** Original spelling per key, so a deferred "unknown state" warning quotes what the caller actually typed. */
   private readonly writtenAs = new Map<string, string>();
@@ -169,6 +180,7 @@ export class BharatChoropleth {
     for (const [name, value] of Object.entries(merged.values ?? {})) {
       const key = this.keyFor(name);
       this.values.set(key, value);
+      this.exactKeys.set(name, key);
       this.writtenAs.set(key, name);
     }
 
@@ -181,7 +193,9 @@ export class BharatChoropleth {
     this.statesAccessor = new Proxy({} as Record<string, number | null>, {
       get: (_target, prop) => (typeof prop === "string" ? this.getValue(prop) : undefined),
       has: (_target, prop) => typeof prop === "string" && this.values.has(this.keyFor(prop)),
-      ownKeys: () => [...this.labelByKey.values()],
+      // Deduplicated: a feature is registered under several keys, all mapping
+      // to the same label, and a Proxy's ownKeys must not repeat one.
+      ownKeys: () => [...new Set(this.labelByKey.values())],
       getOwnPropertyDescriptor: (_target, prop) =>
         typeof prop === "string" && this.values.has(this.keyFor(prop))
           ? { enumerable: true, configurable: true, value: this.getValue(prop) }
@@ -264,6 +278,20 @@ export class BharatChoropleth {
     return resolveState(name)?.id ?? normalizeStateKey(name);
   }
 
+  /** Every key a feature answers to, most literal first. Mirrors `valueForFeature`. */
+  private keysForFeature(feature: MapFeature): string[] {
+    const id = this.getId(feature);
+    const label = this.getLabel(feature);
+    return [
+      id,
+      label,
+      resolveState(id)?.id,
+      resolveState(label)?.id,
+      normalizeStateKey(id),
+      normalizeStateKey(label),
+    ].filter((key): key is string => typeof key === "string" && key.length > 0);
+  }
+
   private keyForFeature(feature: MapFeature): string {
     const id = this.getId(feature);
     return resolveState(id)?.id ?? resolveState(this.getLabel(feature))?.id ?? normalizeStateKey(this.getLabel(feature));
@@ -273,9 +301,29 @@ export class BharatChoropleth {
     return this.values.get(this.keyFor(name)) ?? null;
   }
 
+  /**
+   * Finds a feature's value, most literal match first: exact id, exact label,
+   * then each resolved through the state registry. `has` rather than `??`, so a
+   * deliberate null reads as "no data" instead of falling to the next candidate.
+   */
+  private valueForFeature(id: string, label: string): number | null {
+    for (const candidate of [
+      this.exactKeys.get(id),
+      this.exactKeys.get(label),
+      resolveState(id)?.id,
+      resolveState(label)?.id,
+      normalizeStateKey(id),
+      normalizeStateKey(label),
+    ]) {
+      if (candidate !== undefined && this.values.has(candidate)) return this.values.get(candidate) ?? null;
+    }
+    return null;
+  }
+
   private setValue(name: string, value: number | null) {
     const key = this.keyFor(name);
     this.values.set(key, value);
+    this.exactKeys.set(name, key);
     if (!this.writtenAs.has(key)) this.writtenAs.set(key, name);
     // Unknown names can't be judged until the boundary data has landed and told
     // us the real label set — so the warning is deferred, never guessed at.
@@ -295,8 +343,14 @@ export class BharatChoropleth {
     this.clearPlaceholder();
 
     for (const feature of asFeatureCollection(geometry).features) {
+      const label = this.getLabel(feature);
+      // Every key this feature can be addressed by. `labelByKey` is what decides
+      // whether a written name is a known region, so it has to accept the same
+      // spellings the value lookup does — otherwise a write through an id the
+      // registry does not know is dismissed as a typo and never repaints.
       const key = this.keyForFeature(feature);
-      this.labelByKey.set(key, this.getLabel(feature));
+      for (const alias of this.keysForFeature(feature)) this.labelByKey.set(alias, label);
+      this.labelByKey.set(key, label);
       if (!this.values.has(key)) this.values.set(key, null);
     }
 
@@ -337,7 +391,7 @@ export class BharatChoropleth {
         geometry,
         getId: this.getId,
         getLabel: this.getLabel,
-        getValue: (feature) => this.values.get(this.keyForFeature(feature)) ?? null,
+        getValue: (feature) => this.valueForFeature(this.getId(feature), this.getLabel(feature)),
       },
     });
 
@@ -362,7 +416,8 @@ export class BharatChoropleth {
       // A singleton district can share its parent's name (Lakshadweep). Resolve
       // it through the state registry before looking up the parent value, rather
       // than using its label's bare slug against an id-keyed value map.
-      getValue: (feature) => this.values.get(this.keyFor(this.getLabel(feature))) ?? null,
+      getValue: (feature) =>
+        this.valueForFeature(String(feature.properties?.id ?? ""), this.getLabel(feature)),
     };
   };
 
@@ -380,7 +435,8 @@ export class BharatChoropleth {
       geometry,
       getId: (feature) => String(feature.properties?.id ?? feature.properties?.name),
       getLabel: (feature) => String(feature.properties?.name ?? feature.properties?.id),
-      getValue: (feature) => this.values.get(this.keyFor(this.getLabel(feature))) ?? null,
+      getValue: (feature) =>
+        this.valueForFeature(String(feature.properties?.id ?? ""), this.getLabel(feature)),
     };
   };
 
@@ -426,6 +482,7 @@ export class BharatChoropleth {
     for (const [name, value] of Object.entries(values)) {
       const key = this.keyFor(name);
       this.values.set(key, value);
+      this.exactKeys.set(name, key);
       if (!this.writtenAs.has(key)) this.writtenAs.set(key, name);
       if (this.engineInstance && !this.labelByKey.has(key)) this.warnUnknown(name);
     }

@@ -76,6 +76,18 @@ List<SemanticsNode> flatten(SemanticsNode root) {
   return nodes;
 }
 
+
+/// Real state identities, so the registry has something to resolve onto.
+final stateFeatures = [
+  box('in-cs-30-goa', 'Goa', 0, 0, 10, 10),
+  box('in-cs-21-odisha', 'Odisha', 20, 0, 30, 10),
+  box('in-cs-01-jammu-and-kashmir', 'Jammu & Kashmir', 40, 0, 50, 10),
+];
+
+List<String> regionLabels(WidgetTester tester) => flatten(tester.getSemantics(
+      find.descendant(of: find.byKey(kChoroplethSurfaceKey), matching: find.byType(CustomPaint)),
+    )).map((node) => node.label).where((label) => label.isNotEmpty).toList();
+
 void main() {
   testWidgets('renders one painted map for the given features', (tester) async {
     await pumpMap(tester, IndiaChoropleth(features: features));
@@ -228,6 +240,65 @@ void main() {
     await tester.tapAt(tester.getTopLeft(finder) + Offset(centre.dx * fit.scale + fit.dx, centre.dy * fit.scale + fit.dy));
     await tester.pump();
     expect(tapped, isEmpty);
+  });
+
+
+  group('values keyed by any spelling of a state', () {
+    testWidgets('accepts a lowercase name, a separator-free name and a former name', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpMap(
+        tester,
+        IndiaChoropleth(features: stateFeatures, values: const {'goa': 6, 'Orissa': 8, 'jammu-and-kashmir': 2}),
+      );
+      final labels = regionLabels(tester);
+      expect(labels.firstWhere((l) => l.startsWith('Goa,')), contains('6'));
+      expect(labels.firstWhere((l) => l.startsWith('Odisha,')), contains('8'));
+      expect(labels.firstWhere((l) => l.startsWith('Jammu & Kashmir,')), contains('2'));
+      handle.dispose();
+    });
+
+    testWidgets('still prefers an exact id, so a layer keyed by its own ids is untouched', (tester) async {
+      final handle = tester.ensureSemantics();
+      // Both keys point at the same region; the exact id must win. That is what
+      // keeps a drill-down layer keyed by its bundle's ids behaving exactly as
+      // it did before the registry existed.
+      await pumpMap(
+        tester,
+        IndiaChoropleth(features: stateFeatures, values: const {'in-cs-30-goa': 6, 'Goa': 99}),
+      );
+      expect(regionLabels(tester).firstWhere((l) => l.startsWith('Goa,')), contains('6'));
+      handle.dispose();
+    });
+
+    testWidgets('leaves an unrecognized name as no data instead of throwing', (tester) async {
+      final handle = tester.ensureSemantics();
+      await pumpMap(
+        tester,
+        IndiaChoropleth(features: stateFeatures, values: const {'goa': 6, 'Xanadu': 99}),
+      );
+      final labels = regionLabels(tester);
+      expect(labels.firstWhere((l) => l.startsWith('Goa,')), contains('6'));
+      expect(labels.firstWhere((l) => l.startsWith('Odisha,')), contains('No data'));
+      handle.dispose();
+    });
+
+    testWidgets('matches names below the state level, where there is no registry', (tester) async {
+      final handle = tester.ensureSemantics();
+      // Districts resolve to nothing in the registry, so they fall back to the
+      // normalized key — which still buys case- and separator-insensitivity.
+      final districts = [
+        box('in-cd-30-585', 'North Goa', 0, 0, 10, 10),
+        box('in-cd-30-586', 'South Goa', 20, 0, 30, 10),
+      ];
+      await pumpMap(
+        tester,
+        IndiaChoropleth(features: districts, values: const {'in-cd-30-585': 90, 'south goa': 76}),
+      );
+      final labels = regionLabels(tester);
+      expect(labels.firstWhere((l) => l.startsWith('North Goa,')), contains('90'));
+      expect(labels.firstWhere((l) => l.startsWith('South Goa,')), contains('76'));
+      handle.dispose();
+    });
   });
 
 }

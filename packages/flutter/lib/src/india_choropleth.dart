@@ -9,6 +9,7 @@ import 'color_scale.dart';
 import 'legend.dart';
 import 'model.dart';
 import 'projection.dart';
+import 'states.dart';
 import 'topojson.dart';
 
 /// An accessible India choropleth, drawn natively — no WebView, no DOM.
@@ -357,8 +358,44 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
     }
   }
 
-  double? _valueIn(Map<String, double?> values, MapFeature feature) =>
-      values.containsKey(feature.id) ? values[feature.id] : values[feature.name];
+  /// A values map re-keyed so any spelling of a state finds its entry.
+  ///
+  /// Built once per map rather than per feature: resolving is cheap, but a
+  /// national layer is 36 features and a district one can be 80.
+  ///
+  /// Only state names collapse — there is no district registry — so a key that
+  /// is not a known state keeps its normalized form, which still buys
+  /// case-insensitivity and separator-insensitivity at every level.
+  static Map<String, double?> _canonicalize(Map<String, double?> values) {
+    final canonical = <String, double?>{};
+    for (final entry in values.entries) {
+      canonical.putIfAbsent(
+        resolveState(entry.key)?.id ?? normalizeStateKey(entry.key),
+        () => entry.value,
+      );
+    }
+    return canonical;
+  }
+
+  /// Exact id, then exact display name, then the canonical key.
+  ///
+  /// The two exact steps come first so nothing that worked before can change
+  /// meaning: a layer keyed by the ids in its own bundle — which is what a
+  /// drill-down loader normally hands back — never reaches the registry at all.
+  /// The third step is what lets `'goa'`, `'tamilnadu'`, `'Orissa'` and
+  /// `'jammu-and-kashmir'` work, the way they already do in the React and
+  /// JavaScript packages.
+  double? _valueIn(Map<String, double?> values, Map<String, double?> canonical, MapFeature feature) {
+    if (values.containsKey(feature.id)) return values[feature.id];
+    if (values.containsKey(feature.name)) return values[feature.name];
+    for (final key in <String>[
+      resolveState(feature.id)?.id ?? normalizeStateKey(feature.id),
+      resolveState(feature.name)?.id ?? normalizeStateKey(feature.name),
+    ]) {
+      if (canonical.containsKey(key)) return canonical[key];
+    }
+    return null;
+  }
 
   /// Project one layer into view-box space.
   ///
@@ -373,6 +410,7 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
   ) {
     final all = [...features, ...?overlay?.features];
     if (all.isEmpty) return (const [], const []);
+    final canonical = _canonicalize(values);
     final projection = MercatorProjection.fit(all);
 
     List<List<Offset>> ringsOf(MapFeature feature) => [
@@ -404,7 +442,7 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
       regions.add(ChoroplethRegion(
         id: feature.id,
         label: feature.name,
-        value: _valueIn(values, feature),
+        value: _valueIn(values, canonical, feature),
         path: path,
         hitPath: hull == null ? null : pathOf([hull]),
         bounds: bounds,

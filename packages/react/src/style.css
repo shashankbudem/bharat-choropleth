@@ -118,3 +118,7 @@ button.india-choropleth__swatch[aria-disabled="true"] { cursor: default; }
 .india-choropleth__insights { margin-top: 1rem; }
 @media (prefers-reduced-motion: reduce) { .india-choropleth__region, button.india-choropleth__swatch { transition: none; } }
 
+/* Placeholder shown by the `BharatChoropleth` facade while boundary data is
+   being fetched, and for the message if that fetch fails. */
+.bharat-choropleth__status { padding: 1.25rem; border-radius: .625rem; background: var(--india-map-empty, #eef1f7); color: var(--india-map-muted, #53617b); font: 500 .875rem/1.45 system-ui, sans-serif; text-align: center; }
+.bharat-choropleth__status--error { background: #fdeceb; color: #8a1c14; }

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.3.0 - 2026-09-05
+
+### Added
+
+- `values` keys now resolve through a state registry, so any spelling of a state
+  a reader might type finds its region: `'goa'`, `'tamilnadu'`,
+  `'jammu-and-kashmir'` and former names such as `'Orissa'` all work, matching
+  what the React and JavaScript packages already accepted. Exact id and exact
+  display name are still tried first, so a layer keyed by its own bundle's ids —
+  what a drill-down loader normally returns — is matched directly and behaves
+  exactly as before. Below the state level keys fall back to a normalized form,
+  which still gives case- and separator-insensitive matching.
+- Exported `kStates`, `resolveState`, `normalizeStateKey` and `StateIdentity`.
+
+`lib/src/states.dart` is a translation of `packages/js/src/states.ts`, which the
+two TypeScript packages share as a byte-identical copy. Dart cannot be diffed
+against TypeScript, so the two are held together by behaviour instead:
+`test/state_resolution_test.dart` replays every spelling the JavaScript registry
+accepts, recorded in `packages/js/test/state-resolution-cases.json`, and fails if
+this package resolves any of them differently.
+
 ## 0.2.0
 
 - Added an optional sub-district level below districts, matching the React and

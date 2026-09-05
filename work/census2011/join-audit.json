@@ -1,0 +1,379 @@
+{
+  "schemaVersion": 1,
+  "sourceRows": 2028,
+  "sourceRowsByLevel": {
+    "India": 3,
+    "STATE": 105,
+    "DISTRICT": 1920
+  },
+  "sourceRowsByResidence": {
+    "Total": 676,
+    "Rural": 676,
+    "Urban": 676
+  },
+  "retainedTotalRows": {
+    "states": 35,
+    "districts": 640
+  },
+  "geometryCounts": {
+    "states": 35,
+    "districts": 640
+  },
+  "joinKey": "state code + Census district code: XLS (State,District) = geometry (properties.sourceStateCode, properties.source.censuscode)",
+  "coveragePass": true,
+  "duplicateStateKeys": 0,
+  "duplicateDistrictKeys": 0,
+  "invalidRateInputs": 0,
+  "perState": [
+    {
+      "stateCode": "01",
+      "stateName": "JAMMU & KASHMIR",
+      "stateGeometryId": "in-hs-01-jammu-and-kashmir",
+      "geometryDistrictCount": 22,
+      "valueDistrictCount": 22,
+      "joinedDistrictCount": 22,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "02",
+      "stateName": "HIMACHAL PRADESH",
+      "stateGeometryId": "in-hs-02-himachal-pradesh",
+      "geometryDistrictCount": 12,
+      "valueDistrictCount": 12,
+      "joinedDistrictCount": 12,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "03",
+      "stateName": "PUNJAB",
+      "stateGeometryId": "in-hs-03-punjab",
+      "geometryDistrictCount": 20,
+      "valueDistrictCount": 20,
+      "joinedDistrictCount": 20,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "04",
+      "stateName": "CHANDIGARH",
+      "stateGeometryId": "in-hs-04-chandigarh",
+      "geometryDistrictCount": 1,
+      "valueDistrictCount": 1,
+      "joinedDistrictCount": 1,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "05",
+      "stateName": "UTTARAKHAND",
+      "stateGeometryId": "in-hs-05-uttarakhand",
+      "geometryDistrictCount": 13,
+      "valueDistrictCount": 13,
+      "joinedDistrictCount": 13,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "06",
+      "stateName": "HARYANA",
+      "stateGeometryId": "in-hs-06-haryana",
+      "geometryDistrictCount": 21,
+      "valueDistrictCount": 21,
+      "joinedDistrictCount": 21,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "07",
+      "stateName": "NCT OF DELHI",
+      "stateGeometryId": "in-hs-07-nct-of-delhi",
+      "geometryDistrictCount": 9,
+      "valueDistrictCount": 9,
+      "joinedDistrictCount": 9,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "08",
+      "stateName": "RAJASTHAN",
+      "stateGeometryId": "in-hs-08-rajasthan",
+      "geometryDistrictCount": 33,
+      "valueDistrictCount": 33,
+      "joinedDistrictCount": 33,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "09",
+      "stateName": "UTTAR PRADESH",
+      "stateGeometryId": "in-hs-09-uttar-pradesh",
+      "geometryDistrictCount": 71,
+      "valueDistrictCount": 71,
+      "joinedDistrictCount": 71,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "10",
+      "stateName": "BIHAR",
+      "stateGeometryId": "in-hs-10-bihar",
+      "geometryDistrictCount": 38,
+      "valueDistrictCount": 38,
+      "joinedDistrictCount": 38,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "11",
+      "stateName": "SIKKIM",
+      "stateGeometryId": "in-hs-11-sikkim",
+      "geometryDistrictCount": 4,
+      "valueDistrictCount": 4,
+      "joinedDistrictCount": 4,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "12",
+      "stateName": "ARUNACHAL PRADESH",
+      "stateGeometryId": "in-hs-12-arunanchal-pradesh",
+      "geometryDistrictCount": 16,
+      "valueDistrictCount": 16,
+      "joinedDistrictCount": 16,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "13",
+      "stateName": "NAGALAND",
+      "stateGeometryId": "in-hs-13-nagaland",
+      "geometryDistrictCount": 11,
+      "valueDistrictCount": 11,
+      "joinedDistrictCount": 11,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "14",
+      "stateName": "MANIPUR",
+      "stateGeometryId": "in-hs-14-manipur",
+      "geometryDistrictCount": 9,
+      "valueDistrictCount": 9,
+      "joinedDistrictCount": 9,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "15",
+      "stateName": "MIZORAM",
+      "stateGeometryId": "in-hs-15-mizoram",
+      "geometryDistrictCount": 8,
+      "valueDistrictCount": 8,
+      "joinedDistrictCount": 8,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "16",
+      "stateName": "TRIPURA",
+      "stateGeometryId": "in-hs-16-tripura",
+      "geometryDistrictCount": 4,
+      "valueDistrictCount": 4,
+      "joinedDistrictCount": 4,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "17",
+      "stateName": "MEGHALAYA",
+      "stateGeometryId": "in-hs-17-meghalaya",
+      "geometryDistrictCount": 7,
+      "valueDistrictCount": 7,
+      "joinedDistrictCount": 7,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "18",
+      "stateName": "ASSAM",
+      "stateGeometryId": "in-hs-18-assam",
+      "geometryDistrictCount": 27,
+      "valueDistrictCount": 27,
+      "joinedDistrictCount": 27,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "19",
+      "stateName": "WEST BENGAL",
+      "stateGeometryId": "in-hs-19-west-bengal",
+      "geometryDistrictCount": 19,
+      "valueDistrictCount": 19,
+      "joinedDistrictCount": 19,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "20",
+      "stateName": "JHARKHAND",
+      "stateGeometryId": "in-hs-20-jharkhand",
+      "geometryDistrictCount": 24,
+      "valueDistrictCount": 24,
+      "joinedDistrictCount": 24,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "21",
+      "stateName": "ODISHA",
+      "stateGeometryId": "in-hs-21-odisha",
+      "geometryDistrictCount": 30,
+      "valueDistrictCount": 30,
+      "joinedDistrictCount": 30,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "22",
+      "stateName": "CHHATTISGARH",
+      "stateGeometryId": "in-hs-22-chhattisgarh",
+      "geometryDistrictCount": 18,
+      "valueDistrictCount": 18,
+      "joinedDistrictCount": 18,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "23",
+      "stateName": "MADHYA PRADESH",
+      "stateGeometryId": "in-hs-23-madhya-pradesh",
+      "geometryDistrictCount": 50,
+      "valueDistrictCount": 50,
+      "joinedDistrictCount": 50,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "24",
+      "stateName": "GUJARAT",
+      "stateGeometryId": "in-hs-24-gujarat",
+      "geometryDistrictCount": 26,
+      "valueDistrictCount": 26,
+      "joinedDistrictCount": 26,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "25",
+      "stateName": "DAMAN & DIU",
+      "stateGeometryId": "in-hs-25-daman-and-diu",
+      "geometryDistrictCount": 2,
+      "valueDistrictCount": 2,
+      "joinedDistrictCount": 2,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "26",
+      "stateName": "DADRA & NAGAR HAVELI",
+      "stateGeometryId": "in-hs-26-dadara-and-nagar-havelli",
+      "geometryDistrictCount": 1,
+      "valueDistrictCount": 1,
+      "joinedDistrictCount": 1,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "27",
+      "stateName": "MAHARASHTRA",
+      "stateGeometryId": "in-hs-27-maharashtra",
+      "geometryDistrictCount": 35,
+      "valueDistrictCount": 35,
+      "joinedDistrictCount": 35,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "28",
+      "stateName": "ANDHRA PRADESH",
+      "stateGeometryId": "in-hs-28-andhra-pradesh",
+      "geometryDistrictCount": 23,
+      "valueDistrictCount": 23,
+      "joinedDistrictCount": 23,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "29",
+      "stateName": "KARNATAKA",
+      "stateGeometryId": "in-hs-29-karnataka",
+      "geometryDistrictCount": 30,
+      "valueDistrictCount": 30,
+      "joinedDistrictCount": 30,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "30",
+      "stateName": "GOA",
+      "stateGeometryId": "in-hs-30-goa",
+      "geometryDistrictCount": 2,
+      "valueDistrictCount": 2,
+      "joinedDistrictCount": 2,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "31",
+      "stateName": "LAKSHADWEEP",
+      "stateGeometryId": "in-hs-31-lakshadweep",
+      "geometryDistrictCount": 1,
+      "valueDistrictCount": 1,
+      "joinedDistrictCount": 1,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "32",
+      "stateName": "KERALA",
+      "stateGeometryId": "in-hs-32-kerala",
+      "geometryDistrictCount": 14,
+      "valueDistrictCount": 14,
+      "joinedDistrictCount": 14,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "33",
+      "stateName": "TAMIL NADU",
+      "stateGeometryId": "in-hs-33-tamil-nadu",
+      "geometryDistrictCount": 32,
+      "valueDistrictCount": 32,
+      "joinedDistrictCount": 32,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "34",
+      "stateName": "PUDUCHERRY",
+      "stateGeometryId": "in-hs-34-puducherry",
+      "geometryDistrictCount": 4,
+      "valueDistrictCount": 4,
+      "joinedDistrictCount": 4,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    },
+    {
+      "stateCode": "35",
+      "stateName": "ANDAMAN & NICOBAR ISLANDS",
+      "stateGeometryId": "in-hs-35-andaman-and-nicobar-island",
+      "geometryDistrictCount": 3,
+      "valueDistrictCount": 3,
+      "joinedDistrictCount": 3,
+      "missingGeometryValueIds": [],
+      "missingValueDistrictCodes": []
+    }
+  ]
+}

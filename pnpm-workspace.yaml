@@ -2,6 +2,9 @@ packages:
   - "packages/*"
   - "apps/*"
   - "data"
+  # Example 2: the observatory showcase. Its React app is a workspace package so
+  # it can depend on the local bharat-choropleth build like the other demos do.
+  - "examples/observatory/react"
 
 allowBuilds:
   esbuild: true
