@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- The default data source now points at the `v0.2.0` boundary bundle. It was
+  still pinned to `v0.1.0`, which predates `data/generated/current-2019-subdistricts/`,
+  so every sub-district request 404'd — and because a 404 means "this district
+  has no sub-district level", the level 0.2.0 added was silently unreachable for
+  anyone using the default `dataBaseUrl`. Nothing errored; districts simply
+  stayed leaves. Self-hosted `dataBaseUrl` deployments were unaffected.
+
 ## 0.2.0
 
 - Added an optional sub-district level below districts — tehsils, taluks,

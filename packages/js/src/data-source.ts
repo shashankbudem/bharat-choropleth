@@ -20,8 +20,14 @@ import type { Topology } from "topojson-specification";
  * mutable and cached by jsDelivr for hours, so a data change would silently
  * alter — or break — every consumer's map at a time nobody chose. Bump this
  * deliberately, alongside a release.
+ *
+ * Bump it *in* the release, and check one asset of every level actually resolves
+ * at the new tag. Leaving it behind does not fail loudly: a level whose files
+ * the pinned tag predates 404s, and `loadSubDistrictTopology` reads a 404 as
+ * "this district has no sub-districts", so the whole level just quietly goes
+ * missing. That is exactly what 0.2.0 shipped with.
  */
-export const DEFAULT_DATA_BASE_URL = "https://cdn.jsdelivr.net/gh/shashankbudem/bharat-choropleth@v0.1.0/data/generated";
+export const DEFAULT_DATA_BASE_URL = "https://cdn.jsdelivr.net/gh/shashankbudem/bharat-choropleth@v0.2.0/data/generated";
 
 export const ATTRIBUTION = "State/UT, district and sub-district boundaries derived from datta07/INDIAN-SHAPEFILES (MIT).";
 
