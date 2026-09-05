@@ -11,7 +11,14 @@ Requires `xlrd` (pip install xlrd).
 import json
 import sys
 
-import xlrd
+try:
+    import xlrd
+except ModuleNotFoundError:  # pragma: no cover - a setup problem, not a code path
+    raise SystemExit(
+        "read-nfhs5-state-xls.py needs xlrd to read the published .xls workbook.\n"
+        "  pip install -r scripts/requirements.txt\n"
+        "See examples/observatory/README.md."
+    ) from None
 
 # Metric -> a distinctive fragment of the published column heading.
 COLUMNS = {

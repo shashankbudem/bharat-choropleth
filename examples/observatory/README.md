@@ -23,6 +23,13 @@ opens straight onto Pune's sub-districts.
 
 `--skip-flutter` builds the other two if the Flutter SDK is not on the machine.
 
+It needs one Python package: the NFHS-5 factsheet is published as legacy BIFF
+(`.xls`), which no Node reader handles.
+
+```bash
+pip install -r scripts/requirements.txt
+```
+
 | Route | App |
 | --- | --- |
 | `/` | Portal |

@@ -1,0 +1,7 @@
+# Python dependencies for the data-preparation scripts.
+#
+# Only read-nfhs5-state-xls.py needs anything: the NFHS-5 state factsheet is
+# published as legacy BIFF (.xls), which no Node reader handles.
+#
+#     pip install -r scripts/requirements.txt
+xlrd==2.0.2

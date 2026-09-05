@@ -44,6 +44,13 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
+      # The observatory dataset parses the NFHS-5 workbook, which is legacy
+      # BIFF (.xls) and needs a Python reader — no Node package handles it.
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r scripts/requirements.txt
+
       # The dataset is rebuilt rather than trusted: it re-fetches the NFHS-5
       # workbook and checks its SHA-256 against the recorded audit, so a source
       # that changed under us fails the deploy instead of shipping quietly.
