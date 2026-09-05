@@ -1,6 +1,6 @@
 # Bharat Choropleth
 
-`bharat-choropleth` is an open-source React renderer for accessible India state-to-district choropleths, with a framework-free `bharat-choropleth-js` port for non-React use — same behavior, same CSS, either an ES module or a single `<script>` tag. A native `bharat_choropleth` Flutter package provides the same map interaction without a WebView, and the Python `bharat_choropleth` package produces static SVG or optional Matplotlib output. This workspace also includes a separately documented, historical Census-2011 state/UT-to-district boundary bundle for the reference implementation.
+`bharat-choropleth` is an open-source React renderer for accessible India state-to-district choropleths — a zero-config `BharatChoropleth` component over a full `IndiaChoropleth` renderer — with a framework-free `bharat-choropleth-js` port for non-React use — same behavior, same CSS, either an ES module or a single `<script>` tag. A native `bharat_choropleth` Flutter package provides the same map interaction without a WebView, and the Python `bharat_choropleth` package produces static SVG or optional Matplotlib output. This workspace also includes a separately documented, historical Census-2011 state/UT-to-district boundary bundle for the reference implementation.
 
 The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, then loads a selected state's district layer on demand — and, below that, a selected district's sub-districts (tehsils / taluks / mandals / blocks). It follows the approved Atlas UX: hover/focus inspection, activation/drill-down, a breadcrumb return, optional legend and host-owned insight content. The legend also filters — picking a swatch highlights the regions painted in it and dulls the rest, picked again or Escape to clear.
 
@@ -129,7 +129,41 @@ Import the default stylesheet once:
 import "bharat-choropleth/style.css";
 ```
 
+## React: one prop
+
+`BharatChoropleth` is the React counterpart of the script-tag facade above — map
+state names to numbers and you have a map, with boundary data fetched for you and
+drill-down already wired:
+
+```tsx
+import { BharatChoropleth } from "bharat-choropleth";
+import "bharat-choropleth/style.css";
+
+export function Map() {
+  return (
+    <BharatChoropleth
+      values={{
+        Telangana: 82,
+        Karnataka: 74,
+        Maharashtra: 91,
+      }}
+    />
+  );
+}
+```
+
+Keys resolve through the same state registry the JavaScript facade uses, so
+`Goa`, `goa`, `tamilnadu`, `Jammu & Kashmir`, `Orissa` and `in-cs-30-goa` all
+land where you would expect; an unrecognized name is ignored with a warning
+rather than throwing. Row-shaped data works too, via
+`data` + `regionKey` + `valueKey`. Every `IndiaChoropleth` prop except `states`
+passes straight through. See [packages/react/README.md](./packages/react/README.md).
+
 ## Minimal usage
+
+Everything below uses `IndiaChoropleth`, the core renderer that
+`BharatChoropleth` wraps. Use it directly when you own the geometry — it is the
+full API and is not going anywhere.
 
 ```tsx
 import { IndiaChoropleth, type MapLayer } from "bharat-choropleth";
