@@ -5,7 +5,7 @@ A dashboard built three times on the same data, once per ecosystem
 the library's own behaviour; this one is what an application built on it looks
 like.
 
-**[Live demo →](https://shashankbudem.github.io/bharat-choropleth/)**
+**[Live demo →](https://shashankbudem.is-a.dev/bharat-choropleth/)**
 
 ![Sub-districts of Pune district coloured by current temperature](../../previews/observatory-subdistrict-desktop.png)
 

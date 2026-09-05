@@ -6,7 +6,7 @@ The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, the
 
 ![Bharat Choropleth current 2019-boundary dashboard](./previews/country-full-claimed-outline-desktop.png)
 
-**[Try the live demo →](https://shashankbudem.github.io/bharat-choropleth/)** — the
+**[Try the live demo →](https://shashankbudem.is-a.dev/bharat-choropleth/)** — the
 same dashboard built three times, once per ecosystem, on published Indian
 statistics plus a live temperature feed that drills to sub-district.
 
