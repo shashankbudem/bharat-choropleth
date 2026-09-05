@@ -47,13 +47,19 @@ function copy(from, to) {
   cpSync(source, resolve(out, to), { recursive: true });
 }
 
+// The packages come first: build-observatory-data.mjs resolves state names
+// through the framework-free package's own registry, and imports it from
+// `packages/js/dist`. Building the data before the package it depends on worked
+// only on a machine with a dist left over from an earlier run — on a clean
+// checkout it is a module-not-found, which is how CI found this.
+run("pnpm", ["--filter", "bharat-choropleth-js", "build"]);
+run("pnpm", ["--filter", "bharat-choropleth", "build"]);
+
 // The dataset is regenerated rather than trusted: it verifies the NFHS-5
 // workbook's SHA-256 against the recorded audit before using a single number.
 run("node", ["scripts/build-observatory-data.mjs"]);
 run("node", ["scripts/build-region-centroids.mjs"]);
 
-run("pnpm", ["--filter", "bharat-choropleth", "build"]);
-run("pnpm", ["--filter", "bharat-choropleth-js", "build"]);
 run("pnpm", ["--filter", "@bharat-choropleth/observatory-react", "build"]);
 
 const flutterDir = resolve(root, "examples/observatory/flutter");
