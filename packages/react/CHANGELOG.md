@@ -2,6 +2,21 @@
 
 ## 0.3.0 - 2026-09-05
 
+### Added
+
+- `IndiaChoropleth` warns when `loadDistricts` or `loadSubDistricts` has been a
+  different function on three renders running while the level it loads has not
+  moved. That is the signature of an inline arrow: the loaders are compared by
+  identity because a genuinely different loader must refetch, so an unstable one
+  silently refetches the level over the network on every unrelated re-render
+  while still rendering correctly. One deliberate swap does not warn.
+
+### Changed
+
+- Documented `renderInsights` as a pure render slot and pointed at `onInsight`
+  for reacting to the inspected region. Calling `setState` from `renderInsights`
+  is a state update during render; the two props carry the same payload.
+
 ### Changed
 
 - The default data source now points at the `v0.3.0` boundary bundle. A release

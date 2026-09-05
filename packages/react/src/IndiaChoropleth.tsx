@@ -199,6 +199,48 @@ function defaultTooltip(context: TooltipContext, formatValue: (value: number) =>
  * A data-agnostic, accessible SVG India map renderer. Import `@india-choropleth/react/style.css`
  * once in the host app; data and boundaries intentionally remain separate.
  */
+/**
+ * Warns when a lazy loader is being recreated on every render.
+ *
+ * The loading effects list their loader in their dependencies because a
+ * genuinely different loader — a different boundary edition, a different
+ * reporting year — must refetch. An inline arrow is also a new function every
+ * render, and the two are indistinguishable from in here.
+ *
+ * The cost of getting it wrong is invisible: the level silently refetches over
+ * the network on every unrelated re-render, so a dashboard that swaps a metric
+ * while drilled in pays for the district topology again each time. It renders
+ * correctly throughout, which is why nobody notices.
+ *
+ * Three consecutive changes without the level below moving is the signal. One
+ * change is an ordinary deliberate swap, and this must not cry wolf at those.
+ */
+function useStableLoaderWarning(propName: string, loader: unknown, levelId: string | null) {
+  const seen = useRef<{ loader: unknown; levelId: string | null; churn: number; warned: boolean }>({
+    loader,
+    levelId,
+    churn: 0,
+    warned: false,
+  });
+  useEffect(() => {
+    const state = seen.current;
+    if (loader !== state.loader) {
+      state.churn = levelId === state.levelId ? state.churn + 1 : 0;
+      state.loader = loader;
+      if (loader && !state.warned && state.churn >= 3) {
+        state.warned = true;
+        console.warn(
+          `IndiaChoropleth: \`${propName}\` has been a different function on ${state.churn + 1} renders while the ` +
+            "level it loads stayed the same, so that level has been fetched again each time. Wrap it in `useCallback` " +
+            "or hoist it out of the component — an inline arrow is a new function on every render, and the renderer " +
+            "cannot tell that apart from a deliberately different loader.",
+        );
+      }
+    }
+    state.levelId = levelId;
+  }, [levelId, loader, propName]);
+}
+
 export function IndiaChoropleth({
   states,
   referenceOverlay,
@@ -303,6 +345,8 @@ export function IndiaChoropleth({
    */
   const stateRegionsRef = useRef(stateRegions);
   stateRegionsRef.current = stateRegions;
+  useStableLoaderWarning("loadDistricts", loadDistricts, activeDrillDownId);
+  useStableLoaderWarning("loadSubDistricts", loadSubDistricts, activeSubDrillDownId);
   const isDrillRequested = Boolean(drilledState && activeDrillDownId);
   const districtLayer = loadedDistricts?.stateId === activeDrillDownId ? loadedDistricts.layer : null;
   const districtReferenceOverlay = loadedDistrictReferenceOverlay?.stateId === activeDrillDownId

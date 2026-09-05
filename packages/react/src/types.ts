@@ -154,6 +154,15 @@ export interface IndiaChoroplethProps {
   /** Format both tooltip and legend values. */
   formatValue?: (value: number) => string;
   renderTooltip?: (context: TooltipContext) => ReactNode;
+  /**
+   * Renders host-owned content for the inspected region. A render slot: it is
+   * called during render and must be pure.
+   *
+   * To *react* to the inspected region — set state, fire analytics, sync another
+   * panel — use {@link IndiaChoroplethProps.onInsight}, which is the same payload
+   * delivered from an effect. Calling `setState` from here is a state update
+   * during render, and React will say so.
+   */
   renderInsights?: (context: InsightContext | null) => ReactNode;
   /**
    * Map-level visual chrome can be independently disabled/composed.

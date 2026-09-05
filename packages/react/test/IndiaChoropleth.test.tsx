@@ -900,3 +900,39 @@ describe("repainting values without reloading the level below", () => {
     expect(screen.getByRole("button", { name: /alpha, 7/i })).toBeInTheDocument();
   });
 });
+
+describe("warning about a loader recreated on every render", () => {
+  it("warns once when loadDistricts keeps changing while the drilled-in state does not", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { rerender } = render(
+      <IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={async () => districtLayer} />,
+    );
+    // Each rerender passes a brand-new arrow, which is what an inline prop does.
+    for (let n = 0; n < 5; n++) {
+      rerender(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={async () => districtLayer} />);
+    }
+    const hits = warn.mock.calls.filter(([message]) => String(message).includes("loadDistricts"));
+    expect(hits).toHaveLength(1);
+    expect(String(hits[0]?.[0])).toMatch(/useCallback/);
+  });
+
+  it("stays quiet for a stable loader, however often the component rerenders", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const loadDistricts = async () => districtLayer;
+    const { rerender } = render(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={loadDistricts} />);
+    for (let n = 0; n < 6; n++) {
+      rerender(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={loadDistricts} ariaLabel={`pass ${n}`} />);
+    }
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("stays quiet for a deliberate one-off swap, which must not be mistaken for churn", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const first = async () => districtLayer;
+    const second = async () => districtLayer;
+    const { rerender } = render(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={first} />);
+    rerender(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={second} />);
+    rerender(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={second} />);
+    expect(warn).not.toHaveBeenCalled();
+  });
+});

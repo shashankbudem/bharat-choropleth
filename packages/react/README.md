@@ -242,6 +242,50 @@ The breadcrumb gains a third segment. Its back step goes up exactly one level;
 `defaultSubDistrictDrillDownId` as the uncontrolled path — and because a district ID
 means nothing outside the state it came from, changing `drillDownId` clears it.
 
+## Reacting to what the reader is looking at
+
+Two props carry the same payload, and picking the wrong one is the most common
+mistake with this component:
+
+| | |
+| --- | --- |
+| `renderInsights` | A **render slot**. Called during render, must be pure, returns nodes. |
+| `onInsight` | A **callback**. Called from an effect. Set state, fire analytics, drive another panel from here. |
+
+```tsx
+// Wrong — this is a state update during render.
+<BharatChoropleth renderInsights={(context) => { setInspected(context); return null; }} />
+
+// Right.
+<BharatChoropleth onInsight={(context) => setInspected(context)} />
+```
+
+`onInspect` is the narrower version, firing for hover and keyboard focus with the
+region alone; `onInsight` adds the scope total, share and rank.
+
+## Lazy loaders must keep a stable identity
+
+`loadDistricts` and `loadSubDistricts` are compared by identity, because a
+genuinely different loader — a different boundary edition or reporting year —
+has to refetch. An inline arrow is a new function on every render, and the
+renderer cannot tell the two apart, so the level is refetched over the network
+every time anything in the parent re-renders:
+
+```tsx
+// Refetches the district topology on every render.
+<BharatChoropleth values={values} loadDistricts={async (id) => fetchDistricts(id, metric)} />
+
+// Fetches once per state, and again only when `metric` actually changes.
+const loadDistricts = useCallback(async (id) => fetchDistricts(id, metric), [metric]);
+<BharatChoropleth values={values} loadDistricts={loadDistricts} />
+```
+
+The component warns on the console when it sees a loader change three times
+running without the level below it moving, which is the signature of the mistake.
+
+If all you need is district *numbers* rather than different geometry, prefer
+[`districtValues`](#district-values) — it repaints without refetching anything.
+
 ## Features
 
 - Keyboard-accessible regions with Enter/Space activation and focus inspection.
