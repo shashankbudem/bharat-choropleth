@@ -1,0 +1,61 @@
+{
+  "status": "blocked",
+  "dataset": "ISFR 2023 district forest-cover change",
+  "metric": "Change w.r.t. 2021 Raster based",
+  "unit": "km2",
+  "source": {
+    "name": "India State of Forest Report 2023, Volume II",
+    "publisher": "Forest Survey of India",
+    "url": "https://fsi.nic.in/uploads/isfr2023/isfr_book_eng-vol-2_2023.pdf",
+    "sha256": "86029d090ae3687a20f9353e86841959434e76b15f28a7bbc0511f853dbae344",
+    "pages": 428
+  },
+  "expected": {
+    "administrativeDistrictRows": 751,
+    "stateUtUnits": 36,
+    "requirement": "one numeric value for every geometry feature"
+  },
+  "extraction": {
+    "districtTables": 36,
+    "numericTableRecordsIncludingAggregates": 786,
+    "aggregateGrandTotalRowsExcluded": 36,
+    "districtRowsPresent": 750,
+    "numericChangeValuesPresent": 750,
+    "combinedReportedUnits": [
+      {
+        "table": "Table 10.2.3",
+        "label": "East Siang & Siang",
+        "reason": "FSI footnote explicitly says combined forest cover is provided for these two districts"
+      }
+    ],
+    "oneToOne751RowValidation": false
+  },
+  "localGeometry": {
+    "stateManifest": "/Users/shashankbudem/Documents/Bharath Choropleth/data/generated/current-2019-states/manifest.json",
+    "districtManifest": "/Users/shashankbudem/Documents/Bharath Choropleth/data/generated/current-2019-districts/manifest.json",
+    "stateFeatureCount": 36,
+    "districtFeatureCount": 788,
+    "vintage": "approximately 2019 per manifest",
+    "source": "datta07/INDIAN-SHAPEFILES",
+    "sourceCommit": "2c028f5c30fb4191ca1639ff136b152cecdbb69f",
+    "officialIsfr2023Crosswalk": false
+  },
+  "publicGeometry": {
+    "stateUrl": "https://cdn.jsdelivr.net/gh/shashankbudem/bharat-choropleth@v0.1.0/data/generated/current-2019-states/states.topo.json",
+    "districtBaseUrl": "https://cdn.jsdelivr.net/gh/shashankbudem/bharat-choropleth@v0.1.0/data/generated/current-2019-districts/",
+    "stateFeatureCount": 36,
+    "districtFeatureCount": 788,
+    "vintage": "approximately 2019 per published manifest",
+    "matchesIsfr2023SurveyOfIndiaVintage": false,
+    "officialCrosswalkAvailable": false
+  },
+  "join": {
+    "joinReady": false,
+    "reason": "The official value field has 750 district rows with one explicitly combined two-district unit, while available geometry has 788 districts and is not a 2023 Survey-of-India edition.",
+    "unresolved": [
+      "751 expected administrative districts versus 750 report value rows",
+      "East Siang and Siang cannot be assigned separate values without unsupported allocation",
+      "No authoritative 2023 geometry/crosswalk was found locally or in the checked public source"
+    ]
+  }
+}

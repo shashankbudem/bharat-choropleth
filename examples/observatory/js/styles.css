@@ -1,0 +1,87 @@
+:root {
+  --ink: #e8eef2;
+  --muted: #93a4b3;
+  --panel: #131a22;
+  --panel-2: #18212b;
+  --line: #24303c;
+  --accent: #4fd1c0;
+  --bg: #0b1017;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--ink); font: 400 15px/1.55 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: .85em; }
+a { color: var(--accent); }
+
+.app { max-width: 1280px; margin: 0 auto; padding: 1.5rem 1.25rem 3rem; }
+
+header { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; justify-content: space-between; padding-bottom: 1.25rem; border-bottom: 1px solid var(--line); }
+.brand { display: flex; gap: .85rem; align-items: center; }
+.mark { display: grid; place-items: center; inline-size: 2.6rem; block-size: 2.6rem; border-radius: .7rem; background: linear-gradient(140deg, #2f9c90, #1c6f8f); font-weight: 700; letter-spacing: .02em; }
+header h1 { margin: 0; font-size: 1.15rem; letter-spacing: -.01em; }
+header p { margin: .15rem 0 0; color: var(--muted); font-size: .82rem; }
+.ecosystems { display: flex; gap: .5rem; }
+.ecosystems a { padding: .45rem .8rem; border: 1px solid var(--line); border-radius: .5rem; color: var(--ink); font-size: .8rem; text-decoration: none; }
+.ecosystems a:hover { border-color: var(--accent); color: var(--accent); }
+
+.indicators { display: flex; flex-wrap: wrap; gap: .5rem; margin: 1.25rem 0; }
+.indicators button { padding: .55rem .95rem; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--muted); font: inherit; font-size: .85rem; cursor: pointer; }
+.indicators button:hover { color: var(--ink); }
+.indicators button.is-active { border-color: var(--accent); background: rgb(79 209 192 / .12); color: var(--accent); font-weight: 600; }
+.indicators button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: .75rem; margin-bottom: 1.25rem; }
+.kpis article { padding: .9rem 1rem; border: 1px solid var(--line); border-radius: .75rem; background: var(--panel); }
+.kpis span { display: block; color: var(--muted); font-size: .68rem; letter-spacing: .09em; text-transform: uppercase; }
+.kpis strong { display: block; margin: .3rem 0 .15rem; font-size: 1.5rem; font-weight: 650; letter-spacing: -.02em; }
+.kpis small { color: var(--muted); font-size: .74rem; }
+
+main { display: grid; grid-template-columns: minmax(0, 1fr) 21rem; gap: 1rem; align-items: start; }
+.map-panel, .rail { border: 1px solid var(--line); border-radius: .9rem; background: var(--panel); padding: 1.15rem; }
+.panel-head { display: flex; flex-wrap: wrap; gap: .75rem; align-items: start; justify-content: space-between; margin-bottom: .85rem; }
+.panel-head h2 { margin: 0; font-size: 1.05rem; }
+.panel-head p { margin: .25rem 0 0; max-width: 46ch; color: var(--muted); font-size: .82rem; }
+.hint { color: var(--muted); font-size: .72rem; }
+.loading { padding: 4rem 0; color: var(--muted); text-align: center; }
+
+.rail h2 { margin: 0 0 .6rem; font-size: .95rem; }
+.rail h3 { margin: 1.5rem 0 .5rem; font-size: .78rem; color: var(--muted); letter-spacing: .07em; text-transform: uppercase; }
+.rail-label { margin: 0; font-size: 1.05rem; font-weight: 600; }
+.rail-value { margin: .1rem 0 .6rem; font-size: 2rem; font-weight: 650; color: var(--accent); letter-spacing: -.02em; }
+.rail-empty { color: var(--muted); font-size: .85rem; }
+.rail dl, .provenance dl { display: grid; gap: .35rem; margin: 0; }
+.rail dl div, .provenance dl div { display: flex; gap: .75rem; justify-content: space-between; padding: .4rem 0; border-block-start: 1px solid var(--line); font-size: .82rem; }
+.rail dt, .provenance dt { color: var(--muted); }
+.rail dd, .provenance dd { margin: 0; text-align: end; }
+
+.board { display: grid; gap: .25rem; margin: 0; padding: 0; list-style: none; counter-reset: none; }
+.board button { display: grid; grid-template-columns: 1.4rem 1fr auto; gap: .5rem; align-items: center; inline-size: 100%; padding: .35rem .4rem; border: 1px solid transparent; border-radius: .45rem; background: none; color: var(--ink); font: inherit; font-size: .8rem; text-align: start; cursor: pointer; }
+.board button:hover { background: var(--panel-2); }
+.board button.is-selected { border-color: var(--accent); background: rgb(79 209 192 / .1); }
+.board button:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.place { color: var(--muted); font-variant-numeric: tabular-nums; }
+.who { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.bar { display: none; }
+.num { color: var(--muted); font-variant-numeric: tabular-nums; }
+
+.provenance { margin-top: 1rem; padding-top: .85rem; border-block-start: 1px solid var(--line); font-size: .82rem; }
+.provenance summary { color: var(--muted); cursor: pointer; }
+.provenance summary:hover { color: var(--ink); }
+.provenance dl { margin-top: .6rem; }
+.provenance dd { max-width: 52ch; }
+.sha { overflow-wrap: anywhere; color: var(--muted); font-size: .72rem; }
+.caveat { margin: .7rem 0; padding: .6rem .75rem; border-inline-start: 3px solid #c58a3d; border-radius: .3rem; background: rgb(197 138 61 / .1); color: #e2c79a; font-size: .8rem; }
+
+footer { margin-top: 1.5rem; padding-top: 1rem; border-block-start: 1px solid var(--line); color: var(--muted); font-size: .78rem; }
+footer p { max-width: 90ch; margin: 0; }
+
+/* The renderer's own surface, tuned for a dark page. */
+.india-choropleth { --india-map-stroke: #0b1017; --india-map-text: #e8eef2; --india-map-empty: #223041; --india-map-muted: #93a4b3; }
+
+@media (max-width: 900px) {
+  main { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* The framework-free page mounts into a bare div, so it sizes the host itself. */
+#map { min-block-size: 30rem; }
+#map .bharat-choropleth__status { margin: 6rem auto; max-inline-size: 24rem; }

@@ -1,0 +1,82 @@
+{
+  "status": "blocked",
+  "blockedReason": "Official APY CSV host aps.dac.gov.in timed out repeatedly; zero source bytes were retrieved, so schema and filtered data could not be inspected.",
+  "source": {
+    "ogdResourceUrl": "https://www.data.gov.in/resource/district-wise-season-wise-crop-production-statistics-1997",
+    "downloadUrl": "https://aps.dac.gov.in/APY/apy.csv",
+    "desReportUrl": "https://data.desagri.gov.in/website/crops-report-district-level-web",
+    "downloadAttemptDate": "2026-08-20",
+    "downloadedBytes": 0,
+    "schemaInspected": false,
+    "filteredRows": null,
+    "derivedRows": null
+  },
+  "filter": {
+    "crop": ["Rice", "Paddy"],
+    "season": "Kharif",
+    "year": "2022-23",
+    "yieldFormula": "production_tonnes * 1000 / area_hectares"
+  },
+  "geometry": {
+    "stateManifest": "/Users/shashankbudem/Documents/Bharath Choropleth/data/generated/current-2019-states/manifest.json",
+    "districtManifest": "/Users/shashankbudem/Documents/Bharath Choropleth/data/generated/current-2019-districts/manifest.json",
+    "stateFeatureCount": 36,
+    "districtFeatureCount": 788,
+    "districtFeatureCountsByState": {
+      "Jammu & Kashmir": 20,
+      "Himachal Pradesh": 12,
+      "Punjab": 23,
+      "Chandigarh": 1,
+      "Uttarakhand": 13,
+      "Haryana": 22,
+      "Delhi": 12,
+      "Rajasthan": 50,
+      "Uttar Pradesh": 75,
+      "Bihar": 38,
+      "Sikkim": 6,
+      "Arunachal Pradesh": 27,
+      "Nagaland": 16,
+      "Manipur": 16,
+      "Mizoram": 11,
+      "Tripura": 8,
+      "Meghalaya": 12,
+      "Assam": 35,
+      "West Bengal": 23,
+      "Jharkhand": 24,
+      "Odisha": 30,
+      "Chhattisgarh": 33,
+      "Madhya Pradesh": 55,
+      "Gujarat": 33,
+      "Dadra and Nagar Haveli and Daman and Diu": 3,
+      "Maharashtra": 36,
+      "Andhra Pradesh": 26,
+      "Karnataka": 31,
+      "Goa": 2,
+      "Lakshadweep": 1,
+      "Kerala": 14,
+      "Tamil Nadu": 38,
+      "Puducherry": 4,
+      "Andaman & Nicobar": 3,
+      "Telangana": 33,
+      "Ladakh": 2
+    }
+  },
+  "join": {
+    "sourceKey": null,
+    "geometryKey": "district feature id; parentId links to state feature id",
+    "joinMethod": "not run",
+    "matchedDistricts": null,
+    "unmatchedDistricts": null,
+    "duplicateJoinKeys": null,
+    "missingNumericYields": null,
+    "complete": false
+  },
+  "requiredPassCriteria": {
+    "stateValues": 36,
+    "districtValues": 788,
+    "missingStateValues": 0,
+    "missingDistrictValues": 0,
+    "unmatchedGeometryIds": 0,
+    "duplicateJoinKeys": 0
+  }
+}

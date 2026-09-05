@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>India Development Observatory · Bharat Choropleth examples</title>
+    <link rel="stylesheet" href="./js/styles.css" />
+    <style>
+      .portal { max-width: 60rem; margin: 0 auto; padding: 4rem 1.25rem; }
+      .portal h1 { margin: 0 0 .5rem; font-size: 2.1rem; letter-spacing: -.02em; }
+      .lede { max-width: 62ch; margin: 0 0 2.5rem; color: var(--muted); font-size: 1rem; }
+      .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); gap: 1rem; }
+      .card { display: flex; flex-direction: column; padding: 1.25rem; border: 1px solid var(--line); border-radius: .9rem; background: var(--panel); }
+      .card h2 { margin: .6rem 0 .35rem; font-size: 1.05rem; }
+      .card p { flex: 1; margin: 0 0 1rem; color: var(--muted); font-size: .85rem; }
+      .tag { align-self: start; padding: .25rem .6rem; border-radius: 999px; background: rgb(79 209 192 / .12); color: var(--accent); font-size: .7rem; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+      .card a.go { padding: .55rem .9rem; border-radius: .5rem; background: var(--accent); color: #06231f; font-size: .85rem; font-weight: 650; text-align: center; text-decoration: none; }
+      .card a.go:hover { filter: brightness(1.08); }
+      .sources { margin-top: 2.5rem; padding-top: 1.5rem; border-block-start: 1px solid var(--line); }
+      .sources h2 { font-size: .8rem; color: var(--muted); letter-spacing: .08em; text-transform: uppercase; }
+      .sources ul { margin: 0; padding-left: 1.1rem; color: var(--muted); font-size: .84rem; }
+      .sources li { margin-bottom: .4rem; }
+    </style>
+  </head>
+  <body>
+    <div class="portal">
+      <h1>India Development Observatory</h1>
+      <p class="lede">
+        The same dashboard, built three times on the same boundary data — once per ecosystem
+        <code>bharat-choropleth</code> supports. Six published official indicators, each joined to the administrative
+        vintage it was actually collected on.
+      </p>
+
+      <div class="cards">
+        <article class="card">
+          <span class="tag">React</span>
+          <h2>React observatory</h2>
+          <p>The zero-config <code>&lt;BharatChoropleth&gt;</code> component with declarative values, controlled selection and drill-down.</p>
+          <a class="go" href="./react/">Open React version</a>
+        </article>
+        <article class="card">
+          <span class="tag">Plain JavaScript</span>
+          <h2>Framework-free observatory</h2>
+          <p>The same page from one <code>&lt;script&gt;</code> tag — no bundler, no compile step, <code>new BharatChoropleth(...)</code>.</p>
+          <a class="go" href="./js/">Open plain JS version</a>
+        </article>
+        <article class="card">
+          <span class="tag">Flutter</span>
+          <h2>Flutter observatory</h2>
+          <p>The same map painted natively by <code>CustomPainter</code>, with no WebView and no DOM.</p>
+          <a class="go" href="./flutter/">Open Flutter version</a>
+        </article>
+      </div>
+
+      <section class="sources">
+        <h2>What the numbers are</h2>
+        <ul>
+          <li><strong>Female literacy</strong> — Census of India 2011, Primary Census Abstract. State and district, on the 2011 boundaries.</li>
+          <li><strong>Sanitation, vaccination, stunting, anaemia</strong> — NFHS-5 (2019–21) state factsheets, on current boundaries.</li>
+          <li><strong>Groundwater extraction</strong> — CGWB <em>Dynamic Ground Water Resources of India, 2023</em>, on current boundaries.</li>
+        </ul>
+        <p style="color: var(--muted); font-size: .84rem; max-width: 78ch;">
+          Every figure is published official data joined to boundary bundles in this repository, with the producer,
+          download URL, source SHA-256 and join rule shown in each page. Nothing is estimated: where a source does not
+          cover a region — or cannot be honestly joined to it — the region reads <em>No data</em>.
+        </p>
+      </section>
+    </div>
+  </body>
+</html>

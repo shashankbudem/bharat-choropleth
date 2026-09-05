@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>India Development Observatory · Plain JavaScript · Bharat Choropleth</title>
+    <link rel="stylesheet" href="/packages/js/dist/style.css" />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app">
+      <header>
+        <div class="brand">
+          <span class="mark">IN</span>
+          <div>
+            <h1>India Development Observatory</h1>
+            <p>Official statistics on this repository&rsquo;s own boundary bundles · <code>bharat-choropleth-js</code>, no build step</p>
+          </div>
+        </div>
+        <nav class="ecosystems">
+          <a href="/">All examples</a>
+          <a href="/react/">React</a>
+          <a href="/flutter/">Flutter</a>
+        </nav>
+      </header>
+
+      <div class="indicators" id="indicators" role="tablist" aria-label="Indicator"></div>
+
+      <section class="kpis" id="kpis" aria-label="Summary"></section>
+
+      <main>
+        <section class="map-panel">
+          <div class="panel-head">
+            <div>
+              <h2 id="indicator-label"></h2>
+              <p id="indicator-description"></p>
+            </div>
+            <span class="hint" id="indicator-hint"></span>
+          </div>
+          <div id="map"></div>
+          <details class="provenance" id="provenance">
+            <summary>Where this number comes from</summary>
+            <dl id="provenance-body"></dl>
+            <p class="caveat" id="provenance-caveat" hidden></p>
+            <a id="provenance-link" rel="noreferrer noopener" target="_blank">Open the source release</a>
+          </details>
+        </section>
+
+        <aside class="rail">
+          <h2>Regional detail</h2>
+          <div id="rail-detail"><p class="rail-empty">Hover, or Tab to a region, for its value and rank.</p></div>
+          <h3 id="board-title">Highest states</h3>
+          <ol class="board" id="board"></ol>
+        </aside>
+      </main>
+
+      <footer>
+        <p>
+          Every figure is a published official statistic joined to boundary data in this repository. Regions a source does
+          not cover are shown as <em>No data</em> and are never estimated. Boundary provenance and licences:
+          <a href="https://github.com/shashankbudem/bharat-choropleth/blob/main/data/ATTRIBUTION.md">data/ATTRIBUTION.md</a>.
+        </p>
+      </footer>
+    </div>
+
+    <!-- The published bundle, exactly as a consumer would load it. -->
+    <script src="/packages/js/dist/bharat-choropleth.min.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>
