@@ -156,7 +156,8 @@ Keys resolve through the same state registry the JavaScript facade uses, so
 `Goa`, `goa`, `tamilnadu`, `Jammu & Kashmir`, `Orissa` and `in-cs-30-goa` all
 land where you would expect; an unrecognized name is ignored with a warning
 rather than throwing. Row-shaped data works too, via
-`data` + `regionKey` + `valueKey`. Every `IndiaChoropleth` prop except `states`
+`data` + `regionKey` + `valueKey`, and district numbers nest under their state
+with `districtValues={{ Telangana: { Hyderabad: 90 } }}`. Every `IndiaChoropleth` prop except `states`
 passes straight through. See [packages/react/README.md](./packages/react/README.md).
 
 ## Minimal usage

@@ -22,6 +22,19 @@
 
 ### Added
 
+- `districtValues`, district numbers nested under the state they belong to:
+  `districtValues={{ Telangana: { Hyderabad: 90 } }}`. The nesting is what makes
+  it safe — district names repeat across states (Aurangabad, Bilaspur and
+  Hamirpur each name two) and there is no district registry to resolve a bare
+  name against. Outer keys resolve through the state registry and are checked at
+  once; inner keys match a district's name, slug or id and are checked when that
+  state's districts arrive. It overlays whichever district layer is in use,
+  including one from a caller's own `loadDistricts`, leaving districts it does
+  not name at whatever that layer returned. There is deliberately no
+  `subDistrictValues`.
+- `loadDistrictTopology` and `loadSubDistrictTopology` are exported, so fetching
+  the prepared bundles from a custom loader does not mean re-deriving their URL
+  scheme by hand. The framework-free package exports them too now.
 - `BharatChoropleth`, a zero-config component over the existing renderer:
   `<BharatChoropleth values={{ Telangana: 82 }} />` is a working map. Keys
   resolve through the state registry the framework-free package already used —

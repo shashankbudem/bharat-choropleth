@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { IndiaChoropleth } from "./IndiaChoropleth";
 import { asFeatureCollection } from "./geometry";
 import {
@@ -11,7 +11,7 @@ import {
   type GeometryInput,
 } from "./data-source";
 import { normalizeStateKey, resolveState } from "./states";
-import type { GeometrySource, IndiaChoroplethProps, MapFeature, MapLayer } from "./types";
+import type { GeometrySource, IndiaChoroplethProps, MapFeature, MapLayer, MapRegion } from "./types";
 
 /** Reads a feature's stable id. Matches the framework-free facade's default. */
 function defaultGetId(feature: MapFeature): string {
@@ -77,6 +77,35 @@ export interface BharatChoroplethProps extends Omit<IndiaChoroplethProps, "state
    * state bundle from `dataBaseUrl`. The package itself bundles no geometry.
    */
   geometry?: GeometryInput;
+  /**
+   * District values, nested under the state each district belongs to.
+   *
+   * ```tsx
+   * districtValues={{
+   *   Telangana: { Hyderabad: 90, "Ranga Reddy": 76 },
+   *   Maharashtra: { Aurangabad: 44 },
+   * }}
+   * ```
+   *
+   * The nesting is not decoration. District names repeat across states —
+   * Aurangabad, Bilaspur and Hamirpur each name a district in two — and unlike
+   * states there is no district registry to resolve a bare name against, so a
+   * flat map could not say which one you meant. Under a state it is unambiguous.
+   *
+   * Outer keys resolve through the state registry, exactly like `values`, and are
+   * checked immediately. Inner keys match a district's name, slug or id,
+   * case-insensitively; they can only be checked once that state's districts have
+   * been fetched, so a typo there is warned about when you first drill into it.
+   *
+   * Applies to whichever district layer is in use, including one from your own
+   * `loadDistricts`: a district listed here takes this value, and any district not
+   * listed keeps whatever the layer itself returned.
+   *
+   * There is no `subDistrictValues`. Three levels of nesting stops reading
+   * clearly, and sub-district naming is far less settled than district naming —
+   * set those through a custom `loadSubDistricts` instead.
+   */
+  districtValues?: Readonly<Record<string, Readonly<Record<string, number | null>>>>;
   /** Base URL for the prepared boundary bundles. Point it at your own copy of `data/generated` to self-host. */
   dataBaseUrl?: string;
   /**
@@ -121,6 +150,7 @@ export interface BharatChoroplethProps extends Omit<IndiaChoroplethProps, "state
 export function BharatChoropleth({
   values,
   data,
+  districtValues,
   regionKey = "region",
   valueKey = "value",
   geometry,
@@ -153,6 +183,36 @@ export function BharatChoropleth({
   }, [entries]);
 
   /**
+   * `{ Telangana: { Hyderabad: 90 } }` resolved to
+   * `{ "in-cs-36-telangana" => { "hyderabad" => 90 } }`. The outer key goes
+   * through the state registry so any spelling of the state works; the inner keys
+   * are normalized the same way, which is what makes them match a district's
+   * name, slug or id whatever case or separators the caller used.
+   */
+  const districtValueMap = useMemo(() => {
+    const byState = new Map<string, Map<string, number | null>>();
+    for (const [stateName, districts] of Object.entries(districtValues ?? {})) {
+      const stateKey = keyFor(stateName);
+      const inner = byState.get(stateKey) ?? new Map<string, number | null>();
+      for (const [districtName, value] of Object.entries(districts ?? {})) {
+        inner.set(normalizeStateKey(districtName), toValue(value));
+      }
+      byState.set(stateKey, inner);
+    }
+    return byState;
+  }, [districtValues]);
+
+  const districtSignature = useMemo(
+    () =>
+      JSON.stringify(
+        [...districtValueMap]
+          .map(([stateKey, inner]) => [stateKey, [...inner].sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))] as const)
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+      ),
+    [districtValueMap],
+  );
+
+  /**
    * Content hash of the resolved values. Callers write `values={{ Goa: 6 }}`
    * inline, so the object is new on every parent render; keying the layer on it
    * would re-project the whole national map each time. Keying on what the values
@@ -168,6 +228,8 @@ export function BharatChoropleth({
   // changes, so a loader rebuilt per value would refetch on every update.
   const valuesRef = useRef(valueMap);
   valuesRef.current = valueMap;
+  const districtValuesRef = useRef(districtValueMap);
+  districtValuesRef.current = districtValueMap;
 
   const source: GeometryInput = geometry ?? statesUrl(dataBaseUrl);
   const inlineGeometry = isInlineGeometry(source) ? source : null;
@@ -266,6 +328,44 @@ export function BharatChoropleth({
   const drillDown = drillDownRef.current;
   useEffect(() => () => drillDownRef.current?.controller?.abort(), []);
 
+  /**
+   * Overlays `districtValues` onto a district layer. A district named in the prop
+   * takes that value; one that is not keeps whatever the layer returned, so a
+   * caller's own `loadDistricts` still supplies everything they did not override.
+   *
+   * Warns once per state, after that state's districts have arrived — the only
+   * point at which an unmatched name is known to be a typo rather than a district
+   * that simply has not loaded yet.
+   */
+  const warnedDistricts = useRef(new Set<string>());
+  const withDistrictValues = useCallback((layer: MapLayer, stateId: string): MapLayer => {
+    const wanted = districtValuesRef.current.get(stateId);
+    if (!wanted || wanted.size === 0) return layer;
+    const keysFor = (feature: MapFeature) => [normalizeStateKey(layer.getId(feature)), normalizeStateKey(layer.getLabel(feature))];
+
+    if (!warnedDistricts.current.has(stateId)) {
+      warnedDistricts.current.add(stateId);
+      const present = new Set(asFeatureCollection(layer.geometry).features.flatMap(keysFor));
+      for (const [key, value] of wanted) {
+        if (value !== null && !present.has(key)) {
+          console.warn(`BharatChoropleth: "${key}" is not a district of this state — its value is ignored.`);
+        }
+      }
+    }
+
+    return {
+      ...layer,
+      getValue: (feature) => {
+        for (const key of keysFor(feature)) {
+          // `has` rather than `??`, so an explicit null reads as "no data"
+          // instead of falling through to the layer's own value.
+          if (wanted.has(key)) return wanted.get(key) ?? null;
+        }
+        return layer.getValue(feature);
+      },
+    };
+  }, []);
+
   const usingDefaultData = geometry === undefined;
   const districtsEnabled = districts ?? usingDefaultData;
   const subDistrictsEnabled = subDistricts ?? usingDefaultData;
@@ -281,14 +381,21 @@ export function BharatChoropleth({
         pending.catch(() => cache.delete(stateId));
         cache.set(stateId, pending);
       }
-      return {
-        geometry: await pending,
-        getId: defaultGetId,
-        getLabel: defaultGetLabel,
-        getValue: (feature) => valuesRef.current.get(keyFor(defaultGetLabel(feature))) ?? null,
-      };
+      return withDistrictValues(
+        {
+          geometry: await pending,
+          getId: defaultGetId,
+          getLabel: defaultGetLabel,
+          getValue: (feature) => valuesRef.current.get(keyFor(defaultGetLabel(feature))) ?? null,
+        },
+        stateId,
+      );
     };
-  }, [dataBaseUrl, districtsEnabled]);
+    // `districtSignature` rebuilds the loader when district values change, which
+    // is what makes the map repaint them: the renderer only re-derives a level
+    // from a new layer object. The geometry behind it is cached, so this is a
+    // repaint, not a refetch.
+  }, [dataBaseUrl, districtSignature, districtsEnabled, withDistrictValues]);
 
   const defaultSubDistrictLoader = useMemo(() => {
     if (!subDistrictsEnabled) return undefined;
@@ -313,6 +420,13 @@ export function BharatChoropleth({
     };
   }, [dataBaseUrl, subDistrictsEnabled]);
 
+  const callerLoadDistricts = rest.loadDistricts;
+  const districtLoader = useMemo(() => {
+    if (!callerLoadDistricts) return defaultDistrictLoader;
+    return async (stateId: string, state: MapRegion) =>
+      withDistrictValues(await callerLoadDistricts(stateId, state), stateId);
+  }, [callerLoadDistricts, defaultDistrictLoader, districtSignature, withDistrictValues]);
+
   if (error) {
     return (
       <div className="bharat-choropleth__status bharat-choropleth__status--error" role="alert">
@@ -333,7 +447,7 @@ export function BharatChoropleth({
     <IndiaChoropleth
       {...rest}
       states={statesLayer}
-      loadDistricts={rest.loadDistricts ?? defaultDistrictLoader}
+      loadDistricts={districtLoader}
       loadSubDistricts={rest.loadSubDistricts ?? defaultSubDistrictLoader}
     />
   );

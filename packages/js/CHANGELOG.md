@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Added
+
+- Exported `loadDistrictTopology` and `loadSubDistrictTopology`, so a custom
+  loader can fetch the prepared bundles without re-deriving their URL scheme.
+
 ### Changed
 
 - Repainting no longer re-unpacks the topology or refits the projection. The

@@ -342,3 +342,96 @@ describe("IndiaChoropleth is unchanged by the facade", () => {
     expect(regionLabel(/^Orissa,/)).toMatch(/3/);
   });
 });
+
+describe("BharatChoropleth districtValues", () => {
+  const goaDistricts: MapLayer = {
+    geometry: { type: "FeatureCollection", features: [
+      { type: "Feature", properties: { id: "in-cd-30-585", name: "North Goa" }, geometry: { type: "Polygon", coordinates: [[[72, 15], [72.5, 15], [72.5, 16], [72, 16], [72, 15]]] } },
+      { type: "Feature", properties: { id: "in-cd-30-586", name: "South Goa" }, geometry: { type: "Polygon", coordinates: [[[72.5, 15], [73, 15], [73, 16], [72.5, 16], [72.5, 15]]] } },
+    ] },
+    getId: (feature) => String(feature.properties?.id),
+    getLabel: (feature) => String(feature.properties?.name),
+    getValue: () => null,
+  };
+
+  function drilled(props: Partial<React.ComponentProps<typeof BharatChoropleth>> = {}) {
+    return render(
+      <BharatChoropleth
+        geometry={geometry}
+        values={{ Goa: 6 }}
+        loadDistricts={async () => goaDistricts}
+        defaultDrillDownId="in-cs-30-goa"
+        {...props}
+      />,
+    );
+  }
+
+  it("applies values nested under the state they belong to", async () => {
+    drilled({ districtValues: { Goa: { "North Goa": 90, "South Goa": 76 } } });
+    await waitFor(() => expect(regionLabel(/^North Goa,/)).toMatch(/90/));
+    expect(regionLabel(/^South Goa,/)).toMatch(/76/);
+  });
+
+  it("resolves the outer key through the state registry, like values", async () => {
+    // "goa" rather than "Goa" — the same spellings `values` accepts.
+    drilled({ districtValues: { goa: { "north-goa": 90 } } });
+    await waitFor(() => expect(regionLabel(/^North Goa,/)).toMatch(/90/));
+  });
+
+  it("matches inner keys case-insensitively, and by slug or id", async () => {
+    drilled({ districtValues: { Goa: { "NORTH GOA": 90, "in-cd-30-586": 76 } } });
+    await waitFor(() => expect(regionLabel(/^North Goa,/)).toMatch(/90/));
+    expect(regionLabel(/^South Goa,/)).toMatch(/76/);
+  });
+
+  it("does not leak one state's district values into another state of the same name", async () => {
+    // The collision the nesting exists for: a district named here under a
+    // different state must not pick this value up.
+    drilled({ districtValues: { Maharashtra: { "North Goa": 90 } } });
+    await waitFor(() => expect(regionLabel(/^North Goa,/)).toMatch(/No data/));
+  });
+
+  it("leaves districts it does not name at whatever the layer returned", async () => {
+    const layerWithValues: MapLayer = { ...goaDistricts, getValue: (feature) => (feature.properties?.id === "in-cd-30-586" ? 12 : null) };
+    drilled({ loadDistricts: async () => layerWithValues, districtValues: { Goa: { "North Goa": 90 } } });
+    await waitFor(() => expect(regionLabel(/^North Goa,/)).toMatch(/90/));
+    expect(regionLabel(/^South Goa,/)).toMatch(/12/);
+  });
+
+  it("reads an explicit null as no data rather than falling through to the layer", async () => {
+    const layerWithValues: MapLayer = { ...goaDistricts, getValue: () => 12 };
+    drilled({ loadDistricts: async () => layerWithValues, districtValues: { Goa: { "North Goa": null } } });
+    await waitFor(() => expect(regionLabel(/^South Goa,/)).toMatch(/12/));
+    expect(regionLabel(/^North Goa,/)).toMatch(/No data/);
+  });
+
+  it("repaints when districtValues change, without refetching the districts", async () => {
+    const loadDistricts = vi.fn(async () => goaDistricts);
+    const { rerender } = render(
+      <BharatChoropleth geometry={geometry} values={{ Goa: 6 }} loadDistricts={loadDistricts} defaultDrillDownId="in-cs-30-goa" districtValues={{ Goa: { "North Goa": 90 } }} />,
+    );
+    await waitFor(() => expect(regionLabel(/^North Goa,/)).toMatch(/90/));
+    rerender(
+      <BharatChoropleth geometry={geometry} values={{ Goa: 6 }} loadDistricts={loadDistricts} defaultDrillDownId="in-cs-30-goa" districtValues={{ Goa: { "North Goa": 55 } }} />,
+    );
+    await waitFor(() => expect(regionLabel(/^North Goa,/)).toMatch(/55/));
+    // The districts stay on screen throughout; only their numbers change.
+    expect(screen.queryByText(/Loading districts/)).toBeNull();
+  });
+
+  it("warns once for a district name that is not in the state, without crashing", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    drilled({ districtValues: { Goa: { "North Goa": 90, Nowhere: 5 } } });
+    await waitFor(() => expect(regionLabel(/^North Goa,/)).toMatch(/90/));
+    await waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining("nowhere")));
+    expect(warn.mock.calls.filter(([m]) => String(m).includes("nowhere"))).toHaveLength(1);
+  });
+
+  it("does not mutate the caller's districtValues object", async () => {
+    const districtValues = { Goa: { "North Goa": 90 } };
+    const before = JSON.stringify(districtValues);
+    drilled({ districtValues });
+    await waitFor(() => expect(regionLabel(/^North Goa,/)).toMatch(/90/));
+    expect(JSON.stringify(districtValues)).toBe(before);
+  });
+});

@@ -104,26 +104,67 @@ also turns drill-down off, since the district files are no longer known to sit
 beside it. Turn it back on explicitly with `districts` / `subDistricts` plus your
 own `loadDistricts` / `loadSubDistricts`.
 
-### Values below the state level
+### District values
 
-`values` is state-level. Sub-state numbers go through the loader that fetches
-that level's geometry, which is where the ids for those regions actually exist:
+`values` is state-level. District numbers nest under the state they belong to:
 
 ```tsx
 <BharatChoropleth
-  values={stateValues}
-  loadDistricts={async (stateId) => ({
-    ...(await loadDistrictGeometry(stateId)),
-    getValue: (feature) => districtValues[String(feature.properties?.id)] ?? null,
-  })}
+  values={{ Telangana: 82, Maharashtra: 91 }}
+  districtValues={{
+    Telangana: { Hyderabad: 90, "Ranga Reddy": 76 },
+    Maharashtra: { Aurangabad: 44 },
+  }}
 />
 ```
 
-There is deliberately no `districtValues` prop keyed by district name. District
-names repeat across states — Aurangabad, Bilaspur and Hamirpur each name
-districts in two — and unlike states there is no district registry to resolve a
-name against, so such a prop could not be validated or warned about until the
-state it belongs to had been drilled into.
+The nesting is load-bearing, not decoration. District names repeat across states —
+Aurangabad, Bilaspur and Hamirpur each name a district in two — and unlike states
+there is no district registry to resolve a bare name against, so a flat map could
+not say which one you meant.
+
+Outer keys go through the state registry, so every spelling `values` accepts works
+here too, and they are checked immediately. Inner keys match a district's name,
+slug or id, case-insensitively — but they can only be checked once that state's
+districts have been fetched, so a typo there is warned about when you first drill
+into that state, not at first render.
+
+It applies to whichever district layer is in use, including one from your own
+`loadDistricts`. A district named here takes this value; one that is not keeps
+whatever the layer returned, so you can override a few and leave the rest:
+
+```tsx
+<BharatChoropleth
+  loadDistricts={myLoader}                       // supplies most districts
+  districtValues={{ Telangana: { Hyderabad: 90 } }}  // overrides one
+/>
+```
+
+There is no `subDistrictValues`. Three levels of nesting stops reading clearly,
+and sub-district naming is much less settled than district naming. Set those
+through `loadSubDistricts`, which is also how you would supply district values
+from ids rather than names:
+
+```tsx
+import { loadSubDistrictTopology, DEFAULT_DATA_BASE_URL } from "bharat-choropleth";
+
+<BharatChoropleth
+  values={values}
+  loadSubDistricts={async (districtId) => {
+    const geometry = await loadSubDistrictTopology(DEFAULT_DATA_BASE_URL, districtId);
+    if (!geometry) return null;   // this district has no sub-district level
+    return {
+      geometry,
+      getId: (feature) => String(feature.properties?.id),
+      getLabel: (feature) => String(feature.properties?.name),
+      getValue: (feature) => subDistrictValues[String(feature.properties?.id)] ?? null,
+    };
+  }}
+/>
+```
+
+`loadDistrictTopology` and `loadSubDistrictTopology` are exported so fetching the
+prepared bundles does not mean re-deriving their URL scheme by hand.
 
 ## Advanced usage
 

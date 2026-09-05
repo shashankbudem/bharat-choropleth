@@ -416,7 +416,11 @@ export function IndiaChoropleth({
     if (!sourceState) return;
     setLoadingState(activeDrillDownId);
     setLoadError(null);
-    setLoadedDistricts(null);
+    // Only blank the level when it is a different one. A reload of the state
+    // already showing — a swapped loader, say — should leave its districts up
+    // until the replacement lands, rather than flashing "Loading districts…"
+    // over a map the reader is looking at.
+    setLoadedDistricts((current) => (current?.stateId === activeDrillDownId ? current : null));
     loadDistricts(activeDrillDownId, sourceState)
       .then((loaded) => { if (!cancelled) setLoadedDistricts({ stateId: activeDrillDownId, layer: loaded }); })
       .catch((error: unknown) => { if (!cancelled) setLoadError(error instanceof Error ? error : new Error("Unable to load districts.")); })
@@ -454,7 +458,8 @@ export function IndiaChoropleth({
     if (!sourceDistrict || !activeDrillDownId) return;
     setLoadingDistrict(activeSubDrillDownId);
     setSubLoadError(null);
-    setLoadedSubDistricts(null);
+    // As above, one level down.
+    setLoadedSubDistricts((current) => (current?.districtId === activeSubDrillDownId ? current : null));
     loadSubDistricts(activeSubDrillDownId, sourceDistrict, activeDrillDownId)
       .then((loaded) => {
         if (cancelled) return;
