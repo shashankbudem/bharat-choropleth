@@ -43,12 +43,17 @@ jobs:
       # build + typecheck + example syntax + tests + demo builds + data validation
       - run: pnpm check
 
-      # `validate:data` rewrites the timestamps in its own reports. That is
-      # noise in a working tree and would be a silent commit in CI, so fail if
-      # anything else moved.
-      - name: Working tree is unchanged apart from report timestamps
+      # `validate:data` rewrites its own reports, which are outputs rather than
+      # source: the ones under data/metadata carry a `validatedAt` timestamp, and
+      # the ones beside the bundles record `gzipBytes`, whose value depends on
+      # the zlib version doing the compressing and so differs between a
+      # contributor's machine and this runner. Neither can be stable, so both are
+      # discarded — and anything *else* the build touched is an error, because a
+      # build should not edit the tree.
+      - name: The build did not modify source
         run: |
-          git checkout -- data/metadata/ 2>/dev/null || true
+          reports=$(git diff --name-only | grep -E '^data/metadata/|validation-report\.json$' || true)
+          if [ -n "$reports" ]; then git checkout -- $reports; fi
           if ! git diff --quiet; then
             echo "::error::The build modified tracked files:"
             git diff --stat
@@ -84,7 +89,10 @@ jobs:
         working-directory: packages/flutter
         run: |
           flutter analyze
-          flutter test
+          # Goldens are excluded: Flutter records them per platform, so a file
+          # made on macOS never matches the same widget painted on a Linux
+          # runner, and failing on that would say nothing about the code.
+          flutter test --exclude-tags golden
 
       - name: Observatory example
         working-directory: examples/observatory/flutter
