@@ -1,6 +1,11 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 - 2026-09-05
+
+### Changed
+
+- The default data source now points at the `v0.3.0` boundary bundle. A release
+  pins the geometry a consumer receives, not only the renderer that draws it.
 
 ### Fixed
 

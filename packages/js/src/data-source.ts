@@ -27,7 +27,7 @@ import type { Topology } from "topojson-specification";
  * "this district has no sub-districts", so the whole level just quietly goes
  * missing. That is exactly what 0.2.0 shipped with.
  */
-export const DEFAULT_DATA_BASE_URL = "https://cdn.jsdelivr.net/gh/shashankbudem/bharat-choropleth@v0.2.0/data/generated";
+export const DEFAULT_DATA_BASE_URL = "https://cdn.jsdelivr.net/gh/shashankbudem/bharat-choropleth@v0.3.0/data/generated";
 
 export const ATTRIBUTION = "State/UT, district and sub-district boundaries derived from datta07/INDIAN-SHAPEFILES (MIT).";
 

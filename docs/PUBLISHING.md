@@ -9,7 +9,7 @@ This repository ships four independently versioned libraries. They must be valid
 | Flutter | `packages/flutter` | pub.dev | `dart pub publish` |
 | Python | `packages/python` | PyPI | `python3 -m twine upload dist/*` |
 
-Version `0.2.0` is public on all four registries (verified 2026-09-05). Verify the intended version against the registry rather than this sentence — it has been stale before, and was again between the 0.2.0 release and this line being corrected. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
+Version `0.2.0` is public on all four registries (verified 2026-09-05). `0.3.0` is staged in the working tree for React, plain JavaScript and Flutter — manifests, changelogs and the data pin are bumped, but nothing is published and the READMEs still advertise `0.2.0` on purpose, because they describe what a reader can install today. Verify the intended version against the registry rather than this sentence — it has been stale before, and was again between the 0.2.0 release and this line being corrected. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
 
 ## Boundary data bundles
 
