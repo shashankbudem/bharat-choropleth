@@ -82,6 +82,12 @@ footer p { max-width: 90ch; margin: 0; }
 /* The renderer's own surface, tuned for a dark page. */
 .india-choropleth { --india-map-stroke: #0b1017; --india-map-text: #e8eef2; --india-map-empty: #223041; --india-map-muted: #93a4b3; }
 
+/* Region values sit on the ramp itself, which runs pale at the low end, so they
+   are dark ink rather than the page's near-white text colour — the renderer
+   already paints a white halo behind them, and white-on-white defeated it. */
+.india-choropleth__region-values { fill: #0a1620; stroke: rgb(255 255 255 / .92); stroke-width: 3.5px; }
+
+
 @media (max-width: 900px) {
   main { grid-template-columns: minmax(0, 1fr); }
 }

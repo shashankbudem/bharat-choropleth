@@ -17,6 +17,7 @@ npx serve dist/observatory
 | `/` | Portal |
 | `/react/` | `<BharatChoropleth>` — `examples/observatory/react` |
 | `/js/` | `new BharatChoropleth(...)` from a script tag — `examples/observatory/js` |
+| `/live/` | Live temperature, drilled to **sub-district** — `examples/observatory/live` |
 | `/flutter/` | `IndiaChoropleth` painted natively — `examples/observatory/flutter` |
 
 ## The data is real
@@ -60,6 +61,33 @@ than drawing every statistic on the newest outline. Census 2011 is reported on
 2011 units — the historical 35-state / 640-district bundle. NFHS-5 and CGWB are
 reported on present-day states — the current 36-state bundle. Drawing a 2011
 figure on 2019 boundaries would misstate which places were measured.
+
+## The live case, and why it is the one that reaches sub-district
+
+The six published indicators stop at district, and no rearranging fixes that: a
+statistic is collected on particular administrative units, so drawing a 2011
+figure on 2019 outlines would misstate which places were measured, and none of
+the audited sources publishes below district anyway.
+
+A weather API has no vintage. It answers for a coordinate, now — so every level
+of the current bundle can be filled honestly, all 5,950 sub-districts included.
+`/live/` reads current temperatures from [Open-Meteo](https://open-meteo.com/)
+(CC BY 4.0, no API key) and drills state → district → sub-district, one request
+per view: 36 states, at most 75 districts in a state, at most 38 sub-districts
+in a district.
+
+`pnpm build:centroids` writes the sampling points it needs — one per region at
+every level, derived from the boundary bundles. `geoCentroid` alone would not
+do: for a crescent or an island group the centre of mass can fall outside the
+region, and asking a weather API about a point in the sea while labelling it a
+district would be quietly wrong. Every point is checked with `geoContains` and
+replaced by a scan of the region's own bounding box when it fails; 87 of 6,774
+needed that, and the count is recorded in the file.
+
+**It samples a point, not an area.** Each region shows the temperature at one
+representative point inside it — a large district is a single reading, the same
+as a small one. The page says so, because a choropleth invites you to read it as
+an area measure and this is not one.
 
 ## Boundary assets for the Flutter app
 

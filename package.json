@@ -13,6 +13,7 @@
     "build:pages": "node scripts/build-cloudflare-pages.mjs",
     "build:observatory": "node scripts/build-observatory.mjs",
     "build:observatory-data": "node scripts/build-observatory-data.mjs",
+    "build:centroids": "node scripts/build-region-centroids.mjs",
     "deploy:pages": "node scripts/deploy-cloudflare-pages.mjs",
     "validate:data": "pnpm --dir data run validate",
     "verify:data-pin": "node scripts/verify-data-pin.mjs",

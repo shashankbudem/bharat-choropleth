@@ -10,6 +10,7 @@
  *     /                  the portal
  *     /react/            the React app
  *     /js/               the framework-free app
+ *     /live/             the live-temperature case, drilled to sub-district
  *     /flutter/          the Flutter web build
  *     /data/             the observatory dataset + the boundary bundles
  *     /packages/js/dist/ the published framework-free bundle
@@ -43,6 +44,7 @@ function copy(from, to) {
 // The dataset is regenerated rather than trusted: it verifies the NFHS-5
 // workbook's SHA-256 against the recorded audit before using a single number.
 run("node", ["scripts/build-observatory-data.mjs"]);
+run("node", ["scripts/build-region-centroids.mjs"]);
 
 run("pnpm", ["--filter", "bharat-choropleth", "build"]);
 run("pnpm", ["--filter", "bharat-choropleth-js", "build"]);
@@ -61,7 +63,9 @@ mkdirSync(out, { recursive: true });
 copy("examples/observatory/index.html", "index.html");
 copy("examples/observatory/react/dist", "react");
 copy("examples/observatory/js", "js");
+copy("examples/observatory/live", "live");
 copy("examples/observatory/data/india-observatory.json", "data/india-observatory.json");
+copy("examples/observatory/data/region-centroids.json", "data/region-centroids.json");
 copy("data/generated", "data/generated");
 copy("packages/js/dist", "packages/js/dist");
 if (buildFlutter) copy("examples/observatory/flutter/build/web", "flutter");

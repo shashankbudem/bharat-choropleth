@@ -28,7 +28,8 @@
       <p class="lede">
         The same dashboard, built three times on the same boundary data — once per ecosystem
         <code>bharat-choropleth</code> supports. Six published official indicators, each joined to the administrative
-        vintage it was actually collected on.
+        vintage it was actually collected on. Plus a fourth case on live data, which is the one that reaches
+        sub-district level.
       </p>
 
       <div class="cards">
@@ -43,6 +44,12 @@
           <h2>Framework-free observatory</h2>
           <p>The same page from one <code>&lt;script&gt;</code> tag — no bundler, no compile step, <code>new BharatChoropleth(...)</code>.</p>
           <a class="go" href="./js/">Open plain JS version</a>
+        </article>
+        <article class="card">
+          <span class="tag">Live data · sub-district</span>
+          <h2>Live temperature</h2>
+          <p>Current readings from Open-Meteo, drilled state → district → sub-district. A live API has no vintage, so every level can be filled.</p>
+          <a class="go" href="./live/">Open live temperature</a>
         </article>
         <article class="card">
           <span class="tag">Flutter</span>
