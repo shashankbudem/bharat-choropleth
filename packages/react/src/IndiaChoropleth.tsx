@@ -205,39 +205,59 @@ function defaultTooltip(context: TooltipContext, formatValue: (value: number) =>
  * The loading effects list their loader in their dependencies because a
  * genuinely different loader — a different boundary edition, a different
  * reporting year — must refetch. An inline arrow is also a new function every
- * render, and the two are indistinguishable from in here.
+ * render, and from in here the two look identical: in both cases the loader is
+ * the only dependency that moved.
  *
- * The cost of getting it wrong is invisible: the level silently refetches over
- * the network on every unrelated re-render, so a dashboard that swaps a metric
- * while drilled in pays for the district topology again each time. It renders
- * correctly throughout, which is why nobody notices.
+ * What separates them is *density*. An inline arrow changes on consecutive
+ * renders, because every render makes one. A memoized loader whose dependency
+ * changed — a dashboard swapping the displayed metric — changes once, then not
+ * again until the reader does something, which is many renders later. So the
+ * test is three changes inside a short window of renders, not three changes.
  *
- * Three consecutive changes without the level below moving is the signal. One
- * change is an ordinary deliberate swap, and this must not cry wolf at those.
+ * That distinction is the whole value of the check: this repo's own demo swaps a
+ * correctly-memoized loader whenever its metric changes, and a warning that
+ * fired on that would be noise, and would train people to ignore it.
+ *
+ * The cost of the real mistake is invisible — the level silently refetches over
+ * the network on every unrelated re-render while rendering perfectly correctly —
+ * which is why it needs saying at all.
  */
+const LOADER_CHURN_CHANGES = 3;
+/** Renders those changes must fall within. Generous, because StrictMode renders twice. */
+const LOADER_CHURN_WINDOW = 6;
+
 function useStableLoaderWarning(propName: string, loader: unknown, levelId: string | null) {
-  const seen = useRef<{ loader: unknown; levelId: string | null; churn: number; warned: boolean }>({
+  const renders = useRef(0);
+  renders.current += 1;
+  const seen = useRef<{ loader: unknown; levelId: string | null; changedAt: number[]; warned: boolean }>({
     loader,
     levelId,
-    churn: 0,
+    changedAt: [],
     warned: false,
   });
   useEffect(() => {
     const state = seen.current;
-    if (loader !== state.loader) {
-      state.churn = levelId === state.levelId ? state.churn + 1 : 0;
-      state.loader = loader;
-      if (loader && !state.warned && state.churn >= 3) {
-        state.warned = true;
-        console.warn(
-          `IndiaChoropleth: \`${propName}\` has been a different function on ${state.churn + 1} renders while the ` +
-            "level it loads stayed the same, so that level has been fetched again each time. Wrap it in `useCallback` " +
-            "or hoist it out of the component — an inline arrow is a new function on every render, and the renderer " +
-            "cannot tell that apart from a deliberately different loader.",
-        );
-      }
+    if (loader === state.loader) return;
+    state.loader = loader;
+    // A different level is a different question; start counting again.
+    if (levelId !== state.levelId) {
+      state.levelId = levelId;
+      state.changedAt = [];
+      return;
     }
-    state.levelId = levelId;
+    state.changedAt = [...state.changedAt, renders.current].slice(-LOADER_CHURN_CHANGES);
+    const [first] = state.changedAt;
+    const dense =
+      state.changedAt.length === LOADER_CHURN_CHANGES && renders.current - (first ?? 0) <= LOADER_CHURN_WINDOW;
+    if (loader && dense && !state.warned) {
+      state.warned = true;
+      console.warn(
+        `IndiaChoropleth: \`${propName}\` has been a different function on ${LOADER_CHURN_CHANGES} renders in a row ` +
+          "while the level it loads stayed the same, so that level has been fetched again each time. Wrap it in " +
+          "`useCallback` or hoist it out of the component — an inline arrow is a new function on every render, and the " +
+          "renderer cannot tell that apart from a deliberately different loader.",
+      );
+    }
   }, [levelId, loader, propName]);
 }
 

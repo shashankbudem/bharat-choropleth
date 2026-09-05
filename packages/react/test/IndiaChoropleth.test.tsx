@@ -926,6 +926,23 @@ describe("warning about a loader recreated on every render", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  it("stays quiet for a memoized loader that changes when its own dependency does", async () => {
+    // The shape of this repo's own demo: the loader is correctly memoized on the
+    // displayed metric, so it changes once per switch with many renders in
+    // between. Warning here would be noise, and noise gets the check ignored.
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const loaders = [async () => districtLayer, async () => districtLayer, async () => districtLayer, async () => districtLayer];
+    const { rerender } = render(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={loaders[0]} />);
+    for (const loader of loaders.slice(1)) {
+      // Several renders with the loader held steady, as a real interaction produces.
+      for (let n = 0; n < 6; n++) {
+        rerender(<IndiaChoropleth states={stateLayer} defaultDrillDownId="27" loadDistricts={loader} ariaLabel={`settle ${n}`} />);
+      }
+    }
+    await waitFor(() => expect(screen.getByRole("button", { name: /delta, 9/i })).toBeInTheDocument());
+    expect(warn.mock.calls.filter(([m]) => String(m).includes("loadDistricts"))).toHaveLength(0);
+  });
+
   it("stays quiet for a deliberate one-off swap, which must not be mistaken for churn", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     const first = async () => districtLayer;
