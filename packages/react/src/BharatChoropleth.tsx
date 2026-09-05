@@ -220,7 +220,7 @@ export function BharatChoropleth({
       // of exactly these values, so the captured map and the key always agree.
       getValue: (feature) => valueMap.get(keyForFeature(feature)) ?? null,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- valueSignature stands in for valueMap; see above.
+    // `valueSignature` is the dependency that stands in for `valueMap`; see above.
   }, [getId, getLabel, resolvedGeometry, valueSignature]);
 
   /**
@@ -250,16 +250,21 @@ export function BharatChoropleth({
   // Drill-down geometry is fetched once per id and held for the component's life.
   // IndiaChoropleth re-runs its district effect whenever the state layer changes
   // — which a value update does — so without this every value change refetched.
-  const drillDown = useRef<{
+  interface DrillDownState {
     controller: AbortController | null;
     districts: Map<string, Promise<GeometrySource>>;
     subDistricts: Map<string, Promise<GeometrySource | null>>;
-  }>({
+  }
+  // Built lazily: `useRef(expr)` evaluates `expr` on every render and discards
+  // it, and this component is built to re-render on every data tick.
+  const drillDownRef = useRef<DrillDownState | null>(null);
+  drillDownRef.current ??= {
     controller: typeof AbortController === "function" ? new AbortController() : null,
     districts: new Map(),
     subDistricts: new Map(),
-  });
-  useEffect(() => () => drillDown.current.controller?.abort(), []);
+  };
+  const drillDown = drillDownRef.current;
+  useEffect(() => () => drillDownRef.current?.controller?.abort(), []);
 
   const usingDefaultData = geometry === undefined;
   const districtsEnabled = districts ?? usingDefaultData;
@@ -268,10 +273,10 @@ export function BharatChoropleth({
   const defaultDistrictLoader = useMemo(() => {
     if (!districtsEnabled) return undefined;
     return async (stateId: string): Promise<MapLayer> => {
-      const cache = drillDown.current.districts;
+      const cache = drillDown.districts;
       let pending = cache.get(stateId);
       if (!pending) {
-        pending = loadDistrictTopology(dataBaseUrl, stateId, drillDown.current.controller?.signal);
+        pending = loadDistrictTopology(dataBaseUrl, stateId, drillDown.controller?.signal);
         // A failed fetch must not be cached, or a retry can never succeed.
         pending.catch(() => cache.delete(stateId));
         cache.set(stateId, pending);
@@ -288,10 +293,10 @@ export function BharatChoropleth({
   const defaultSubDistrictLoader = useMemo(() => {
     if (!subDistrictsEnabled) return undefined;
     return async (districtId: string): Promise<MapLayer | null> => {
-      const cache = drillDown.current.subDistricts;
+      const cache = drillDown.subDistricts;
       let pending = cache.get(districtId);
       if (!pending) {
-        pending = loadSubDistrictTopology(dataBaseUrl, districtId, drillDown.current.controller?.signal);
+        pending = loadSubDistrictTopology(dataBaseUrl, districtId, drillDown.controller?.signal);
         pending.catch(() => cache.delete(districtId));
         cache.set(districtId, pending);
       }
