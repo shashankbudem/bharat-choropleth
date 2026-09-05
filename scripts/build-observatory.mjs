@@ -10,7 +10,6 @@
  *     /                  the portal
  *     /react/            the React app
  *     /js/               the framework-free app
- *     /live/             the live-temperature case, drilled to sub-district
  *     /flutter/          the Flutter web build
  *     /data/             the observatory dataset + the boundary bundles
  *     /packages/js/dist/ the published framework-free bundle
@@ -63,7 +62,6 @@ mkdirSync(out, { recursive: true });
 copy("examples/observatory/index.html", "index.html");
 copy("examples/observatory/react/dist", "react");
 copy("examples/observatory/js", "js");
-copy("examples/observatory/live", "live");
 copy("examples/observatory/data/india-observatory.json", "data/india-observatory.json");
 copy("examples/observatory/data/region-centroids.json", "data/region-centroids.json");
 copy("data/generated", "data/generated");

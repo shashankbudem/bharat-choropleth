@@ -18,6 +18,88 @@
  },
  "indicators": [
   {
+   "key": "live_temperature",
+   "label": "Current temperature",
+   "short": "Temperature",
+   "unit": "°C",
+   "description": "The temperature right now at one point inside each region — a sample, not an average over its area.",
+   "edition": "current",
+   "levels": [
+    "state",
+    "district",
+    "subdistrict"
+   ],
+   "decimals": 1,
+   "live": {
+    "provider": "Open-Meteo",
+    "endpoint": "https://api.open-meteo.com/v1/forecast",
+    "variable": "temperature_2m",
+    "centroids": "/data/region-centroids.json",
+    "colorScale": [
+     "#4a6fa5",
+     "#6d95bd",
+     "#9dbdd4",
+     "#e8e2d0",
+     "#efc48a",
+     "#e09453",
+     "#c2542f"
+    ],
+    "legendLabels": [
+     "Cooler",
+     "Warmer"
+    ]
+   },
+   "source": {
+    "publisher": "Open-Meteo",
+    "title": "Open-Meteo forecast API, current temperature_2m",
+    "vintage": "live",
+    "url": "https://open-meteo.com/",
+    "licence": "CC BY 4.0",
+    "joinRule": "One representative point inside each region, derived from this repository's boundary bundles and checked to fall inside it. Read in one batched request per view.",
+    "caveat": "A point sample, not an area average: a large district is a single reading, the same as a small one. Readings change between visits, so this indicator is the one thing here that is not reproducible from a recorded source hash."
+   },
+   "values": {
+    "state": {
+     "in-cs-01-jammu-and-kashmir": null,
+     "in-cs-02-himachal-pradesh": null,
+     "in-cs-03-punjab": null,
+     "in-cs-04-chandigarh": null,
+     "in-cs-05-uttarakhand": null,
+     "in-cs-06-haryana": null,
+     "in-cs-07-delhi": null,
+     "in-cs-08-rajasthan": null,
+     "in-cs-09-uttar-pradesh": null,
+     "in-cs-10-bihar": null,
+     "in-cs-11-sikkim": null,
+     "in-cs-12-arunachal-pradesh": null,
+     "in-cs-13-nagaland": null,
+     "in-cs-14-manipur": null,
+     "in-cs-15-mizoram": null,
+     "in-cs-16-tripura": null,
+     "in-cs-17-meghalaya": null,
+     "in-cs-18-assam": null,
+     "in-cs-19-west-bengal": null,
+     "in-cs-20-jharkhand": null,
+     "in-cs-21-odisha": null,
+     "in-cs-22-chhattisgarh": null,
+     "in-cs-23-madhya-pradesh": null,
+     "in-cs-24-gujarat": null,
+     "in-cs-26-dadra-and-nagar-haveli-and-daman-and-diu": null,
+     "in-cs-27-maharashtra": null,
+     "in-cs-28-andhra-pradesh": null,
+     "in-cs-29-karnataka": null,
+     "in-cs-30-goa": null,
+     "in-cs-31-lakshadweep": null,
+     "in-cs-32-kerala": null,
+     "in-cs-33-tamil-nadu": null,
+     "in-cs-34-puducherry": null,
+     "in-cs-35-andaman-and-nicobar": null,
+     "in-cs-36-telangana": null,
+     "in-cs-37-ladakh": null
+    }
+   }
+  },
+  {
    "key": "female_literacy",
    "label": "Female literacy rate",
    "short": "Female literacy",

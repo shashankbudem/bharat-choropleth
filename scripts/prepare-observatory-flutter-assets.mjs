@@ -9,8 +9,9 @@
  *
  *     pnpm prepare:observatory-flutter-assets
  *
- * Only the historical district files are copied: female literacy is the one
- * indicator with a district level, and it is reported on the 2011 units.
+ * Both district vintages are copied, plus the sub-districts: female literacy
+ * drills the historical bundle, and the live-temperature indicator drills the
+ * current one all the way to sub-district.
  */
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
@@ -23,6 +24,10 @@ const COPIES = [
   { to: "historical/states.topo.json", from: "data/generated/census-2011/states.topo.json" },
   { to: "current/states.topo.json", from: "data/generated/current-2019-states/states.topo.json" },
   { to: "historical-districts", from: "data/generated/census-2011/districts" },
+  // The live indicator drills the current bundle all the way down.
+  { to: "region-centroids.json", from: "examples/observatory/data/region-centroids.json" },
+  { to: "current-districts", from: "data/generated/current-2019-districts/districts" },
+  { to: "subdistricts", from: "data/generated/current-2019-subdistricts/subdistricts" },
 ];
 
 const missing = COPIES.filter(({ from }) => !existsSync(resolve(root, from)));

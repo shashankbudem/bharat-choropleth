@@ -28,8 +28,8 @@
       <p class="lede">
         The same dashboard, built three times on the same boundary data — once per ecosystem
         <code>bharat-choropleth</code> supports. Six published official indicators, each joined to the administrative
-        vintage it was actually collected on. Plus a fourth case on live data, which is the one that reaches
-        sub-district level.
+        vintage it was actually collected on — plus a seventh read live from a weather API, which is the one that
+        drills all the way to sub-district.
       </p>
 
       <div class="cards">
@@ -46,12 +46,6 @@
           <a class="go" href="./js/">Open plain JS version</a>
         </article>
         <article class="card">
-          <span class="tag">Live data · sub-district</span>
-          <h2>Live temperature</h2>
-          <p>Current readings from Open-Meteo, drilled state → district → sub-district. A live API has no vintage, so every level can be filled.</p>
-          <a class="go" href="./live/">Open live temperature</a>
-        </article>
-        <article class="card">
           <span class="tag">Flutter</span>
           <h2>Flutter observatory</h2>
           <p>The same map painted natively by <code>CustomPainter</code>, with no WebView and no DOM.</p>
@@ -65,6 +59,7 @@
           <li><strong>Female literacy</strong> — Census of India 2011, Primary Census Abstract. State and district, on the 2011 boundaries.</li>
           <li><strong>Sanitation, vaccination, stunting, anaemia</strong> — NFHS-5 (2019–21) state factsheets, on current boundaries.</li>
           <li><strong>Groundwater extraction</strong> — CGWB <em>Dynamic Ground Water Resources of India, 2023</em>, on current boundaries.</li>
+          <li><strong>Current temperature</strong> — read live from <a href="https://open-meteo.com/">Open-Meteo</a> (CC BY 4.0). The only one with no vintage, and so the only one that can fill every level down to sub-district.</li>
         </ul>
         <p style="color: var(--muted); font-size: .84rem; max-width: 78ch;">
           Every figure is published official data joined to boundary bundles in this repository, with the producer,

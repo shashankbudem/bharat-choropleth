@@ -23,6 +23,46 @@
   var stateNames = new Map();
   var selectedId = null;
   var showValues = true;
+  var centroids = null;
+  var liveValues = {};
+  var observedAt = null;
+
+  function live() { return indicator && indicator.live ? indicator.live : null; }
+
+  /** Values for whichever source the current indicator has. */
+  function stateValues() { return live() ? liveValues : indicator.values.state; }
+
+  /**
+   * Current readings for a set of region ids, in one request. Open-Meteo takes
+   * comma-separated coordinates and answers in the same order, so a whole level
+   * is one call.
+   */
+  function readTemperatures(points, ids) {
+    var known = ids.filter(function (id) { return points[id]; });
+    if (known.length === 0) return Promise.resolve({});
+    var spec = live();
+    var url = spec.endpoint +
+      "?latitude=" + known.map(function (id) { return points[id][0]; }).join(",") +
+      "&longitude=" + known.map(function (id) { return points[id][1]; }).join(",") +
+      "&current=" + spec.variable;
+    return fetch(url)
+      .then(function (response) {
+        if (!response.ok) throw new Error("The weather API responded " + response.status);
+        return response.json();
+      })
+      .then(function (payload) {
+        // One coordinate comes back as an object, several as an array.
+        var entries = Array.isArray(payload) ? payload : [payload];
+        var values = {};
+        known.forEach(function (id, index) {
+          var current = entries[index] && entries[index].current;
+          var reading = current ? current[spec.variable] : null;
+          values[id] = typeof reading === "number" ? reading : null;
+          if (current && current.time) observedAt = current.time;
+        });
+        return values;
+      });
+  }
 
   function format(value) {
     return value === null || value === undefined ? "No data" : value.toFixed(indicator.decimals) + indicator.unit;
@@ -30,9 +70,10 @@
 
   /** Ranked best-first, honouring whether low or high is the good end. */
   function ranked() {
-    var rows = Object.keys(indicator.values.state)
-      .filter(function (id) { return indicator.values.state[id] !== null; })
-      .map(function (id) { return { id: id, value: indicator.values.state[id] }; });
+    var source = stateValues();
+    var rows = Object.keys(source)
+      .filter(function (id) { return source[id] !== null && source[id] !== undefined; })
+      .map(function (id) { return { id: id, value: source[id] }; });
     rows.sort(function (a, b) { return indicator.lowerIsBetter ? a.value - b.value : b.value - a.value; });
     return rows;
   }
@@ -67,7 +108,9 @@
       [indicator.lowerIsBetter ? "Lowest" : "Highest", best ? (stateNames.get(best.id) || best.id) : "—", best ? format(best.value) : ""],
       ["Median", format(median), "across reporting regions"],
       ["Boundaries", dataset.editions[indicator.edition].label.replace(" boundaries", ""),
-        indicator.source.vintage + " data · " + (indicator.levels.indexOf("district") >= 0 ? "state and district" : "state level only")],
+        (live() && observedAt ? "read " + observedAt.replace("T", " ") + " UTC" : indicator.source.vintage + " data") +
+          " · " + (indicator.levels.indexOf("subdistrict") >= 0 ? "to sub-district"
+            : indicator.levels.indexOf("district") >= 0 ? "state and district" : "state level only")],
     ];
     var host = document.getElementById("kpis");
     host.textContent = "";
@@ -90,7 +133,8 @@
       ["Join", source.joinRule],
     ];
     if (source.formula) rows.push(["Formula", source.formula]);
-    rows.push(["Source file", source.sha256]);
+    if (source.licence) rows.push(["Licence", source.licence]);
+    if (source.sha256) rows.push(["Source file", source.sha256]);
 
     var body = document.getElementById("provenance-body");
     body.textContent = "";
@@ -158,28 +202,71 @@
   function select(key) {
     var next = dataset.indicators.filter(function (entry) { return entry.key === key; })[0];
     var editionChanged = !indicator || next.edition !== indicator.edition;
+    var wasLive = Boolean(indicator && indicator.live);
     indicator = next;
     selectedId = null;
 
     document.getElementById("indicator-label").textContent = indicator.label;
     document.getElementById("indicator-description").textContent = indicator.description;
     document.getElementById("indicator-hint").textContent =
-      (indicator.levels.indexOf("district") >= 0 ? "Click a state to drill into its districts" : "State level only") +
+      (indicator.levels.indexOf("subdistrict") >= 0
+        ? "Click a state, then a district, to sample the level below"
+        : indicator.levels.indexOf("district") >= 0
+          ? "Click a state to drill into its districts"
+          : "State level only") +
       " · click a legend swatch to filter";
 
     renderIndicators();
     renderProvenance();
 
-    // A different vintage is a different map, so the whole instance is rebuilt.
-    // Within one edition the values are swapped in place instead.
-    if (editionChanged || !map) mount();
-    else {
-      map.setValues(indicator.values.state);
-      map.colorScale = indicator.lowerIsBetter ? RAMP_INVERSE : RAMP;
-      renderKpis();
-      renderBoard();
-      renderDetail(null);
-    }
+    var ready = live()
+      ? readTemperatures(centroids.centroids.states, Object.keys(centroids.centroids.states))
+          .then(function (values) { liveValues = values; })
+      : Promise.resolve();
+
+    ready
+      .then(function () {
+        // A different vintage is a different map, so the whole instance is
+        // rebuilt. Within one edition the values are swapped in place instead —
+        // but a live indicator changes the ramp and the levels too, so it always
+        // remounts.
+        if (editionChanged || !map || live() || wasLive) mount();
+        else {
+          map.setValues(stateValues());
+          map.colorScale = indicator.lowerIsBetter ? RAMP_INVERSE : RAMP;
+          renderKpis();
+          renderBoard();
+          renderDetail(null);
+        }
+      })
+      .catch(function (error) {
+        document.getElementById("indicator-description").textContent =
+          "Could not read live data: " + error.message;
+      });
+  }
+
+  /** Geometry for one level, plus a live reading for every region in it. */
+  function liveLayer(url, object, level) {
+    return fetch(url)
+      .then(function (response) {
+        if (!response.ok) throw new Error("No geometry at " + url);
+        return response.json();
+      })
+      .then(function (topology) {
+        var geometries = topology.objects[object].geometries;
+        var ids = geometries.map(function (geometry) { return geometry.properties.id; });
+        return readTemperatures(centroids.centroids[level] || {}, ids).then(function (values) {
+          return {
+            geometry: { topology: topology, object: object },
+            getId: function (feature) { return String(feature.properties.id); },
+            getLabel: function (feature) { return String(feature.properties.name); },
+            getValue: function (feature) {
+              var value = values[String(feature.properties.id)];
+              return value === undefined ? null : value;
+            },
+          };
+        });
+      });
   }
 
   function mount() {
@@ -190,9 +277,9 @@
 
     map = new BharatChoropleth("#map", {
       geometry: fetch(edition.states).then(function (response) { return response.json(); }),
-      values: indicator.values.state,
-      colorScale: indicator.lowerIsBetter ? RAMP_INVERSE : RAMP,
-      legendLabels: indicator.lowerIsBetter ? ["Better", "Worse"] : ["Lower", "Higher"],
+      values: stateValues(),
+      colorScale: live() ? live().colorScale : indicator.lowerIsBetter ? RAMP_INVERSE : RAMP,
+      legendLabels: live() ? live().legendLabels : indicator.lowerIsBetter ? ["Better", "Worse"] : ["Lower", "Higher"],
       formatValue: function (value) { return value.toFixed(indicator.decimals) + indicator.unit; },
       ariaLabel: indicator.label + " by state and union territory",
       showRegionValues: showValues,
@@ -200,9 +287,21 @@
       subDistricts: false,
       showLegend: true,
       showBreadcrumb: true,
+      subDistricts: indicator.levels.indexOf("subdistrict") >= 0,
+      loadSubDistricts: indicator.levels.indexOf("subdistrict") >= 0
+        ? function (districtId) {
+            var url = DATA_BASE + "/current-2019-subdistricts/subdistricts/" + districtId + ".topo.json";
+            // Three of the 788 districts have no sub-district level at all.
+            return fetch(url, { method: "HEAD" }).then(function (probe) {
+              return probe.status === 404 ? null : liveLayer(url, "subdistricts", "subdistricts");
+            });
+          }
+        : undefined,
       loadDistricts: hasDistricts
         ? function (stateId) {
-            return fetch(edition.districts + "/" + stateId + ".topo.json")
+            var districtUrl = edition.districts + "/" + stateId + ".topo.json";
+            if (live()) return liveLayer(districtUrl, "districts", "districts");
+            return fetch(districtUrl)
               .then(function (response) {
                 if (!response.ok) throw new Error("No district geometry for " + stateId);
                 return response.json();
@@ -265,10 +364,13 @@
     if (map && map.engine) map.engine.update({ showRegionValues: showValues });
   });
 
-  fetch("../data/india-observatory.json")
-    .then(function (response) { return response.json(); })
+  Promise.all([
+    fetch("../data/india-observatory.json").then(function (r) { return r.json(); }),
+    fetch("/data/region-centroids.json").then(function (r) { return r.json(); }),
+  ])
     .then(function (loaded) {
-      dataset = loaded;
+      dataset = loaded[0];
+      centroids = loaded[1];
       select(dataset.indicators[0].key);
     })
     .catch(function (error) {

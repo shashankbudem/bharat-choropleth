@@ -17,7 +17,6 @@ npx serve dist/observatory
 | `/` | Portal |
 | `/react/` | `<BharatChoropleth>` — `examples/observatory/react` |
 | `/js/` | `new BharatChoropleth(...)` from a script tag — `examples/observatory/js` |
-| `/live/` | Live temperature, drilled to **sub-district** — `examples/observatory/live` |
 | `/flutter/` | `IndiaChoropleth` painted natively — `examples/observatory/flutter` |
 
 ## The data is real
@@ -37,6 +36,7 @@ time and its hash checked against that audit before a single number is used.
 | Child stunting | NFHS-5 state factsheets | 2019–21 | state |
 | Child anaemia | NFHS-5 state factsheets | 2019–21 | state |
 | Groundwater extraction | CGWB, *Dynamic Ground Water Resources of India, 2023* | 2023 | state |
+| Current temperature | [Open-Meteo](https://open-meteo.com/), CC BY 4.0 | live | state + district + **sub-district** |
 
 ### Nothing is filled in
 
@@ -62,7 +62,10 @@ than drawing every statistic on the newest outline. Census 2011 is reported on
 reported on present-day states — the current 36-state bundle. Drawing a 2011
 figure on 2019 boundaries would misstate which places were measured.
 
-## The live case, and why it is the one that reaches sub-district
+## The live indicator, and why it is the one that reaches sub-district
+
+It is the first tab in all three apps.
+
 
 The six published indicators stop at district, and no rearranging fixes that: a
 statistic is collected on particular administrative units, so drawing a 2011
@@ -71,10 +74,12 @@ the audited sources publishes below district anyway.
 
 A weather API has no vintage. It answers for a coordinate, now — so every level
 of the current bundle can be filled honestly, all 5,950 sub-districts included.
-`/live/` reads current temperatures from [Open-Meteo](https://open-meteo.com/)
-(CC BY 4.0, no API key) and drills state → district → sub-district, one request
+All three apps read current temperatures from [Open-Meteo](https://open-meteo.com/)
+(CC BY 4.0, no API key) and drill state → district → sub-district, one request
 per view: 36 states, at most 75 districts in a state, at most 38 sub-districts
-in a district.
+in a district. It is the one indicator whose values are not shipped with the
+dataset — they are fetched when you look, so it is also the only one here that
+is not reproducible from a recorded source hash.
 
 `pnpm build:centroids` writes the sampling points it needs — one per region at
 every level, derived from the boundary bundles. `geoCentroid` alone would not

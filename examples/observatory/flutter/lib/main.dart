@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:bharat_choropleth/bharat_choropleth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart' show rootBundle;
+import 'package:http/http.dart' as http;
 
 /// The India Development Observatory, painted natively — no WebView, no DOM.
 ///
@@ -37,6 +38,7 @@ class Indicator {
         lowerIsBetter = json['lowerIsBetter'] == true,
         levels = (json['levels']! as List<Object?>).cast<String>(),
         source = (json['source']! as Map).cast<String, Object?>(),
+        live = json['live'] == null ? null : (json['live']! as Map).cast<String, Object?>(),
         stateValues = _numbers((json['values']! as Map)['state']),
         districtValues = _numbers((json['values']! as Map)['district']);
 
@@ -50,10 +52,32 @@ class Indicator {
   final bool lowerIsBetter;
   final List<String> levels;
   final Map<String, Object?> source;
+
+  /// Present only on the indicator whose values are read from an API at run
+  /// time rather than shipped with the app.
+  final Map<String, Object?>? live;
   final Map<String, double?> stateValues;
   final Map<String, double?> districtValues;
 
   bool get hasDistricts => levels.contains('district');
+  bool get hasSubDistricts => levels.contains('subdistrict');
+  bool get isLive => live != null;
+
+  List<Color> get ramp {
+    final colors = live?['colorScale'];
+    if (colors is List) {
+      return [
+        for (final value in colors) Color(int.parse('FF${(value as String).substring(1)}', radix: 16)),
+      ];
+    }
+    return lowerIsBetter ? _rampInverse : _ramp;
+  }
+
+  (String, String) get legend {
+    final labels = live?['legendLabels'];
+    if (labels is List && labels.length == 2) return (labels[0] as String, labels[1] as String);
+    return lowerIsBetter ? ('Better', 'Worse') : ('Lower', 'Higher');
+  }
 
   /// Nulls are kept: a region a source does not cover reads as "No data" rather
   /// than quietly vanishing from the map.
@@ -115,6 +139,51 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
   ChoroplethInsight? _insight;
   bool _showValues = true;
   String? _error;
+  Map<String, Map<String, List<double>>> _centroids = const {};
+  Map<String, double?> _liveValues = const {};
+  String? _observedAt;
+
+  /// Values for whichever source the current indicator has.
+  Map<String, double?> get _stateValues =>
+      (_indicator?.isLive ?? false) ? _liveValues : (_indicator?.stateValues ?? const {});
+
+  /// Current readings for a set of region ids, in one request. The API takes
+  /// comma-separated coordinates and answers in the same order, so a whole
+  /// level is one call.
+  Future<Map<String, double?>> _readTemperatures(Indicator indicator, String level, List<String> ids) async {
+    final points = _centroids[level] ?? const {};
+    final known = ids.where(points.containsKey).toList(growable: false);
+    if (known.isEmpty) return const {};
+    final spec = indicator.live!;
+    final uri = Uri.parse('${spec['endpoint']}'
+        '?latitude=${known.map((id) => points[id]![0]).join(',')}'
+        '&longitude=${known.map((id) => points[id]![1]).join(',')}'
+        '&current=${spec['variable']}');
+    final response = await http.get(uri);
+    if (response.statusCode != 200) {
+      throw Exception('The weather API responded ${response.statusCode}');
+    }
+    final decoded = jsonDecode(response.body);
+    // One coordinate comes back as an object, several as an array.
+    final entries = decoded is List ? decoded : [decoded];
+    final values = <String, double?>{};
+    for (var index = 0; index < known.length; index++) {
+      final current = (entries[index] as Map)['current'] as Map?;
+      final reading = current?[spec['variable']];
+      values[known[index]] = reading is num ? reading.toDouble() : null;
+      if (current?['time'] is String) _observedAt = current!['time'] as String;
+    }
+    return values;
+  }
+
+  /// Geometry for one level, plus a live reading for every region in it.
+  Future<ChoroplethLayer> _liveLayer(Indicator indicator, String assetPath, String object, String level) async {
+    final raw = jsonDecode(await rootBundle.loadString(assetPath)) as Map<String, Object?>;
+    final features = decodeTopoJson(raw, objectName: object);
+    final values = await _readTemperatures(indicator, level, features.map((f) => f.id).toList(growable: false));
+    if (mounted) setState(() {});
+    return ChoroplethLayer(features: features, values: values);
+  }
 
   @override
   void initState() {
@@ -125,6 +194,8 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
   Future<void> _load() async {
     try {
       final raw = jsonDecode(await rootBundle.loadString('assets/india-observatory.json'))
+          as Map<String, Object?>;
+      final raw2 = jsonDecode(await rootBundle.loadString('assets/region-centroids.json'))
           as Map<String, Object?>;
       final editions = (raw['editions']! as Map).cast<String, Object?>();
       final indicators = (raw['indicators']! as List<Object?>)
@@ -137,6 +208,12 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
             entry.key: ((entry.value! as Map)['label']! as String),
         };
       });
+      _centroids = ((raw2['centroids']! as Map).cast<String, Object?>()).map(
+        (level, byId) => MapEntry(
+          level,
+          (byId! as Map).map((id, point) => MapEntry(id as String, (point as List).cast<num>().map((n) => n.toDouble()).toList())),
+        ),
+      );
       await _select(indicators.first);
     } catch (error) {
       setState(() => _error = '$error');
@@ -163,6 +240,15 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
       _features = features;
       _names = {for (final feature in features) feature.id: feature.name};
     });
+
+    if (next.isLive) {
+      try {
+        final values = await _readTemperatures(next, 'states', features.map((f) => f.id).toList(growable: false));
+        if (mounted) setState(() => _liveValues = values);
+      } catch (error) {
+        if (mounted) setState(() => _error = '$error');
+      }
+    }
   }
 
   @override
@@ -276,8 +362,19 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
         child: child,
       );
 
+  /// Ranked best-first for a published indicator; warmest-first when live.
+  List<MapEntry<String, double>> _board(Indicator indicator) {
+    if (!indicator.isLive) return indicator.ranked;
+    final rows = <MapEntry<String, double>>[
+      for (final entry in _liveValues.entries)
+        if (entry.value != null) MapEntry(entry.key, entry.value!),
+    ];
+    rows.sort((a, b) => b.value.compareTo(a.value));
+    return rows;
+  }
+
   Widget _kpis(Indicator indicator) {
-    final board = indicator.ranked;
+    final board = _board(indicator);
     final best = board.isEmpty ? null : board.first;
     final median = board.isEmpty ? null : board[board.length ~/ 2].value;
     final cards = <List<String>>[
@@ -291,7 +388,8 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
       [
         'Boundaries',
         (_editionLabels[indicator.edition] ?? indicator.edition).replaceAll(' boundaries', ''),
-        '${indicator.source['vintage']} data · ${indicator.hasDistricts ? 'state and district' : 'state level only'}',
+        '${indicator.isLive && _observedAt != null ? 'read ${_observedAt!.replaceFirst('T', ' ')} UTC' : '${indicator.source['vintage']} data'}'
+            ' · ${indicator.hasSubDistricts ? 'to sub-district' : indicator.hasDistricts ? 'state and district' : 'state level only'}',
       ],
     ];
     return LayoutBuilder(
@@ -352,7 +450,9 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
               Flexible(
                 child: Text(
                   indicator.hasDistricts
-                      ? 'Tap a state to drill into its districts'
+                      ? (indicator.hasSubDistricts
+                          ? 'Tap a state, then a district, to sample the level below'
+                          : 'Tap a state to drill into its districts')
                       : 'State level only',
                   textAlign: TextAlign.end,
                   style: const TextStyle(fontSize: 11.5, color: _muted),
@@ -366,13 +466,11 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
             child: features == null
                 ? const Center(child: CircularProgressIndicator(color: _accent))
                 : IndiaChoropleth(
-                    key: ValueKey(indicator.edition),
+                    key: ValueKey('${indicator.key}-${indicator.edition}'),
                     features: features,
-                    values: indicator.stateValues,
-                    colorScale: ColorScale(colors: indicator.lowerIsBetter ? _rampInverse : _ramp),
-                    legendLabels: indicator.lowerIsBetter
-                        ? const ('Better', 'Worse')
-                        : const ('Lower', 'Higher'),
+                    values: _stateValues,
+                    colorScale: ColorScale(colors: indicator.ramp),
+                    legendLabels: indicator.legend,
                     formatValue: (value) => '${value.toStringAsFixed(indicator.decimals)}${indicator.unit}',
                     semanticLabel: '${indicator.label} by state and union territory',
                     selectedId: _selectedId,
@@ -385,8 +483,9 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
                     showRegionValues: _showValues,
                     loadDistricts: indicator.hasDistricts
                         ? (stateId, state) async {
-                            final raw = await rootBundle
-                                .loadString('assets/${indicator.edition}-districts/$stateId.topo.json');
+                            final path = 'assets/${indicator.edition}-districts/$stateId.topo.json';
+                            if (indicator.isLive) return _liveLayer(indicator, path, 'districts', 'districts');
+                            final raw = await rootBundle.loadString(path);
                             return ChoroplethLayer(
                               features: decodeTopoJson(
                                 jsonDecode(raw) as Map<String, Object?>,
@@ -394,6 +493,22 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
                               ),
                               values: indicator.districtValues,
                             );
+                          }
+                        : null,
+                    loadSubDistricts: indicator.hasSubDistricts
+                        ? (districtId, district, stateId) async {
+                            try {
+                              return await _liveLayer(
+                                indicator,
+                                'assets/subdistricts/$districtId.topo.json',
+                                'subdistricts',
+                                'subdistricts',
+                              );
+                            } catch (_) {
+                              // Three of the 788 districts have no sub-district
+                              // level; null leaves them as leaves.
+                              return null;
+                            }
                           }
                         : null,
                   ),
@@ -414,7 +529,8 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
       ['Boundaries', _editionLabels[indicator.edition] ?? indicator.edition],
       ['Join', '${source['joinRule']}'],
       if (source['formula'] != null) ['Formula', '${source['formula']}'],
-      ['Source file', '${source['sha256']}'],
+      if (source['licence'] != null) ['Licence', '${source['licence']}'],
+      if (source['sha256'] != null) ['Source file', '${source['sha256']}'],
     ];
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
@@ -455,7 +571,7 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
 
   Widget _rail(Indicator indicator) {
     final insight = _insight;
-    final board = indicator.ranked;
+    final board = _board(indicator);
     return _card(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

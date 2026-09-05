@@ -251,6 +251,53 @@ const groundwater = {
   values: { state: complete(currentStateIds, groundwaterValues) },
 };
 
+/* --------------------------------------------------- 0. Live temperature */
+
+/**
+ * The one indicator that reaches sub-district, and the only one with no vintage.
+ *
+ * The published five are collected on particular administrative units, so they
+ * stop where their source stops. A weather API answers for a coordinate at the
+ * moment you ask, so it can fill every level of the current bundle honestly —
+ * all 5,950 sub-districts included.
+ *
+ * It carries no values here. The apps fetch them, keyed by region id, using the
+ * sampling points from `region-centroids.json`; the state map is emitted as all
+ * nulls purely so every indicator has the same shape.
+ */
+const liveTemperature = {
+  key: "live_temperature",
+  label: "Current temperature",
+  short: "Temperature",
+  unit: "°C",
+  description:
+    "The temperature right now at one point inside each region — a sample, not an average over its area.",
+  edition: "current",
+  levels: ["state", "district", "subdistrict"],
+  decimals: 1,
+  live: {
+    provider: "Open-Meteo",
+    endpoint: "https://api.open-meteo.com/v1/forecast",
+    variable: "temperature_2m",
+    centroids: "/data/region-centroids.json",
+    // Cool to hot. Not a "more is better" ramp: temperature has no good end.
+    colorScale: ["#4a6fa5", "#6d95bd", "#9dbdd4", "#e8e2d0", "#efc48a", "#e09453", "#c2542f"],
+    legendLabels: ["Cooler", "Warmer"],
+  },
+  source: {
+    publisher: "Open-Meteo",
+    title: "Open-Meteo forecast API, current temperature_2m",
+    vintage: "live",
+    url: "https://open-meteo.com/",
+    licence: "CC BY 4.0",
+    joinRule:
+      "One representative point inside each region, derived from this repository's boundary bundles and checked to fall inside it. Read in one batched request per view.",
+    caveat:
+      "A point sample, not an area average: a large district is a single reading, the same as a small one. Readings change between visits, so this indicator is the one thing here that is not reproducible from a recorded source hash.",
+  },
+  values: { state: complete(currentStateIds, {}) },
+};
+
 /* ------------------------------------------------------------------ write */
 
 mkdirSync(out, { recursive: true });
@@ -273,17 +320,20 @@ const dataset = {
       stateCount: currentStateIds.size,
     },
   },
-  indicators: [literacy, ...nfhs, groundwater],
+  // Live first: it is the one that drills to sub-district, so it is what a
+  // reader should meet before the published five that stop at district.
+  indicators: [liveTemperature, literacy, ...nfhs, groundwater],
 };
 writeFileSync(resolve(out, "india-observatory.json"), `${JSON.stringify(dataset, null, 1)}\n`);
 
 for (const indicator of dataset.indicators) {
   const states = Object.values(indicator.values.state);
-  const reported = states.filter((value) => value !== null).length;
+  const reported = indicator.live ? states.length : states.filter((value) => value !== null).length;
   const districts = indicator.values.district ? Object.keys(indicator.values.district).length : 0;
   console.log(
     `  ${indicator.key.padEnd(23)} ${indicator.edition.padEnd(11)} states ${reported}/${states.length}` +
-      (districts ? `  districts ${districts}` : ""),
+      (districts ? `  districts ${districts}` : "") +
+      (indicator.live ? "  (fetched at runtime, to sub-district)" : ""),
   );
 }
 if (cgwbSkipped.length > 0) console.log(`\n  CGWB rows left as no data: ${cgwbSkipped.join(", ")}`);
