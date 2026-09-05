@@ -1,6 +1,6 @@
-import { StrictMode, useEffect, useMemo, useState } from "react";
+import { StrictMode, useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { IndiaChoropleth, type MapLayer, type MapRegion } from "bharat-choropleth";
+import { BharatChoropleth, type MapRegion } from "bharat-choropleth";
 import type { Topology } from "topojson-specification";
 import "bharat-choropleth/style.css";
 import "./styles.css";
@@ -24,6 +24,8 @@ const CONFIG_URL = "/examples/parity-config.json";
 /**
  * A stable pseudo-random number per id, so the drill-down is a real choropleth
  * and looks the same on every load without shipping a second data file.
+ * Identical to the plain-JS parity demo's `sampleValue` — that is what makes
+ * the two demos' district colours match.
  */
 function sampleValue(id: string): number {
   let hash = 0;
@@ -39,36 +41,21 @@ async function loadJson<T>(url: string): Promise<T> {
 
 function App() {
   const [config, setConfig] = useState<ParityConfig | null>(null);
-  const [states, setStates] = useState<Topology | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const [status, setStatus] = useState("Loading…");
   const [selectedId, setSelectedId] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([
-      loadJson<ParityConfig>(CONFIG_URL),
-      loadJson<Topology>(`${DATA_BASE}/current-2019-states/states.topo.json`),
-    ])
-      .then(([loadedConfig, topology]) => {
+    loadJson<ParityConfig>(CONFIG_URL)
+      .then((loadedConfig) => {
         setConfig(loadedConfig);
-        setStates(topology);
         setStatus("Ready — 36 states and union territories");
       })
       .catch(setError);
   }, []);
 
-  const stateLayer = useMemo<MapLayer | null>(() => {
-    if (!config || !states) return null;
-    return {
-      geometry: { topology: states, object: "states" },
-      getId: (feature) => String(feature.properties?.id),
-      getLabel: (feature) => String(feature.properties?.name),
-      getValue: (feature) => config.values[String(feature.properties?.id)] ?? null,
-    };
-  }, [config, states]);
-
   if (error) return <p className="status">Could not load: {error.message}</p>;
-  if (!config || !stateLayer) return <p className="status">Loading…</p>;
+  if (!config) return <p className="status">Loading…</p>;
 
   return (
     <>
@@ -85,8 +72,9 @@ function App() {
 
       {/* Fixed width so all three demos render the map at exactly the same size. */}
       <div className="map" style={{ width: config.mapWidth }}>
-        <IndiaChoropleth
-          states={stateLayer}
+        <BharatChoropleth
+          values={config.values}
+          dataBaseUrl={DATA_BASE}
           // Shared appearance — identical in all three demos.
           colorScale={config.colorScale}
           // Colours and widths are CSS variables in the web packages, so they are
@@ -113,6 +101,22 @@ function App() {
               getLabel: (feature) => String(feature.properties?.name),
               // Districts need their own values or every one renders as "no data" —
               // a near-white fill with white borders, which is invisible on this page.
+              getValue: (feature) => sampleValue(String(feature.properties?.id)),
+            };
+          }}
+          // Same reasoning as loadDistricts above, one level down, and matching
+          // what the plain-JS and Flutter demos do at this level.
+          loadSubDistricts={async (districtId) => {
+            const response = await fetch(`${DATA_BASE}/current-2019-subdistricts/subdistricts/${districtId}.topo.json`);
+            // Three of the 788 districts genuinely have no sub-district level.
+            // Null leaves them as leaves rather than opening an empty map.
+            if (response.status === 404) return null;
+            if (!response.ok) throw new Error(`sub-districts responded ${response.status}`);
+            const topology = (await response.json()) as Topology;
+            return {
+              geometry: { topology, object: "subdistricts" },
+              getId: (feature) => String(feature.properties?.id),
+              getLabel: (feature) => String(feature.properties?.name),
               getValue: (feature) => sampleValue(String(feature.properties?.id)),
             };
           }}

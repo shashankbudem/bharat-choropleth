@@ -64,6 +64,26 @@
               };
             });
         },
+        // Same reasoning as loadDistricts above, one level down: without values
+        // every sub-district is a near-white "no data" fill behind white borders,
+        // which reads as a blank page. Matches the Flutter demo's third level.
+        subDistricts: true,
+        loadSubDistricts: function (districtId) {
+          return fetch("/data/generated/current-2019-subdistricts/subdistricts/" + districtId + ".topo.json")
+            .then(function (response) {
+              // Three of the 788 districts genuinely have no sub-district level.
+              // Null leaves them as leaves rather than opening an empty map.
+              if (response.status === 404) return null;
+              return response.json().then(function (topology) {
+                return {
+                  geometry: { topology: topology, object: "subdistricts" },
+                  getId: function (feature) { return String(feature.properties.id); },
+                  getLabel: function (feature) { return String(feature.properties.name); },
+                  getValue: function (feature) { return sampleValue(String(feature.properties.id)); },
+                };
+              });
+            });
+        },
         interactive: true,
         formatValue: function (value) { return new Intl.NumberFormat("en-IN").format(value); },
         renderInsights: function (context, container) {
