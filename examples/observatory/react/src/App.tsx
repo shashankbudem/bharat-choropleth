@@ -69,6 +69,7 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drillDownId, setDrillDownId] = useState<string | null>(null);
   const [insight, setInsight] = useState<InsightContext | null>(null);
+  const [showValues, setShowValues] = useState(true);
 
   // The edition changes with the indicator, because the two are not
   // interchangeable: a 2011 statistic belongs on 2011 units.
@@ -161,7 +162,13 @@ export default function App() {
               <h2>{indicator.label}</h2>
               <p>{indicator.description}</p>
             </div>
-            <span className="hint">{hasDistricts ? "Click a state to drill in" : "State level only"} · click a legend swatch to filter</span>
+            <div className="panel-actions">
+              <label className="toggle">
+                <input type="checkbox" checked={showValues} onChange={(event) => setShowValues(event.target.checked)} />
+                <span>Values on map</span>
+              </label>
+              <span className="hint">{hasDistricts ? "Click a state to drill into its districts" : "State level only"} · click a legend swatch to filter</span>
+            </div>
           </div>
 
           {geometry ? (
@@ -179,7 +186,7 @@ export default function App() {
               selectedId={selectedId}
               onSelectedChange={(region) => setSelectedId(region?.id ?? null)}
               onInsight={setInsight}
-              showRegionValues={false}
+              showRegionValues={showValues}
               ariaLabel={`${indicator.label} by state and union territory`}
             />
           ) : (

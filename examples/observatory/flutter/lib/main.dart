@@ -113,6 +113,7 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
   String? _selectedId;
   String? _drillDownId;
   ChoroplethInsight? _insight;
+  bool _showValues = true;
   String? _error;
 
   @override
@@ -337,7 +338,29 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
           Text(indicator.label, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: _ink)),
           const SizedBox(height: 4),
           Text(indicator.description, style: const TextStyle(fontSize: 12.5, color: _muted)),
-          const SizedBox(height: 12),
+          Row(
+            children: [
+              Checkbox(
+                value: _showValues,
+                onChanged: (value) => setState(() => _showValues = value ?? true),
+                activeColor: _accent,
+                visualDensity: VisualDensity.compact,
+                materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+              ),
+              const Text('Values on map', style: TextStyle(fontSize: 12.5, color: _muted)),
+              const Spacer(),
+              Flexible(
+                child: Text(
+                  indicator.hasDistricts
+                      ? 'Tap a state to drill into its districts'
+                      : 'State level only',
+                  textAlign: TextAlign.end,
+                  style: const TextStyle(fontSize: 11.5, color: _muted),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
           SizedBox(
             height: 520,
             child: features == null
@@ -359,6 +382,7 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
                     onBackgroundTap: () => setState(() => _selectedId = null),
                     onInsight: (insight) => setState(() => _insight = insight),
                     borderColor: _bg,
+                    showRegionValues: _showValues,
                     loadDistricts: indicator.hasDistricts
                         ? (stateId, state) async {
                             final raw = await rootBundle

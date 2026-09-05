@@ -146,7 +146,14 @@ export default function App() {
       <main id="map">
         <section className="intro"><div><h1>Regional performance</h1><p>Explore totals across regions, then select one to see its districts — and, on the current edition, a district to see its sub-districts.</p></div><div className="total-block"><span>{drillDownId ? "Selected state / UT" : metric === "index" ? "Sample Census-coverage aggregate" : METRICS[metric].label}</span><strong>{subDistrictDrillDownId ? "Sub-district view" : drillDownId ? "District view" : metric === "index" ? formatter.format(total ?? 0) : "Per-region only"}</strong></div></section>
         <div className="dashboard-grid">
-          <section className="map-workspace" aria-labelledby="map-title"><div className="map-toolbar"><h2 id="map-title">{scopeLabel === "State-level performance" ? "All states" : scopeLabel}</h2><span className="helper">Tab · Enter/Space · Esc</span></div>
+          <section className="map-workspace" aria-labelledby="map-title"><div className="map-toolbar"><h2 id="map-title">{scopeLabel === "State-level performance" ? "All states" : scopeLabel}</h2><span className="helper">
+              {/* Which depths this edition actually offers. The historical
+                  Census-2011 bundle has no sub-district layer, so its districts
+                  are leaves — without saying so, the third level looks missing
+                  rather than absent by vintage. */}
+              {edition === "current" ? "State → district → sub-district" : "State → district (this vintage has no sub-districts)"}
+              <span aria-hidden="true"> · </span>Tab · Enter/Space · Esc
+            </span></div>
             <IndiaChoropleth
               key={edition}
               states={layer}

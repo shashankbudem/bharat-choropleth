@@ -22,6 +22,7 @@
   var map = null;
   var stateNames = new Map();
   var selectedId = null;
+  var showValues = true;
 
   function format(value) {
     return value === null || value === undefined ? "No data" : value.toFixed(indicator.decimals) + indicator.unit;
@@ -163,7 +164,7 @@
     document.getElementById("indicator-label").textContent = indicator.label;
     document.getElementById("indicator-description").textContent = indicator.description;
     document.getElementById("indicator-hint").textContent =
-      (indicator.levels.indexOf("district") >= 0 ? "Click a state to drill in" : "State level only") +
+      (indicator.levels.indexOf("district") >= 0 ? "Click a state to drill into its districts" : "State level only") +
       " · click a legend swatch to filter";
 
     renderIndicators();
@@ -194,6 +195,7 @@
       legendLabels: indicator.lowerIsBetter ? ["Better", "Worse"] : ["Lower", "Higher"],
       formatValue: function (value) { return value.toFixed(indicator.decimals) + indicator.unit; },
       ariaLabel: indicator.label + " by state and union territory",
+      showRegionValues: showValues,
       districts: hasDistricts,
       subDistricts: false,
       showLegend: true,
@@ -255,6 +257,13 @@
       })
       .catch(function () { /* leaderboard falls back to ids */ });
   }
+
+  document.getElementById("show-values").addEventListener("change", function (event) {
+    showValues = event.target.checked;
+    // The engine takes this as an option, so the running instance is updated
+    // rather than rebuilt — the geometry has not changed.
+    if (map && map.engine) map.engine.update({ showRegionValues: showValues });
+  });
 
   fetch("../data/india-observatory.json")
     .then(function (response) { return response.json(); })
