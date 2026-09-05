@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Changed
+
+- Repainting no longer re-unpacks the topology or refits the projection. The
+  zero-config facade calls `update({})` for every value written, and both steps
+  ran again each time even though neither reads a value. They are now held
+  against `states.geometry`, and the decoded features are passed into layer
+  preparation rather than unpacked a second time. Mirrors the React renderer.
+
 ### Fixed
 
 - The default data source now points at the `v0.2.0` boundary bundle. It was

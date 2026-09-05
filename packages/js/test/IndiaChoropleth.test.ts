@@ -875,3 +875,80 @@ describe("IndiaChoropleth sub-district drill-down", () => {
     await vi.waitFor(() => byLabel(container, /delta, 9/i));
   });
 });
+
+describe("repainting values without re-decoding the geometry", () => {
+  let host: HTMLElement;
+  beforeEach(() => { host = document.createElement("div"); document.body.appendChild(host); });
+  afterEach(() => { host.remove(); });
+
+  /**
+   * A topology that counts how many times its `objects` bag is read. Reading it
+   * is what `asFeatureCollection` does to unpack the layer, so the count is the
+   * number of times the geometry was decoded.
+   */
+  function countingTopology() {
+    let reads = 0;
+    const objects = {
+      states: {
+        type: "GeometryCollection" as const,
+        geometries: [
+          { type: "Polygon" as const, arcs: [[0]], properties: { id: "a", name: "Aland", value: 1 } },
+          { type: "Polygon" as const, arcs: [[1]], properties: { id: "b", name: "Bland", value: 2 } },
+        ],
+      },
+    };
+    const topology = {
+      type: "Topology" as const,
+      arcs: [
+        [[0, 0], [1000, 0], [0, 1000], [-1000, 0], [0, -1000]],
+        [[2000, 0], [1000, 0], [0, 1000], [-1000, 0], [0, -1000]],
+      ],
+      transform: { scale: [0.001, 0.001] as [number, number], translate: [72, 18] as [number, number] },
+      get objects() { reads++; return objects; },
+    };
+    return { topology, reads: () => reads };
+  }
+
+  it("decodes the topology once across many value updates", () => {
+    const { topology, reads } = countingTopology();
+    const values: Record<string, number | null> = { a: 1, b: 2 };
+    const map = new IndiaChoropleth(host, {
+      states: {
+        geometry: { topology: topology as never, object: "states" },
+        getId: (feature) => String(feature.properties?.id),
+        getLabel: (feature) => String(feature.properties?.name),
+        getValue: (feature) => values[String(feature.properties?.id)] ?? null,
+      },
+    });
+    const afterMount = reads();
+    expect(afterMount).toBeGreaterThan(0);
+
+    // What the zero-config facade does for every value written.
+    for (let n = 0; n < 5; n++) {
+      values.a = n;
+      map.update({});
+    }
+    expect(reads()).toBe(afterMount);
+
+    // The numbers still repaint; only the unpacking is skipped.
+    const labels = [...host.querySelectorAll('[role="button"]')].map((node) => node.getAttribute("aria-label") ?? "");
+    expect(labels.find((label) => label.startsWith("Aland,"))).toMatch(/4/);
+    map.destroy();
+  });
+
+  it("decodes again when the geometry itself is replaced", () => {
+    const first = countingTopology();
+    const second = countingTopology();
+    const layer = (source: ReturnType<typeof countingTopology>): MapLayer => ({
+      geometry: { topology: source.topology as never, object: "states" },
+      getId: (feature) => String(feature.properties?.id),
+      getLabel: (feature) => String(feature.properties?.name),
+      getValue: (feature) => Number(feature.properties?.value),
+    });
+    const map = new IndiaChoropleth(host, { states: layer(first) });
+    expect(second.reads()).toBe(0);
+    map.update({ states: layer(second) });
+    expect(second.reads()).toBeGreaterThan(0);
+    map.destroy();
+  });
+});

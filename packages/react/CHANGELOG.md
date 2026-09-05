@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Fixed
+
+- Changing values no longer reloads the level below. Repainting means handing
+  the renderer a new `MapLayer`, and the district and sub-district loaders keyed
+  their effects on the prepared regions — which carry values — so every number
+  that moved called the loader again and blanked the level while the promise was
+  in flight. A map drilled into a state, driven by a timer or a slider, blinked
+  its districts away on every tick. The loaders now key on the geometry and id
+  accessor, the things that decide which regions exist. A real geometry change
+  still reloads.
+
+### Changed
+
+- Repainting no longer re-unpacks the topology or refits the projection. Both
+  are keyed on `states.geometry`, and the decoded features are passed into layer
+  preparation instead of being unpacked a second time. Values live on the layer,
+  not the geometry, so neither step could have changed its answer.
+
 ### Added
 
 - `BharatChoropleth`, a zero-config component over the existing renderer:

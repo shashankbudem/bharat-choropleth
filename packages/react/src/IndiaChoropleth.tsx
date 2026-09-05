@@ -103,12 +103,18 @@ function makeProjection(collection: MapFeatureCollection): GeoProjection {
   );
 }
 
+/**
+ * `collection` lets a caller that has already unpacked this layer's geometry
+ * hand the features straight in. Preparing a layer is how values reach the
+ * screen, so it re-runs on every value change — unpacking the same topology
+ * again each time is work whose answer cannot have changed.
+ */
 function prepareLayer(
   layer: MapLayer,
   projection = makeProjection(asFeatureCollection(layer.geometry)),
   minPartExtent = 0,
+  collection: MapFeatureCollection = asFeatureCollection(layer.geometry),
 ): PreparedRegion[] {
-  const collection = asFeatureCollection(layer.geometry);
   const path = geoPath(projection);
   return collection.features.map((feature) => {
     const centroid = path.centroid(feature) as [number, number];
@@ -260,7 +266,11 @@ export function IndiaChoropleth({
   const pathRefs = useRef<Record<string, SVGPathElement | null>>({});
   const restoreFocusId = useRef<string | null>(null);
 
-  const stateCollection = useMemo(() => asFeatureCollection(states.geometry), [states]);
+  // Keyed on the geometry, not the layer: a caller that repaints by handing over
+  // a new `MapLayer` with the same geometry — which is how values change — gets
+  // the same decoded features and the same projection back, instead of paying to
+  // unpack the topology and refit the projection for numbers that moved.
+  const stateCollection = useMemo(() => asFeatureCollection(states.geometry), [states.geometry]);
   const referenceCollection = useMemo(
     () => referenceOverlay ? asFeatureCollection(referenceOverlay.geometry) : null,
     [referenceOverlay],
@@ -269,7 +279,10 @@ export function IndiaChoropleth({
     () => makeProjection({ type: "FeatureCollection", features: [...stateCollection.features, ...(referenceCollection?.features ?? [])] }),
     [referenceCollection, stateCollection],
   );
-  const stateRegions = useMemo(() => prepareLayer(states, nationalProjection, minPartExtent), [minPartExtent, nationalProjection, states]);
+  const stateRegions = useMemo(
+    () => prepareLayer(states, nationalProjection, minPartExtent, stateCollection),
+    [minPartExtent, nationalProjection, stateCollection, states],
+  );
   const referenceRegions = useMemo(
     () => referenceOverlay ? prepareReferenceOverlay(referenceOverlay, nationalProjection) : [],
     [nationalProjection, referenceOverlay],
@@ -278,6 +291,18 @@ export function IndiaChoropleth({
     () => stateRegions.find((region) => region.id === activeDrillDownId) ?? null,
     [activeDrillDownId, stateRegions],
   );
+  /**
+   * Prepared regions bake in each region's value, so they are a new array
+   * whenever any number changes. The lazy-loading effects below need the current
+   * region to hand to a loader, but must not re-run just because a value moved:
+   * re-running calls the loader again and clears the level while the promise is
+   * in flight, so a map whose data updates on a timer would blink its districts
+   * away on every tick. They read regions through these refs and depend on the
+   * geometry and id accessor instead — the things that actually decide which
+   * regions exist and what they are called.
+   */
+  const stateRegionsRef = useRef(stateRegions);
+  stateRegionsRef.current = stateRegions;
   const isDrillRequested = Boolean(drilledState && activeDrillDownId);
   const districtLayer = loadedDistricts?.stateId === activeDrillDownId ? loadedDistricts.layer : null;
   const districtReferenceOverlay = loadedDistrictReferenceOverlay?.stateId === activeDrillDownId
@@ -300,14 +325,17 @@ export function IndiaChoropleth({
   // resolvable — by id, for the breadcrumb and for the loader — from one level down.
   const districtRegions = useMemo(
     () => districtLayer && districtProjection
-      ? prepareLayer(districtLayer, districtProjection, minDistrictPartExtent ?? minPartExtent)
+      ? prepareLayer(districtLayer, districtProjection, minDistrictPartExtent ?? minPartExtent, districtCollection ?? undefined)
       : [],
-    [districtLayer, districtProjection, minDistrictPartExtent, minPartExtent],
+    [districtCollection, districtLayer, districtProjection, minDistrictPartExtent, minPartExtent],
   );
   const drilledDistrict = useMemo(
     () => districtRegions.find((region) => region.id === activeSubDrillDownId) ?? null,
     [activeSubDrillDownId, districtRegions],
   );
+  // As above, one level down.
+  const districtRegionsRef = useRef(districtRegions);
+  districtRegionsRef.current = districtRegions;
   const isSubDrillRequested = Boolean(isDrillRequested && drilledDistrict && activeSubDrillDownId);
   const level: MapLevel = isSubDrillRequested ? "subdistrict" : isDrillRequested ? "district" : "state";
 
@@ -384,7 +412,7 @@ export function IndiaChoropleth({
       setLoadError(null);
       return;
     }
-    const sourceState = stateRegions.find((region) => region.id === activeDrillDownId);
+    const sourceState = stateRegionsRef.current.find((region) => region.id === activeDrillDownId);
     if (!sourceState) return;
     setLoadingState(activeDrillDownId);
     setLoadError(null);
@@ -394,7 +422,7 @@ export function IndiaChoropleth({
       .catch((error: unknown) => { if (!cancelled) setLoadError(error instanceof Error ? error : new Error("Unable to load districts.")); })
       .finally(() => { if (!cancelled) setLoadingState(null); });
     return () => { cancelled = true; };
-  }, [activeDrillDownId, loadDistricts, stateRegions]);
+  }, [activeDrillDownId, loadDistricts, stateCollection, states.getId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -402,7 +430,7 @@ export function IndiaChoropleth({
       setLoadedDistrictReferenceOverlay(null);
       return;
     }
-    const sourceState = stateRegions.find((region) => region.id === activeDrillDownId);
+    const sourceState = stateRegionsRef.current.find((region) => region.id === activeDrillDownId);
     if (!sourceState) return;
     setLoadedDistrictReferenceOverlay(null);
     loadDistrictReferenceOverlay(activeDrillDownId, sourceState)
@@ -410,7 +438,7 @@ export function IndiaChoropleth({
       // Optional reference context must not prevent a usable district data view.
       .catch(() => { if (!cancelled) setLoadedDistrictReferenceOverlay({ stateId: activeDrillDownId, overlay: null }); });
     return () => { cancelled = true; };
-  }, [activeDrillDownId, loadDistrictReferenceOverlay, stateRegions]);
+  }, [activeDrillDownId, loadDistrictReferenceOverlay, stateCollection, states.getId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -420,7 +448,7 @@ export function IndiaChoropleth({
       setSubLoadError(null);
       return;
     }
-    const sourceDistrict = districtRegions.find((region) => region.id === activeSubDrillDownId);
+    const sourceDistrict = districtRegionsRef.current.find((region) => region.id === activeSubDrillDownId);
     // The district layer has not arrived yet, so there is nothing to load from.
     // This effect re-runs once it does.
     if (!sourceDistrict || !activeDrillDownId) return;
@@ -448,7 +476,7 @@ export function IndiaChoropleth({
     // dependencies: a host passing an inline callback would otherwise refetch on
     // every render.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeDrillDownId, activeSubDrillDownId, districtRegions, loadSubDistricts]);
+  }, [activeDrillDownId, activeSubDrillDownId, districtCollection, districtLayer?.getId, loadSubDistricts]);
 
   // A district id only means something inside the state it came from, so leaving
   // or changing the state drops the level below it. Seeded with the mount-time
