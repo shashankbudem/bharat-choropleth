@@ -2,6 +2,18 @@
 
 ## 0.3.0 - 2026-09-05
 
+### Fixed
+
+- Values keyed by a feature id the state registry does not know now match. A
+  feature was keyed by its id only if the registry recognised it, and otherwise
+  fell back to its *label* — so a dataset keyed by id against geometry outside
+  the registry, such as this repo's own historical Census bundle with its
+  `in-hs-*` ids, silently rendered as "No data" on every region while looking
+  perfectly healthy. Each key a caller writes is now recorded against the
+  canonical key it addresses, and a feature is matched by exact id, exact label,
+  then either resolved through the registry. Found by building a dashboard on
+  the historical bundle.
+
 ### Added
 
 - `IndiaChoropleth` warns when `loadDistricts` or `loadSubDistricts` has been a

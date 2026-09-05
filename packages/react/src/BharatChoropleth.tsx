@@ -35,6 +35,38 @@ function keyFor(name: string): string {
   return resolveState(name)?.id ?? normalizeStateKey(name);
 }
 
+/**
+ * Finds a feature's value, trying the most literal match first.
+ *
+ * Each key the caller wrote maps to the canonical key it addresses, never to a
+ * value, so the value map stays the single source of truth and a later write
+ * through one spelling is seen through every other.
+ *
+ * Exact id, then exact label, then each resolved through the state registry.
+ * Ordering matters both ways round: an id that the registry does not know still
+ * matches when the caller keyed by that id, and a caller who keyed by "Orissa"
+ * still reaches Odisha. `has` rather than `??` throughout, so a deliberate null
+ * reads as "no data" instead of falling through to the next candidate.
+ */
+function lookUp(
+  exactKeys: ReadonlyMap<string, string>,
+  canonical: ReadonlyMap<string, number | null>,
+  id: string,
+  label: string,
+): number | null {
+  for (const candidate of [
+    exactKeys.get(id),
+    exactKeys.get(label),
+    resolveState(id)?.id,
+    resolveState(label)?.id,
+    normalizeStateKey(id),
+    normalizeStateKey(label),
+  ]) {
+    if (candidate !== undefined && canonical.has(candidate)) return canonical.get(candidate) ?? null;
+  }
+  return null;
+}
+
 /** A number, or null for "no data". Anything not finite (NaN, Infinity) reads as no data. */
 function toValue(input: unknown): number | null {
   return typeof input === "number" && Number.isFinite(input) ? input : null;
@@ -170,16 +202,28 @@ export function BharatChoropleth({
     return [];
   }, [data, regionKey, valueKey, values]);
 
-  const { valueMap, writtenAs } = useMemo(() => {
+  const { valueMap, exactKeys, writtenAs } = useMemo(() => {
     const valueMap = new Map<string, number | null>();
+    /**
+     * The caller's keys exactly as written, checked before the registry.
+     *
+     * Not every id belongs to the registry. The historical Census bundle in this
+     * repository uses `in-hs-*` ids, which `resolveState` does not know, so a
+     * feature keyed on its id would fall through to being keyed on its *label* —
+     * and values written against ids would silently never match, leaving a fully
+     * populated dataset rendering as "No data" everywhere. Keeping the literal
+     * keys means id-keyed values work for any geometry, registry or not.
+     */
+    const exactKeys = new Map<string, string>();
     const writtenAs = new Map<string, string>();
     for (const [name, value] of entries) {
       const key = keyFor(name);
       valueMap.set(key, value);
+      exactKeys.set(name, key);
       // Keep the caller's own spelling so a warning quotes what they typed.
       if (!writtenAs.has(key)) writtenAs.set(key, name);
     }
-    return { valueMap, writtenAs };
+    return { valueMap, exactKeys, writtenAs };
   }, [entries]);
 
   /**
@@ -228,6 +272,8 @@ export function BharatChoropleth({
   // changes, so a loader rebuilt per value would refetch on every update.
   const valuesRef = useRef(valueMap);
   valuesRef.current = valueMap;
+  const exactKeysRef = useRef(exactKeys);
+  exactKeysRef.current = exactKeys;
   const districtValuesRef = useRef(districtValueMap);
   districtValuesRef.current = districtValueMap;
 
@@ -272,18 +318,16 @@ export function BharatChoropleth({
      * feature through the state registry by id first and only then by label,
      * rather than matching a bare slug against an id-keyed map.
      */
-    const keyForFeature = (feature: MapFeature): string =>
-      resolveState(getId(feature))?.id ?? resolveState(getLabel(feature))?.id ?? normalizeStateKey(getLabel(feature));
     return {
       geometry: resolvedGeometry,
       getId,
       getLabel,
       // `valueMap` is captured deliberately: the memo is keyed on the signature
       // of exactly these values, so the captured map and the key always agree.
-      getValue: (feature) => valueMap.get(keyForFeature(feature)) ?? null,
+      getValue: (feature) => lookUp(exactKeys, valueMap, getId(feature), getLabel(feature)),
     };
     // `valueSignature` is the dependency that stands in for `valueMap`; see above.
-  }, [getId, getLabel, resolvedGeometry, valueSignature]);
+  }, [exactKeys, getId, getLabel, resolvedGeometry, valueSignature]);
 
   /**
    * Unknown names cannot be judged until the boundary data has landed and named
@@ -386,7 +430,7 @@ export function BharatChoropleth({
           geometry: await pending,
           getId: defaultGetId,
           getLabel: defaultGetLabel,
-          getValue: (feature) => valuesRef.current.get(keyFor(defaultGetLabel(feature))) ?? null,
+          getValue: (feature) => lookUp(exactKeysRef.current, valuesRef.current, defaultGetId(feature), defaultGetLabel(feature)),
         },
         stateId,
       );
@@ -415,7 +459,7 @@ export function BharatChoropleth({
         geometry,
         getId: defaultGetId,
         getLabel: defaultGetLabel,
-        getValue: (feature) => valuesRef.current.get(keyFor(defaultGetLabel(feature))) ?? null,
+        getValue: (feature) => lookUp(exactKeysRef.current, valuesRef.current, defaultGetId(feature), defaultGetLabel(feature)),
       };
     };
   }, [dataBaseUrl, subDistrictsEnabled]);

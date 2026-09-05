@@ -433,3 +433,77 @@ describe("BharatChoropleth with fetched geometry", () => {
     expect(container.querySelector(".bharat-choropleth__status")).toBeNull();
   });
 });
+
+describe("values keyed by an id the state registry does not know", () => {
+  // The historical Census bundle in this repo uses in-hs-* ids. They are not in
+  // the registry, so before this the feature fell back to being keyed on its
+  // label while the caller's values were keyed on the id — and a fully populated
+  // dataset rendered as "No data" on every region.
+  const historical: GeometrySource = {
+    type: "FeatureCollection",
+    features: [
+      { type: "Feature", properties: { id: "in-hs-30-goa", name: "Goa" }, geometry: { type: "Polygon", coordinates: [[[72, 15], [73, 15], [73, 16], [72, 16], [72, 15]]] } },
+      { type: "Feature", properties: { id: "in-hs-33-tamil-nadu", name: "Tamil Nadu" }, geometry: { type: "Polygon", coordinates: [[[77, 10], [78, 10], [78, 11], [77, 11], [77, 10]]] } },
+    ],
+  };
+
+  let host: HTMLElement;
+  beforeEach(() => { host = document.createElement("div"); document.body.appendChild(host); });
+  afterEach(() => { host.remove(); });
+
+  function labelFor(name: RegExp): string {
+    const match = [...host.querySelectorAll('[role="button"]')].find((node) => name.test(node.getAttribute("aria-label") ?? ""));
+    return match?.getAttribute("aria-label") ?? "";
+  }
+
+  it("matches them", () => {
+    const map = new BharatChoropleth(host, {
+      geometry: historical,
+      values: { "in-hs-30-goa": 6, "in-hs-33-tamil-nadu": 18 },
+    });
+    expect(labelFor(/^Goa,/)).toMatch(/6/);
+    expect(labelFor(/^Tamil Nadu,/)).toMatch(/18/);
+    map.destroy();
+  });
+
+  it("updates when written through the same id it was seeded with", () => {
+    const map = new BharatChoropleth(host, { geometry: historical, values: { "in-hs-30-goa": 6 } });
+    map.states["in-hs-30-goa"] = 9;
+    expect(labelFor(/^Goa,/)).toMatch(/9/);
+    map.destroy();
+  });
+
+  it("keeps an unregistered id winning over the display name, so precedence is predictable", () => {
+    // "in-hs-30-goa" and "Goa" are not the same key to the registry: the id is
+    // unknown to it, so the two are separate entries and cannot be merged until
+    // the geometry says they are one region. The literal id is matched first, so
+    // which one applies is at least deterministic — key a dataset one way, not
+    // both. The React package behaves identically.
+    const map = new BharatChoropleth(host, { geometry: historical, values: { "in-hs-30-goa": 6, Goa: 99 } });
+    expect(labelFor(/^Goa,/)).toMatch(/6/);
+    map.destroy();
+  });
+});
+
+describe("enumerating .states after a feature gained several keys", () => {
+  it("lists each region once, and Object.keys does not throw", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const map = new BharatChoropleth(host, {
+      geometry: {
+        type: "FeatureCollection",
+        features: [
+          { type: "Feature", properties: { id: "in-hs-30-goa", name: "Goa" }, geometry: { type: "Polygon", coordinates: [[[72, 15], [73, 15], [73, 16], [72, 16], [72, 15]]] } },
+          { type: "Feature", properties: { id: "in-hs-33-tamil-nadu", name: "Tamil Nadu" }, geometry: { type: "Polygon", coordinates: [[[77, 10], [78, 10], [78, 11], [77, 11], [77, 10]]] } },
+        ],
+      },
+      values: { "in-hs-30-goa": 6 },
+    });
+    const keys = Object.keys(map.states);
+    expect(keys).toEqual([...new Set(keys)]);
+    expect(keys.sort()).toEqual(["Goa", "Tamil Nadu"]);
+    expect(Object.keys(map.getValues()).sort()).toEqual(["Goa", "Tamil Nadu"]);
+    map.destroy();
+    host.remove();
+  });
+});
