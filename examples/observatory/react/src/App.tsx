@@ -1,5 +1,5 @@
 import { BharatChoropleth, type InsightContext, type MapLayer, type MapRegion } from "bharat-choropleth";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import raw from "../../data/india-observatory.json";
 
 type Edition = "historical" | "current";
@@ -41,7 +41,13 @@ const dataset = raw as unknown as {
   indicators: Indicator[];
 };
 
-const DATA_BASE = "/data/generated";
+/**
+ * Resolved against the page rather than the server root, so the built site works
+ * wherever it is mounted — at a domain root on Cloudflare Pages, and under
+ * `/<repo>/` on GitHub Pages. Each app sits one directory below the site root.
+ */
+const SITE = new URL("../", document.baseURI).href;
+const DATA_BASE = `${SITE}data/generated`;
 const EDITION_PATHS: Record<Edition, { states: string; districts: string; object: string }> = {
   historical: {
     states: `${DATA_BASE}/census-2011/states.topo.json`,
@@ -129,8 +135,30 @@ function Sources({ indicator }: { indicator: Indicator }) {
   );
 }
 
+/**
+ * Opening state from the URL, so a view can be linked to.
+ *
+ * `?indicator=live_temperature&state=in-cs-27-maharashtra&district=in-cd-27-520`
+ * lands directly on that district's sub-districts. It is what makes the drilled
+ * screenshots in the README reproducible, and it is the obvious thing to want
+ * from a dashboard anyway.
+ */
+function openingView() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    indicator: params.get("indicator"),
+    state: params.get("state"),
+    district: params.get("district"),
+  };
+}
+
 export default function App() {
-  const [indicatorKey, setIndicatorKey] = useState(dataset.indicators[0]!.key);
+  const [opening] = useState(openingView);
+  const [indicatorKey, setIndicatorKey] = useState(
+    opening.indicator && dataset.indicators.some((entry) => entry.key === opening.indicator)
+      ? opening.indicator
+      : dataset.indicators[0]!.key,
+  );
   const indicator = useMemo(
     () => dataset.indicators.find((entry) => entry.key === indicatorKey)!,
     [indicatorKey],
@@ -139,7 +167,7 @@ export default function App() {
 
   const [geometry, setGeometry] = useState<Record<string, unknown> | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
-  const [drillDownId, setDrillDownId] = useState<string | null>(null);
+  const [drillDownId, setDrillDownId] = useState<string | null>(opening.state);
   const [insight, setInsight] = useState<InsightContext | null>(null);
   const [showValues, setShowValues] = useState(true);
   const [centroids, setCentroids] = useState<Centroids | null>(null);
@@ -151,7 +179,7 @@ export default function App() {
   // The sampling points are the same file for every level, so it is fetched once.
   useEffect(() => {
     let cancelled = false;
-    fetch("/data/region-centroids.json")
+    fetch(`${SITE}data/region-centroids.json`)
       .then((response) => response.json())
       .then((loaded: Centroids) => { if (!cancelled) setCentroids(loaded); })
       .catch(() => { if (!cancelled) setCentroids(null); });
@@ -176,10 +204,14 @@ export default function App() {
 
   // The edition changes with the indicator, because the two are not
   // interchangeable: a 2011 statistic belongs on 2011 units.
+  const openedRef = useRef(false);
   useEffect(() => {
     let cancelled = false;
     setGeometry(null);
-    setDrillDownId(null);
+    // The first pass keeps whatever the URL asked for; later edition changes
+    // clear it, because a state id from one vintage means nothing in another.
+    if (openedRef.current) setDrillDownId(null);
+    openedRef.current = true;
     setSelectedId(null);
     fetch(EDITION_PATHS[edition].states)
       .then((response) => response.json())
@@ -277,9 +309,9 @@ export default function App() {
           </div>
         </div>
         <nav className="ecosystems">
-          <a href="/">All examples</a>
-          <a href="/js/">Plain JS</a>
-          <a href="/flutter/">Flutter</a>
+          <a href="../">All examples</a>
+          <a href="../js/">Plain JS</a>
+          <a href="../flutter/">Flutter</a>
         </nav>
       </header>
 
@@ -341,6 +373,7 @@ export default function App() {
               loadSubDistricts={hasSubDistricts ? loadSubDistricts : undefined}
               drillDownId={drillDownId}
               onDrillDownChange={setDrillDownId}
+              defaultSubDistrictDrillDownId={opening.district}
               selectedId={selectedId}
               onSelectedChange={(region) => setSelectedId(region?.id ?? null)}
               onInsight={setInsight}

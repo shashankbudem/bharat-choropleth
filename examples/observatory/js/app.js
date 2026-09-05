@@ -9,7 +9,10 @@
 (function () {
   "use strict";
 
-  var DATA_BASE = "/data/generated";
+  // Resolved against the page, not the server root, so the built site works
+  // wherever it is mounted. This page sits one directory below the site root.
+  var SITE = new URL("../", document.baseURI).href;
+  var DATA_BASE = SITE + "data/generated";
   var EDITIONS = {
     historical: { states: DATA_BASE + "/census-2011/states.topo.json", districts: DATA_BASE + "/census-2011/districts" },
     current: { states: DATA_BASE + "/current-2019-states/states.topo.json", districts: DATA_BASE + "/current-2019-districts/districts" },
@@ -365,8 +368,8 @@
   });
 
   Promise.all([
-    fetch("../data/india-observatory.json").then(function (r) { return r.json(); }),
-    fetch("/data/region-centroids.json").then(function (r) { return r.json(); }),
+    fetch(SITE + "data/india-observatory.json").then(function (r) { return r.json(); }),
+    fetch(SITE + "data/region-centroids.json").then(function (r) { return r.json(); }),
   ])
     .then(function (loaded) {
       dataset = loaded[0];

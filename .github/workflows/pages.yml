@@ -1,0 +1,66 @@
+# Publishes the observatory example to GitHub Pages so the demo has a public URL.
+#
+# A project site is served from /<repo>/, which is why the apps resolve their
+# data relative to the page and the assembly script takes the mount point: the
+# same artifact works here and at a domain root on Cloudflare Pages.
+name: Deploy example to Pages
+
+on:
+  push:
+    branches: [main]
+  # Deployable by hand from any branch, which is how a change gets a preview
+  # before it is merged.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deployment at a time; never cancel one halfway.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.0.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - run: pnpm install --frozen-lockfile
+
+      # The dataset is rebuilt rather than trusted: it re-fetches the NFHS-5
+      # workbook and checks its SHA-256 against the recorded audit, so a source
+      # that changed under us fails the deploy instead of shipping quietly.
+      - name: Build the observatory
+        run: pnpm build:observatory -- --base=/${{ github.event.repository.name }}/
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist/observatory
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

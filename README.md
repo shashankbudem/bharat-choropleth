@@ -6,6 +6,10 @@ The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, the
 
 ![Bharat Choropleth current 2019-boundary dashboard](./previews/country-full-claimed-outline-desktop.png)
 
+**[Try the live demo →](https://shashankbudem.github.io/bharat-choropleth/)** — the
+same dashboard built three times, once per ecosystem, on published Indian
+statistics plus a live temperature feed that drills to sub-district.
+
 ## Examples
 
 ### National view
@@ -17,6 +21,16 @@ The package turns a state GeoJSON/TopoJSON layer into an accessible SVG map, the
 ![Maharashtra district choropleth drill-down using the current 2019 boundaries](./previews/maharashtra-districts-desktop.png)
 
 Activating a district goes one level further, into its sub-districts — see [Sub-district drill-down](#sub-district-drill-down).
+
+### Sub-district level, on live data
+
+![Sub-districts of Pune district coloured by current temperature, with a breadcrumb reading All states / Maharashtra / Pune](./previews/observatory-subdistrict-desktop.png)
+
+The third level, in the [observatory example](./examples/observatory). Published
+statistics stop at district — a figure is collected on particular administrative
+units, and drawing a 2011 one on 2019 outlines would misstate which places were
+measured — so the indicator that reaches sub-district is read live from a weather
+API, which has no vintage and answers for a coordinate.
 
 ### Responsive layout
 

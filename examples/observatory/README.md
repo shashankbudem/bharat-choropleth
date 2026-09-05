@@ -5,10 +5,21 @@ A dashboard built three times on the same data, once per ecosystem
 the library's own behaviour; this one is what an application built on it looks
 like.
 
+**[Live demo →](https://shashankbudem.github.io/bharat-choropleth/)**
+
+![Sub-districts of Pune district coloured by current temperature](../../previews/observatory-subdistrict-desktop.png)
+
 ```bash
 pnpm build:observatory     # assembles dist/observatory (all three + the portal)
 npx serve dist/observatory
 ```
+
+Everything resolves relative to the page, so the same artifact works at a domain
+root and under `/<repo>/` on GitHub Pages. Flutter's `--base-href` cannot be
+relative, so the mount point is passed in: `pnpm build:observatory -- --base=/bharat-choropleth/`.
+
+A view is linkable: `?indicator=live_temperature&state=in-cs-27-maharashtra&district=in-cd-27-423`
+opens straight onto Pune's sub-districts.
 
 `--skip-flutter` builds the other two if the Flutter SDK is not on the machine.
 

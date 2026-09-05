@@ -27,6 +27,13 @@ import { spawnSync } from "node:child_process";
 const root = resolve(import.meta.dirname, "..");
 const out = resolve(root, "dist/observatory");
 const skipFlutter = process.argv.includes("--skip-flutter");
+/**
+ * Where the built site will be mounted. Everything else resolves relative to the
+ * page, but Flutter's `--base-href` has to be absolute, so it is the one thing
+ * that needs telling. Defaults to a domain root; GitHub Pages serves a project
+ * site under `/<repo>/`.
+ */
+const base = (process.argv.find((arg) => arg.startsWith("--base="))?.slice("--base=".length) ?? "/").replace(/\/*$/, "/");
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { cwd: root, stdio: "inherit", ...options });
@@ -53,7 +60,7 @@ const flutterDir = resolve(root, "examples/observatory/flutter");
 const buildFlutter = !skipFlutter && existsSync(flutterDir);
 if (buildFlutter) {
   run("node", ["scripts/prepare-observatory-flutter-assets.mjs"]);
-  run("flutter", ["build", "web", "--base-href", "/flutter/"], { cwd: flutterDir });
+  run("flutter", ["build", "web", "--base-href", `${base}flutter/`], { cwd: flutterDir });
 }
 
 rmSync(out, { recursive: true, force: true });
@@ -68,5 +75,5 @@ copy("data/generated", "data/generated");
 copy("packages/js/dist", "packages/js/dist");
 if (buildFlutter) copy("examples/observatory/flutter/build/web", "flutter");
 
-console.log(`\nObservatory artifact ready: ${out}`);
+console.log(`\nObservatory artifact ready: ${out}  (mounted at ${base})`);
 if (!buildFlutter) console.log("Flutter build skipped; /flutter/ will 404 in this artifact.");
