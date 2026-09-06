@@ -9,7 +9,7 @@ This repository ships four independently versioned libraries. They must be valid
 | Flutter | `packages/flutter` | pub.dev | `dart pub publish` |
 | Python | `packages/python` | PyPI | `python3 -m twine upload dist/*` |
 
-Version `0.3.0` is public on npm and pub.dev for React, plain JavaScript and Flutter; the Python package remains at `0.2.0` (verified against the registries 2026-09-06). `pnpm verify:data-pin` passed against the `v0.3.0` tag before publishing, and the published `bharat-choropleth-js@0.3.0` tarball was checked to carry that pin. Verify the intended version against the registry rather than this sentence — it has been stale before, and was again between the 0.2.0 release and this line being corrected. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
+Version `0.3.0` is public on all four registries (verified against each one 2026-09-06, including installing the published PyPI wheel and rendering with it). `pnpm verify:data-pin` passed against the `v0.3.0` tag before publishing, and the published `bharat-choropleth-js@0.3.0` tarball was checked to carry that pin. Verify the intended version against the registry rather than this sentence — it has been stale before, and was again between the 0.2.0 release and this line being corrected. Before every release, verify that the intended version is not already published and update the root README and package links only after the registry confirms it.
 
 ## Boundary data bundles
 

@@ -53,14 +53,14 @@ The Flutter example's boundary assets are generated data and are not committed, 
 
 ## Availability
 
-Version `0.3.0` is published for the React, plain-JavaScript and Flutter packages. The Python package stays at `0.2.0`: nothing in it changed, and the releases are independent.
+Version `0.3.0` is published for all four packages.
 
 | Target | Package | Registry | Source |
 | --- | --- | --- | --- |
 | React | [`bharat-choropleth@0.3.0`](https://www.npmjs.com/package/bharat-choropleth) | npm | [`packages/react`](./packages/react) |
 | Plain JavaScript | [`bharat-choropleth-js@0.3.0`](https://www.npmjs.com/package/bharat-choropleth-js) | npm | [`packages/js`](./packages/js) |
 | Flutter | [`bharat_choropleth@0.3.0`](https://pub.dev/packages/bharat_choropleth) | pub.dev | [`packages/flutter`](./packages/flutter) |
-| Python | [`bharat-choropleth@0.2.0`](https://pypi.org/project/bharat-choropleth/) | PyPI | [`packages/python`](./packages/python) |
+| Python | [`bharat-choropleth@0.3.0`](https://pypi.org/project/bharat-choropleth/) | PyPI | [`packages/python`](./packages/python) |
 
 Install with:
 
@@ -326,4 +326,4 @@ pnpm prepare:flutter-assets
 
 ## Release status
 
-React, plain JavaScript and Flutter are published at `0.3.0`; Python stays at `0.2.0`, unchanged — see [Availability](#availability) for the registry links. Future releases follow the [publishing guide](./docs/PUBLISHING.md); increment a package's version before publishing because registries do not permit reusing one, and run `pnpm verify:data-pin` so the release does not repeat the 0.2.0 mistake of shipping a renderer whose default data source predates the level it renders. The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.
+All four packages are published at `0.3.0` — see [Availability](#availability) for the registry links. Future releases follow the [publishing guide](./docs/PUBLISHING.md); increment a package's version before publishing because registries do not permit reusing one, and run `pnpm verify:data-pin` so the release does not repeat the 0.2.0 mistake of shipping a renderer whose default data source predates the level it renders. The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.
