@@ -9,7 +9,7 @@ An accessible SVG India state-to-district-to-sub-district choropleth with no fra
 ```html
 <div id="map"></div>
 
-<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js@0.2.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js@0.3.0"></script>
 <script>
   var map = new BharatChoropleth("#map");
 
