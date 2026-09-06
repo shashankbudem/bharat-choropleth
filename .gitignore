@@ -5,3 +5,8 @@ coverage
 example-sites/
 # Generated boundary data for the observatory's Flutter app.
 examples/observatory/flutter/assets/
+
+# Playwright scratch from browser-automation sessions: screenshots and console
+# logs, not source. Committed previews live in previews/.
+output/
+.playwright-cli/
