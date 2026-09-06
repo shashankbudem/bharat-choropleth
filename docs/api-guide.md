@@ -198,27 +198,27 @@ is scaled against the other districts in its state, not against the states.
 
 ## Key semantics across the packages
 
-`values` keys resolve identically in React, plain JavaScript and Flutter — the
-same 36 states, the same 15 aliases, the same normalization. React and plain JS
-share one `states.ts` as a byte-identical copy checked by a test; Flutter carries
-a translation held to the same behaviour by a generated fixture of every accepted
-spelling (`pnpm generate:state-cases`). Below the state level there is no
-registry in any package: district and sub-district keys match by id or by a
-normalized name, which is still case- and separator-insensitive.
-
-The Python renderer resolves nothing: `render_svg` looks a value up by
-`feature.id` and by nothing else, not even the display name. Key its `values` by
-id.
+`values` keys resolve identically in all four packages — the same 36 states, the
+same 15 aliases, the same normalization. React and plain JS share one
+`states.ts` as a byte-identical copy checked by a test; Flutter and Python carry
+translations held to the same behaviour by a generated fixture of every accepted
+spelling (`pnpm generate:state-cases`), replayed by a test in each. Below the
+state level there is no registry anywhere: district and sub-district keys match
+by id or by a normalized name, which is still case- and separator-insensitive.
 
 | Written | React / JS | Flutter | Python |
 | --- | --- | --- | --- |
 | `in-cs-30-goa` (id) | ✅ | ✅ | ✅ |
-| `Goa` (display name) | ✅ | ✅ | ❌ |
-| `goa`, `GOA` | ✅ | ✅ | ❌ |
-| `tamilnadu`, `tamil_nadu` | ✅ | ✅ | ❌ |
-| `Orissa` → Odisha | ✅ | ✅ | ❌ |
-| `jammu-and-kashmir` for `Jammu & Kashmir` | ✅ | ✅ | ❌ |
+| `Goa` (display name) | ✅ | ✅ | ✅ |
+| `goa`, `GOA` | ✅ | ✅ | ✅ |
+| `tamilnadu`, `tamil_nadu` | ✅ | ✅ | ✅ |
+| `Orissa` → Odisha | ✅ | ✅ | ✅ |
+| `jammu-and-kashmir` for `Jammu & Kashmir` | ✅ | ✅ | ✅ |
+
+Every package tries an exact id first, then an exact display name, and only then
+the registry — so a layer keyed by the ids in its own bundle behaves exactly as
+it did before any of this existed.
 
 In every package an unmatched key is ignored and its region reads as "No data".
 React and plain JS warn on the console when they can tell a state name is
-unrecognized; Flutter and Python do not warn at all, so a typo there is silent.
+unrecognized; Flutter and Python do not warn, so a typo there is silent.

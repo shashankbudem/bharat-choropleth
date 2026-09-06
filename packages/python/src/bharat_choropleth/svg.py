@@ -5,13 +5,76 @@ from __future__ import annotations
 from html import escape
 from itertools import count
 from math import cos, radians
-from typing import Callable, Mapping, Optional, Sequence, Tuple, Union
+from typing import Callable, Dict, Mapping, Optional, Sequence, Tuple, Union
 
 from .scale import ColorScale, FittedColorScale, numeric_value
+from .states import normalize_state_key, resolve_state
 from .topojson import Feature, TopologyInput, decode_topology
 
 FeatureInput = Sequence[Feature]
 ValueMapping = Mapping[str, object]
+
+
+def canonical_values(values: ValueMapping) -> Dict[str, object]:
+    """Re-key a values mapping so any spelling of a state finds its entry.
+
+    Built once per layer rather than per feature: resolving is cheap, but a
+    national map is 36 features and a district one can be 80, and rebuilding
+    this for each would make the lookup quadratic.
+
+    Only state names collapse - there is no district registry - so a key that is
+    not a known state keeps its normalized form, which still buys
+    case-insensitivity and separator-insensitivity at every level.  The first
+    spelling of a region wins, so a caller who writes two keys for one region
+    gets a deterministic answer rather than a dict-ordering accident.
+    """
+    canonical: Dict[str, object] = {}
+    for key, value in values.items():
+        resolved = resolve_state(key)
+        canonical.setdefault(resolved.id if resolved else normalize_state_key(key), value)
+    return canonical
+
+
+def value_for(
+    values: ValueMapping,
+    feature: "Feature",
+    canonical: Optional[Mapping[str, object]] = None,
+) -> object:
+    """Find a feature's value, trying the most literal match first.
+
+    Exact id, then exact display name, then both sides resolved through the
+    state registry.  The exact steps come first so nothing that already worked
+    can change meaning: a layer keyed by the ids in its own bundle - which is
+    what a drill-down loader normally hands back - never reaches the registry at
+    all.
+
+    The registry step is what lets ``"goa"``, ``"tamilnadu"``, ``"Orissa"`` and
+    ``"jammu-and-kashmir"`` work, matching the React, JavaScript and Flutter
+    packages.  Below the state level there is no registry, so those keys fall
+    back to the normalized form, which still buys case- and
+    separator-insensitive matching.
+
+    ``in`` rather than ``.get(...) or``, so an explicit ``None`` reads as "no
+    data" instead of falling through to the next candidate.  Pass ``canonical``
+    from :func:`canonical_values` when looking up many features against one
+    mapping; it is rebuilt here otherwise.
+    """
+    if feature.id in values:
+        return values[feature.id]
+    if feature.name in values:
+        return values[feature.name]
+    index = canonical_values(values) if canonical is None else canonical
+    resolved_id = resolve_state(feature.id)
+    resolved_name = resolve_state(feature.name)
+    for candidate in (
+        resolved_id.id if resolved_id else None,
+        resolved_name.id if resolved_name else None,
+        normalize_state_key(feature.id),
+        normalize_state_key(feature.name),
+    ):
+        if candidate is not None and candidate in index:
+            return index[candidate]
+    return None
 
 
 def render_svg(
@@ -44,7 +107,8 @@ def render_svg(
     if padding < 0 or padding * 2 >= min(width, height):
         raise ValueError("padding must leave room for the map")
     features = _coerce_features(source, object_name)
-    scale = ColorScale.fit((values.get(feature.id) for feature in features), colors=colors, empty=empty_color)
+    canonical = canonical_values(values)
+    scale = ColorScale.fit((value_for(values, feature, canonical) for feature in features), colors=colors, empty=empty_color)
     projector = _fit_projector(features, width, height, padding)
     value_formatter = format_value or _default_format
     serial = count(1)
@@ -62,7 +126,7 @@ def render_svg(
         parts.append('<desc id="{}">{}</desc>'.format(description_id, escape(description)))
     parts.append('<g fill-rule="evenodd" stroke="{}" stroke-width="{}" stroke-linejoin="round">'.format(escape(stroke), stroke_width))
     for feature in features:
-        raw_value = values.get(feature.id)
+        raw_value = value_for(values, feature, canonical)
         numeric = numeric_value(raw_value)
         value_text = value_formatter(numeric) if numeric is not None else "No data"
         label = "{}, {}".format(feature.name, value_text)

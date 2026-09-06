@@ -8,7 +8,8 @@ state-to-district-to-sub-district notebook control.
 """
 
 from .scale import DEFAULT_COLORS, EMPTY_COLOR, ColorScale
-from .svg import render_svg
+from .states import STATES, StateIdentity, normalize_state_key, resolve_state
+from .svg import canonical_values, render_svg, value_for
 from .topojson import Feature, TopoJSONError, decode_topology, load_topology
 
 __all__ = [
@@ -16,10 +17,16 @@ __all__ = [
     "EMPTY_COLOR",
     "ColorScale",
     "Feature",
+    "canonical_values",
+    "STATES",
+    "StateIdentity",
     "TopoJSONError",
     "decode_topology",
     "load_topology",
+    "normalize_state_key",
     "render_svg",
+    "resolve_state",
+    "value_for",
 ]
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"

@@ -1,5 +1,29 @@
 # Changelog
 
+## 0.3.0
+
+### Added
+
+- `values` keys now resolve through a state registry, so any spelling of a state
+  a reader might type finds its region: `"goa"`, `"tamilnadu"`,
+  `"jammu-and-kashmir"` and former names such as `"Orissa"` all work. This was
+  the last package matching on `feature.id` and nothing else — a display name
+  silently rendered as no data — and it now behaves like the React, JavaScript
+  and Flutter packages.
+- Exact id and exact display name are still tried first, in that order, so a
+  layer keyed by the ids in its own bundle is matched directly and behaves
+  exactly as before. Below the state level keys fall back to a normalized form,
+  which still gives case- and separator-insensitive matching.
+- Exported `STATES`, `StateIdentity`, `resolve_state`, `normalize_state_key`,
+  `value_for` and `canonical_values`.
+
+`states.py` is a translation of `packages/js/src/states.ts`, which the two
+TypeScript packages share as a byte-identical copy. Python cannot be diffed
+against TypeScript, so the two are held together by behaviour instead:
+`tests/test_states.py` replays every spelling the JavaScript registry accepts,
+recorded in `packages/js/test/state-resolution-cases.json`, and fails if this
+package resolves any of them differently.
+
 ## 0.2.0
 
 - `notebook_drilldown` gained an optional sub-district level, matching the

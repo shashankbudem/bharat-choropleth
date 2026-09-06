@@ -43,11 +43,29 @@ svg = render_svg(
 open("states.svg", "w", encoding="utf-8").write(svg)
 ```
 
-Key `values` by feature id. Unlike the React, JavaScript and Flutter packages,
-this renderer resolves nothing: a value is looked up by `feature.id` and by
-nothing else, so display names, casing variants and former names such as
-`Orissa` do not match and their regions read as no data. Nothing warns about it,
-so check your keys against the bundle's ids.
+Key `values` by whatever spelling your data already has. An exact feature id is
+tried first, then an exact display name, then the state registry — so all of
+these reach the same region, matching the React, JavaScript and Flutter
+packages:
+
+```python
+values = {
+    "in-cs-30-goa": 6,        # LGD id
+    "Tamil Nadu": 18,         # display name
+    "tamilnadu": 18,          # separator-free
+    "jammu-and-kashmir": 2,   # & normalizes to "and"
+    "Orissa": 8,              # former name, resolves to Odisha
+}
+```
+
+Below the state level there is no registry — district and sub-district names are
+not a fixed set — so those keys fall back to a normalized form, which still
+matches case- and separator-insensitively (`"south goa"` finds `South Goa`).
+
+A key that matches nothing is ignored and its region reads as no data. Nothing
+warns about it, so check your keys against the bundle's ids if a region is blank
+unexpectedly. `resolve_state`, `normalize_state_key` and `STATES` are exported if
+you want to resolve names yourself.
 
 `render_svg` returns a complete `<svg>` element with a title, optional
 description, per-region accessible labels, an even-odd fill rule, and a
