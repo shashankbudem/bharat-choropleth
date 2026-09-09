@@ -70,11 +70,18 @@ The ramp is validated as an ordinal scale against the `#0a1016` tile surface —
 monotone lightness, adjacent ΔL ≥ 0.06, one hue (4° spread), and a dark end at
 2.10:1 on the surface. Its top step is the board's own accent green.
 
-## Data
+## Data — read this before shipping it
 
 Every number is generated in the browser by [`src/feeds.ts`](./src/feeds.ts) —
 36 independent per-state series per feed, seeded from a rough IT-footprint
-weight. Nothing here reads a real network.
+weight. Nothing here reads a real network, a SIEM, or an ITSM queue.
+
+**The board no longer says so on screen.** The "simulated feed" badge and the
+synthetic-values footer were removed so the demo reads as a product. That is
+fine for a demo and not fine in front of someone who might take these for their
+own infrastructure — before this is user-facing, either point `Tile`'s interval
+at a real source or put the notice back. The footer that remains is the boundary
+bundle's licence attribution, which has to stay either way.
 
 The invariants that make the simulation believable are checked, not assumed:
 

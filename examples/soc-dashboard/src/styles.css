@@ -1,7 +1,7 @@
 :root {
-  --ink: #05070a;
+  --ink: #000;
   --panel: #0a1016;
-  --line: #16303a;
+  --line: #16452f;
   --text: #b8f5d8;
   --dim: #4d7f74;
   --accent: #22ff88;
@@ -13,10 +13,7 @@
 
 body {
   margin: 0;
-  background:
-    radial-gradient(1200px 600px at 50% -10%, #0d2a24 0%, transparent 70%),
-    repeating-linear-gradient(0deg, rgb(34 255 136 / 0.035) 0 1px, transparent 1px 3px),
-    var(--ink);
+  background: var(--ink);
   color: var(--text);
 }
 

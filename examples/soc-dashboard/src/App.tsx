@@ -4,6 +4,14 @@ import statesTopoUrl from "../../../data/generated/current-2019-states/states.to
 import { colorOf, FEEDS, type Feed, format, formatBreak, RAMP, rollUp, seed, tick, trend, type Values } from "./feeds";
 
 /**
+ * NOTE FOR WHOEVER SHIPS THIS: every reading on this board is generated in the
+ * browser by `feeds.ts`. Nothing here is connected to a network, a SIEM, or an
+ * ITSM queue. The chrome no longer says so, so wire `Tile`'s interval to a real
+ * source — or put the notice back — before anyone reads these numbers as their
+ * own infrastructure.
+ */
+
+/**
  * One fetch for the whole board. Every tile is handed this same promise, so the
  * 36-feature state layer crosses the network once instead of nine times.
  */
@@ -129,7 +137,7 @@ export default function App() {
           <span className="board__glyph">▚</span> BHARAT SOC / NOC GRID
         </h1>
         <p className="board__sub">
-          national infrastructure telemetry · 36 states &amp; UTs · <b>SIMULATED FEED</b>
+          national infrastructure telemetry · 36 states &amp; UTs · {FEEDS.length} feeds
         </p>
         <p className="board__clock">
           {now} IST <span className="board__pulse" aria-hidden="true" /> LIVE
@@ -142,9 +150,9 @@ export default function App() {
         ))}
       </main>
 
+      {/* Attribution, not a disclaimer: the boundary bundle's licence requires it. */}
       <footer className="board__foot">
-        Values are synthetic and generated in the browser. Boundaries derived from
-        datta07/INDIAN-SHAPEFILES (MIT), rendered with bharat-choropleth.
+        Boundaries derived from datta07/INDIAN-SHAPEFILES (MIT), rendered with bharat-choropleth.
       </footer>
     </div>
   );
