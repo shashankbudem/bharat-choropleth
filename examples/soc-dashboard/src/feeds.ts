@@ -23,33 +23,27 @@ export const STATES = Object.keys(FOOTPRINT);
 export type Values = Record<string, number>;
 
 /**
- * Ramps.
+ * The one ramp, shared by all nine maps.
  *
- * Each is one hue stepping dark→bright, because these encode magnitude and a
- * multi-hue ramp turns magnitude into a rainbow — the middle buckets come out
- * olive and stop meaning anything. On a dark board the bright end is "more", so
- * a hot state glows and a quiet one recedes into the panel.
+ * One hue stepping dark→bright, because these encode magnitude and a multi-hue
+ * ramp turns magnitude into a rainbow — the middle buckets come out olive and
+ * stop meaning anything. Bright is *more*, so a hot state glows off the dark
+ * board and a quiet one recedes into the panel.
  *
- * The hue is the metric *family*, not the value: risk, load, health, defence,
- * capacity. Two tiles in the same hue are asking the same kind of question.
+ * One hue across the whole grid means brightness reads the same everywhere: a
+ * lit-up map is a busy map, whichever tile it is. Whether "more" is good or bad
+ * is the tile's job to say — its title and the two legend words carry that, not
+ * the colour.
  *
- * Validated as ordinal ramps against the #0a1016 tile surface — monotone
- * lightness, adjacent ΔL ≥ 0.06, single hue, dark end ≥ 2:1 on the surface.
+ * The top step is the board's own accent, so a maxed-out state burns the same
+ * green as the chrome. Nothing above it: a paler mint on top read as washed-out
+ * rather than hot, and put most of the map in a near-white band.
+ *
+ * Validated as an ordinal ramp against the #0a1016 tile surface: monotone
+ * lightness, adjacent ΔL ≥ 0.06, single hue (4° spread), dark end at 2.10:1 on
+ * the surface.
  */
-export const RAMPS = {
-  /** Something is broken or unprotected right now. */
-  risk: ["#991b1b", "#c62828", "#ef4444", "#f87171", "#fca5a5"],
-  /** Work piling up, or taking longer. */
-  load: ["#854d0e", "#a16207", "#ca8a04", "#eab308", "#facc15"],
-  /** Healthy and compliant — the bright end is the good end here. */
-  health: ["#14532d", "#15803d", "#22c55e", "#4ade80", "#86efac"],
-  /** Controls firing: things caught and dropped. */
-  defence: ["#5b21b6", "#7c3aed", "#a78bfa", "#c4b5fd", "#ddd6fe"],
-  /** Throughput and occupancy, neither good nor bad. */
-  capacity: ["#164e63", "#0e7490", "#06b6d4", "#22d3ee", "#67e8f9"],
-} as const satisfies Record<string, readonly string[]>;
-
-export type RampName = keyof typeof RAMPS;
+export const RAMP = ["#14532d", "#157244", "#179a5b", "#1bcd74", "#22ff88"];
 
 
 /**
@@ -68,9 +62,23 @@ export interface Feed {
   mode: Mode;
   /** Milliseconds between ticks. Deliberately non-multiples so tiles never phase-lock. */
   interval: number;
-  /** Which ramp paints this tile. See {@link RAMPS}. */
-  ramp: RampName;
   legendLabels: [string, string];
+  /**
+   * Optional: four ascending thresholds, in this feed's own unit, that split the
+   * ramp into five fixed bands.
+   *
+   * Without it the renderer scales the ramp to the current spread, so a fill says
+   * where a state sits among the other 35 right now — an all-quiet board still
+   * paints its calmest state the darkest green, and a colour that changed
+   * overnight might mean the state moved or might mean its neighbours did.
+   *
+   * With it the fill is an absolute reading: below the first threshold is dim
+   * whether it is the only such state or all thirty-six. That is the right call
+   * where the thresholds are real rather than invented — uptime has the nines —
+   * and the wrong one where a metric has no agreed scale, which is why exactly
+   * one tile here uses it.
+   */
+  breaks?: [number, number, number, number];
   /** Per-state scale factor applied to the footprint weight. */
   scale: number;
   /**
@@ -83,8 +91,10 @@ export interface Feed {
 }
 
 export const FEEDS: Feed[] = [
-  // Grid order matters: no two tiles that share a ramp hue sit next to each
-  // other, so a glance at the board separates families instead of blurring them.
+  // Six, not nine: two cumulative counters, two live readings, two bounded
+  // percentages. The three that went — phishing quarantined, patch compliance,
+  // mean time to detect — each moved exactly like one that stayed, and paying
+  // for them in map size made every tile worse.
   {
     id: "outages",
     title: "ACTIVE NETWORK OUTAGES",
@@ -92,7 +102,6 @@ export const FEEDS: Feed[] = [
     unit: "links",
     mode: "live",
     interval: 900,
-    ramp: "risk",
     legendLabels: ["stable", "degraded"],
     scale: 26,
   },
@@ -103,8 +112,8 @@ export const FEEDS: Feed[] = [
     unit: "%",
     mode: "ratio",
     interval: 1300,
-    ramp: "health",
     legendLabels: ["outage", "healthy"],
+    breaks: [98, 99, 99.5, 99.9],
     scale: 1,
     decimals: 2,
   },
@@ -115,7 +124,6 @@ export const FEEDS: Feed[] = [
     unit: "tickets",
     mode: "count",
     interval: 1700,
-    ramp: "load",
     legendLabels: ["quiet", "surging"],
     scale: 90,
   },
@@ -126,7 +134,6 @@ export const FEEDS: Feed[] = [
     unit: "%",
     mode: "ratio",
     interval: 2600,
-    ramp: "risk",
     legendLabels: ["covered", "exposed"],
     scale: 1,
     decimals: 1,
@@ -138,7 +145,6 @@ export const FEEDS: Feed[] = [
     unit: "hits",
     mode: "count",
     interval: 700,
-    ramp: "defence",
     legendLabels: ["low volume", "heavy"],
     scale: 640,
   },
@@ -149,45 +155,8 @@ export const FEEDS: Feed[] = [
     unit: "sessions",
     mode: "live",
     interval: 1100,
-    ramp: "capacity",
     legendLabels: ["idle", "saturated"],
     scale: 4200,
-  },
-  {
-    id: "phish",
-    title: "PHISHING MAIL QUARANTINED",
-    caption: "secure email gateway · cumulative today",
-    unit: "mails",
-    mode: "count",
-    interval: 2100,
-    ramp: "defence",
-    legendLabels: ["trickle", "campaign"],
-    scale: 220,
-  },
-  {
-    id: "patch",
-    title: "CRITICAL PATCH COMPLIANCE",
-    caption: "CVSS ≥ 9.0 remediated within SLA",
-    unit: "%",
-    mode: "ratio",
-    interval: 3100,
-    ramp: "health",
-    legendLabels: ["behind", "compliant"],
-    scale: 1,
-    decimals: 1,
-  },
-  {
-    id: "mttd",
-    title: "MEAN TIME TO DETECT",
-    caption: "SIEM alert → triage · rolling median",
-    unit: "min",
-    mode: "live",
-    interval: 1900,
-    ramp: "load",
-    legendLabels: ["fast", "slow"],
-    scale: 34,
-    aggregate: "mean",
-    decimals: 1,
   },
 ];
 
@@ -248,7 +217,31 @@ export function tick(feed: Feed, previous: Values): Values {
   return next;
 }
 
+/** Which of the five bands a reading falls in. Ascending, so band 4 is the hottest. */
+export function bandOf(feed: Feed, value: number | null): number | null {
+  const breaks = feed.breaks;
+  if (!breaks || value === null || !Number.isFinite(value)) return null;
+  let band = 0;
+  while (band < breaks.length && value >= (breaks[band] as number)) band += 1;
+  return band;
+}
+
+/** The fill for a reading, or the no-data colour. Passed to the renderer as its colour scale. */
+export function colorOf(feed: Feed, value: number | null): string {
+  const band = bandOf(feed, value);
+  return band === null ? "var(--india-map-empty)" : (RAMP[band] as string);
+}
+
 const INTEGER = new Intl.NumberFormat("en-IN", { maximumFractionDigits: 0 });
+
+/**
+ * A threshold, as short as it can be written. The reading formatter pads to the
+ * feed's decimals — right for a live number that would otherwise jitter in width,
+ * wrong for a legend, where "99.50" is just noise around "99.5".
+ */
+export function formatBreak(value: number): string {
+  return new Intl.NumberFormat("en-IN", { maximumFractionDigits: 2 }).format(value);
+}
 
 export function format(feed: Feed, value: number): string {
   if (feed.decimals) return value.toFixed(feed.decimals);

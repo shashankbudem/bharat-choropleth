@@ -1,7 +1,7 @@
 import { BharatChoropleth, type GeometrySource } from "bharat-choropleth";
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import statesTopoUrl from "../../../data/generated/current-2019-states/states.topo.json?url";
-import { FEEDS, type Feed, format, RAMPS, rollUp, seed, tick, trend, type Values } from "./feeds";
+import { colorOf, FEEDS, type Feed, format, formatBreak, RAMP, rollUp, seed, tick, trend, type Values } from "./feeds";
 
 /**
  * One fetch for the whole board. Every tile is handed this same promise, so the
@@ -50,14 +50,23 @@ function Tile({ feed }: { feed: Feed }) {
 
   // `values` changes every tick, so only the parts that don't are worth memoizing.
   const formatValue = useMemo(() => (value: number) => format(feed, value), [feed]);
-  const ramp = RAMPS[feed.ramp];
+  // A feed with thresholds gets a function scale, so its fill is decided by the
+  // reading alone rather than by where it sits among the other 35 states right
+  // now. Everything else hands the renderer the ramp and lets it scale to spread.
+  const colorScale = useMemo(
+    () => (feed.breaks ? (value: number | null) => colorOf(feed, value) : RAMP),
+    [feed],
+  );
 
   return (
     <section className="tile">
       <header className="tile__head">
         <div>
           <h2 className="tile__title">{feed.title}</h2>
-          <p className="tile__caption">{feed.caption}</p>
+          <p className="tile__caption">
+            {feed.caption}
+            {feed.breaks && <b className="tile__badge">fixed bands</b>}
+          </p>
         </div>
         <div className={`tile__reading tile__reading--${direction}`}>
           <span className="tile__number">{format(feed, national)}</span>
@@ -70,7 +79,7 @@ function Tile({ feed }: { feed: Feed }) {
       <BharatChoropleth
         values={values}
         geometry={GEOMETRY}
-        colorScale={ramp}
+        colorScale={colorScale}
         formatValue={formatValue}
         showLegend={false}
         showBreadcrumb={false}
@@ -86,16 +95,20 @@ function Tile({ feed }: { feed: Feed }) {
         )}
       />
 
+      {/* A fixed-band tile prints its thresholds between the swatches — the same
+          green means the same reading every refresh, so the legend can say what it
+          is. A relative one can only honestly say "lower" and "higher". */}
       <footer className="tile__foot">
-        <span>{feed.legendLabels[0]}</span>
-        {/* Five swatches, not a gradient: the renderer buckets values into exactly
-            these five fills, and a smooth bar would promise a continuum it doesn't paint. */}
-        <span className="tile__ramp" aria-hidden="true">
-          {ramp.map((color) => (
-            <i key={color} style={{ background: color }} />
+        {!feed.breaks && <span>{feed.legendLabels[0]}</span>}
+        <span className="tile__scale">
+          {RAMP.map((color, index) => (
+            <Fragment key={color}>
+              <i style={{ background: color }} />
+              {feed.breaks && index < feed.breaks.length && <b>{formatBreak(feed.breaks[index] as number)}</b>}
+            </Fragment>
           ))}
         </span>
-        <span>{feed.legendLabels[1]}</span>
+        {!feed.breaks && <span>{feed.legendLabels[1]}</span>}
         <em className="tile__rate">{feed.interval}ms</em>
       </footer>
     </section>

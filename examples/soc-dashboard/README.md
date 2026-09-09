@@ -1,31 +1,50 @@
 # SOC / NOC grid
 
-A 3×3 board of nine `BharatChoropleth` maps, each on its own simulated live
-feed, in a dark operations-centre theme.
+A 3×2 board of six `BharatChoropleth` maps, each on its own simulated live feed,
+in a dark operations-centre theme. The whole board is one screenful — no
+scrolling on a desktop viewport.
 
 ```bash
 pnpm install
 pnpm --filter @bharat-choropleth/soc-dashboard dev
 ```
 
-## The nine feeds
+## The six feeds
 
 | Tile | Behaviour | Tick |
 | --- | --- | --- |
 | Active network outages | up and down | 900 ms |
-| Server fleet uptime % | bounded drift | 1300 ms |
+| Server fleet uptime % | bounded drift, **fixed bands** | 1300 ms |
 | ITSM incidents opened today | only up | 1700 ms |
 | Endpoints without AV / EDR % | bounded drift | 2600 ms |
 | Perimeter intrusions blocked | only up | 700 ms |
-| Phishing mail quarantined | only up | 2100 ms |
 | Concurrent VPN sessions | up and down | 1100 ms |
-| Critical patch compliance % | bounded drift | 3100 ms |
-| Mean time to detect | up and down | 1900 ms |
+
+Two cumulative counters, two live readings, two bounded percentages.
 
 Intervals are deliberately non-multiples of each other, so the tiles never
 phase-lock and the board updates asynchronously.
 
-## How it holds up under nine maps
+## Relative vs fixed bands
+
+Five tiles hand the renderer a colour ramp, which scales it to the current
+spread. A fill then says where a state sits among the other 35 *right now* — an
+all-quiet board still paints its calmest state dim and its busiest bright, and a
+colour that changed overnight might mean the state moved or might mean its
+neighbours did.
+
+The uptime tile passes a **function** colour scale instead, mapping each reading
+through four fixed thresholds — 98 / 99 / 99.5 / 99.9, the nines. Its fill is an
+absolute reading: below 98 is dim whether it is the only such state or all
+thirty-six, and the legend can print the thresholds rather than saying "lower"
+and "higher". A badge on the tile says which encoding it is on, so the two are
+never silently mixed.
+
+It is one tile because fixed bands are a claim about the metric. Uptime has
+agreed thresholds; "concurrent VPN sessions" does not, and inventing some would
+dress a guess up as a standard.
+
+## How it holds up under six maps
 
 - **One geometry fetch.** The state layer is fetched once at module scope and the
   same promise is handed to all nine tiles.
@@ -34,19 +53,22 @@ phase-lock and the board updates asynchronously.
 - **No drill-down.** `BharatChoropleth` only enables district drill-down when it
   fetched the state layer itself; supplying `geometry` leaves each tile a single
   level, which is what a fixed grid cell wants.
-- **One hue per map.** These ramps encode magnitude, so each is a single hue
-  stepping dark→bright. A multi-hue ramp turns magnitude into a rainbow and the
-  middle buckets come out olive. On a dark board bright reads as *more*, so a hot
-  state glows and a quiet one recedes into the panel.
-- **Hue is the metric family, not the value.** Five ramps — risk, load, health,
-  defence, capacity — so two tiles asking the same kind of question look alike,
-  and the grid order keeps same-hue tiles off each other's shoulder.
-- **The legend is five swatches, not a gradient.** The renderer buckets values
-  into exactly five fills; a smooth bar would promise a continuum it never paints.
+- **One ramp, one hue, everywhere.** Magnitude is a single hue stepping
+  dark→bright; a multi-hue ramp turns magnitude into a rainbow and the middle
+  buckets come out olive. Bright is *more*, so a hot state glows off the dark
+  board and a quiet one recedes into the panel — and because every tile shares
+  the ramp, brightness reads the same on all six. Whether "more" is good or bad
+  is the tile's title and legend words to say, not the colour's.
+- **The legend is five swatches, not a gradient.** Values land in exactly five
+  fills; a smooth bar would promise a continuum nothing paints.
+- **One screenful.** The board is a flex column whose grid row uses
+  `minmax(0, 1fr)` tracks, so the maps scale to the height left over instead of
+  setting it. Below ~1000px wide or ~620px tall it gives up and scrolls, rather
+  than squeezing six unreadable maps into the viewport.
 
-Every ramp is validated as an ordinal scale against the `#0a1016` tile surface —
-monotone lightness, adjacent ΔL ≥ 0.06, one hue, and a dark end that still clears
-2:1 on the surface.
+The ramp is validated as an ordinal scale against the `#0a1016` tile surface —
+monotone lightness, adjacent ΔL ≥ 0.06, one hue (4° spread), and a dark end at
+2.10:1 on the surface. Its top step is the board's own accent green.
 
 ## Data
 
@@ -61,4 +83,6 @@ pnpm --filter @bharat-choropleth/soc-dashboard check
 ```
 
 It asserts that cumulative counters never decrease, live readings move in both
-directions, and percentages stay inside 0–100, over 200 ticks of every feed.
+directions, and percentages stay inside 0–100, over 200 ticks of every feed — and
+that the fixed bands are ordered and total, so a bigger reading never lands in a
+lower band and a fill never depends on the other 35 states.
