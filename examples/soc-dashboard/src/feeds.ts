@@ -178,7 +178,10 @@ export function seed(feed: Feed): Values {
   const values: Values = {};
   for (const state of STATES) {
     const base = baseline(feed, state);
-    values[state] = clamp(feed, base * (0.75 + Math.random() * 0.5));
+    // Percentages get an additive jitter. A multiplicative one puts a 99% uptime
+    // baseline at 74% on first paint, and reversion is slow enough that the tile
+    // opens on a national outage that never happened.
+    values[state] = clamp(feed, feed.mode === "ratio" ? base + (Math.random() - 0.5) * 4 : base * (0.75 + Math.random() * 0.5));
   }
   return values;
 }

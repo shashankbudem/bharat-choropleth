@@ -1,5 +1,5 @@
 import { BharatChoropleth, type GeometrySource } from "bharat-choropleth";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import statesTopoUrl from "../../../data/generated/current-2019-states/states.topo.json?url";
 import { FEEDS, type Feed, format, rollUp, seed, tick, trend, type Values } from "./feeds";
 
@@ -15,18 +15,38 @@ const CLOCK = new Intl.DateTimeFormat("en-IN", { hour12: false, timeStyle: "medi
 
 const ARROW = { up: "▲", down: "▼", flat: "■" } as const;
 
+/**
+ * A tick's worth of the feed. The direction arrow is computed *in* the tick and
+ * kept alongside the values, not derived during render from a ref — a render is
+ * not always a tick (StrictMode runs two, React may run more), and comparing a
+ * roll-up against itself always reads flat.
+ */
+interface Frame {
+  values: Values;
+  national: number;
+  direction: "up" | "down" | "flat";
+}
+
+function firstFrame(feed: Feed): Frame {
+  const values = seed(feed);
+  return { values, national: rollUp(feed, values), direction: "flat" };
+}
+
 function Tile({ feed }: { feed: Feed }) {
-  const [values, setValues] = useState<Values>(() => seed(feed));
-  const previous = useRef(rollUp(feed, values));
+  const [frame, setFrame] = useState<Frame>(() => firstFrame(feed));
 
   useEffect(() => {
-    const timer = setInterval(() => setValues((current) => tick(feed, current)), feed.interval);
+    const timer = setInterval(() => {
+      setFrame((current) => {
+        const values = tick(feed, current.values);
+        const national = rollUp(feed, values);
+        return { values, national, direction: trend(feed, national, current.national) };
+      });
+    }, feed.interval);
     return () => clearInterval(timer);
   }, [feed]);
 
-  const national = rollUp(feed, values);
-  const direction = trend(feed, national, previous.current);
-  previous.current = national;
+  const { values, national, direction } = frame;
 
   // `values` changes every tick, so only the parts that don't are worth memoizing.
   const formatValue = useMemo(() => (value: number) => format(feed, value), [feed]);
