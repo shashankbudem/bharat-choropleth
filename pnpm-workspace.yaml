@@ -5,7 +5,7 @@ packages:
   # Example 2: the observatory showcase. Its React app is a workspace package so
   # it can depend on the local bharat-choropleth build like the other demos do.
   - "examples/observatory/react"
-  # Example 3: the SOC/NOC grid — six live-simulated security dashboards.
+  # Example 3: the SOC & NOC dashboard — six live-simulated security maps.
   - "examples/soc-dashboard"
 
 allowBuilds:

@@ -1,4 +1,4 @@
-# SOC / NOC grid
+# SOC & NOC dashboard
 
 A 3×2 board of six `BharatChoropleth` maps, each on its own simulated live feed,
 in a dark operations-centre theme. The whole board is one screenful — no

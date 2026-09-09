@@ -134,7 +134,7 @@ export default function App() {
     <div className="board">
       <header className="board__head">
         <h1>
-          <span className="board__glyph">▚</span> BHARAT SOC / NOC GRID
+          <span className="board__glyph">▚</span> SOC &amp; NOC DASHBOARD
         </h1>
         <p className="board__sub">
           national infrastructure telemetry · 36 states &amp; UTs · {FEEDS.length} feeds
