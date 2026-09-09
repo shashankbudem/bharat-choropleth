@@ -34,9 +34,19 @@ phase-lock and the board updates asynchronously.
 - **No drill-down.** `BharatChoropleth` only enables district drill-down when it
   fetched the state layer itself; supplying `geometry` leaves each tile a single
   level, which is what a fixed grid cell wants.
-- **Colour follows polarity.** Each ramp is ordered low→high, with the *bad* end
-  red — so high outages and high MTTD are red, while high uptime and high patch
-  compliance are green.
+- **One hue per map.** These ramps encode magnitude, so each is a single hue
+  stepping dark→bright. A multi-hue ramp turns magnitude into a rainbow and the
+  middle buckets come out olive. On a dark board bright reads as *more*, so a hot
+  state glows and a quiet one recedes into the panel.
+- **Hue is the metric family, not the value.** Five ramps — risk, load, health,
+  defence, capacity — so two tiles asking the same kind of question look alike,
+  and the grid order keeps same-hue tiles off each other's shoulder.
+- **The legend is five swatches, not a gradient.** The renderer buckets values
+  into exactly five fills; a smooth bar would promise a continuum it never paints.
+
+Every ramp is validated as an ordinal scale against the `#0a1016` tile surface —
+monotone lightness, adjacent ΔL ≥ 0.06, one hue, and a dark end that still clears
+2:1 on the surface.
 
 ## Data
 

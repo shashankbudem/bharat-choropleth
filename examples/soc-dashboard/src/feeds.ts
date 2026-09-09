@@ -23,6 +23,36 @@ export const STATES = Object.keys(FOOTPRINT);
 export type Values = Record<string, number>;
 
 /**
+ * Ramps.
+ *
+ * Each is one hue stepping dark→bright, because these encode magnitude and a
+ * multi-hue ramp turns magnitude into a rainbow — the middle buckets come out
+ * olive and stop meaning anything. On a dark board the bright end is "more", so
+ * a hot state glows and a quiet one recedes into the panel.
+ *
+ * The hue is the metric *family*, not the value: risk, load, health, defence,
+ * capacity. Two tiles in the same hue are asking the same kind of question.
+ *
+ * Validated as ordinal ramps against the #0a1016 tile surface — monotone
+ * lightness, adjacent ΔL ≥ 0.06, single hue, dark end ≥ 2:1 on the surface.
+ */
+export const RAMPS = {
+  /** Something is broken or unprotected right now. */
+  risk: ["#991b1b", "#c62828", "#ef4444", "#f87171", "#fca5a5"],
+  /** Work piling up, or taking longer. */
+  load: ["#854d0e", "#a16207", "#ca8a04", "#eab308", "#facc15"],
+  /** Healthy and compliant — the bright end is the good end here. */
+  health: ["#14532d", "#15803d", "#22c55e", "#4ade80", "#86efac"],
+  /** Controls firing: things caught and dropped. */
+  defence: ["#5b21b6", "#7c3aed", "#a78bfa", "#c4b5fd", "#ddd6fe"],
+  /** Throughput and occupancy, neither good nor bad. */
+  capacity: ["#164e63", "#0e7490", "#06b6d4", "#22d3ee", "#67e8f9"],
+} as const satisfies Record<string, readonly string[]>;
+
+export type RampName = keyof typeof RAMPS;
+
+
+/**
  * `count`  — cumulative "since 00:00" counters. Only ever go up.
  * `live`   — instantaneous readings. Random walk pulled back toward a baseline, so
  *            they go up and down without wandering off.
@@ -38,8 +68,8 @@ export interface Feed {
   mode: Mode;
   /** Milliseconds between ticks. Deliberately non-multiples so tiles never phase-lock. */
   interval: number;
-  /** Low-to-high ramp. Ends are chosen by polarity: whichever end is bad is red. */
-  colorScale: string[];
+  /** Which ramp paints this tile. See {@link RAMPS}. */
+  ramp: RampName;
   legendLabels: [string, string];
   /** Per-state scale factor applied to the footprint weight. */
   scale: number;
@@ -53,6 +83,8 @@ export interface Feed {
 }
 
 export const FEEDS: Feed[] = [
+  // Grid order matters: no two tiles that share a ramp hue sit next to each
+  // other, so a glance at the board separates families instead of blurring them.
   {
     id: "outages",
     title: "ACTIVE NETWORK OUTAGES",
@@ -60,7 +92,7 @@ export const FEEDS: Feed[] = [
     unit: "links",
     mode: "live",
     interval: 900,
-    colorScale: ["#052e1c", "#0f5132", "#b45309", "#dc2626", "#ff2d55"],
+    ramp: "risk",
     legendLabels: ["stable", "degraded"],
     scale: 26,
   },
@@ -71,7 +103,7 @@ export const FEEDS: Feed[] = [
     unit: "%",
     mode: "ratio",
     interval: 1300,
-    colorScale: ["#ff2d55", "#dc2626", "#b45309", "#15803d", "#22ff88"],
+    ramp: "health",
     legendLabels: ["outage", "healthy"],
     scale: 1,
     decimals: 2,
@@ -83,7 +115,7 @@ export const FEEDS: Feed[] = [
     unit: "tickets",
     mode: "count",
     interval: 1700,
-    colorScale: ["#04231a", "#0e7490", "#0ea5e9", "#f59e0b", "#ff2d55"],
+    ramp: "load",
     legendLabels: ["quiet", "surging"],
     scale: 90,
   },
@@ -94,7 +126,7 @@ export const FEEDS: Feed[] = [
     unit: "%",
     mode: "ratio",
     interval: 2600,
-    colorScale: ["#052e1c", "#15803d", "#b45309", "#dc2626", "#ff2d55"],
+    ramp: "risk",
     legendLabels: ["covered", "exposed"],
     scale: 1,
     decimals: 1,
@@ -106,20 +138,9 @@ export const FEEDS: Feed[] = [
     unit: "hits",
     mode: "count",
     interval: 700,
-    colorScale: ["#042f2e", "#0f766e", "#22c55e", "#a3e635", "#22ff88"],
+    ramp: "defence",
     legendLabels: ["low volume", "heavy"],
     scale: 640,
-  },
-  {
-    id: "phish",
-    title: "PHISHING MAIL QUARANTINED",
-    caption: "secure email gateway · cumulative today",
-    unit: "mails",
-    mode: "count",
-    interval: 2100,
-    colorScale: ["#1e1b4b", "#4c1d95", "#7c3aed", "#c026d3", "#f0abfc"],
-    legendLabels: ["trickle", "campaign"],
-    scale: 220,
   },
   {
     id: "vpn",
@@ -128,9 +149,20 @@ export const FEEDS: Feed[] = [
     unit: "sessions",
     mode: "live",
     interval: 1100,
-    colorScale: ["#083344", "#0e7490", "#06b6d4", "#67e8f9", "#a5f3fc"],
+    ramp: "capacity",
     legendLabels: ["idle", "saturated"],
     scale: 4200,
+  },
+  {
+    id: "phish",
+    title: "PHISHING MAIL QUARANTINED",
+    caption: "secure email gateway · cumulative today",
+    unit: "mails",
+    mode: "count",
+    interval: 2100,
+    ramp: "defence",
+    legendLabels: ["trickle", "campaign"],
+    scale: 220,
   },
   {
     id: "patch",
@@ -139,7 +171,7 @@ export const FEEDS: Feed[] = [
     unit: "%",
     mode: "ratio",
     interval: 3100,
-    colorScale: ["#ff2d55", "#dc2626", "#b45309", "#15803d", "#22ff88"],
+    ramp: "health",
     legendLabels: ["behind", "compliant"],
     scale: 1,
     decimals: 1,
@@ -151,7 +183,7 @@ export const FEEDS: Feed[] = [
     unit: "min",
     mode: "live",
     interval: 1900,
-    colorScale: ["#052e1c", "#15803d", "#eab308", "#dc2626", "#ff2d55"],
+    ramp: "load",
     legendLabels: ["fast", "slow"],
     scale: 34,
     aggregate: "mean",

@@ -3,6 +3,8 @@
   --panel: #0a1016;
   --line: #16303a;
   --text: #b8f5d8;
+  /* Data ink. Deliberately neutral: the map carries the colour, the number states the fact. */
+  --ink: #e6f1f5;
   --dim: #4d7f74;
   --accent: #22ff88;
   --alert: #ff2d55;
@@ -53,14 +55,15 @@ body {
 .tile__title { margin: 0; font-size: .7rem; letter-spacing: .14em; color: var(--text); }
 .tile__caption { margin: .2rem 0 0; font-size: .62rem; letter-spacing: .06em; color: var(--dim); }
 .tile__reading { text-align: right; line-height: 1.05; }
-.tile__number { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); text-shadow: 0 0 14px rgb(34 255 136 / .4); }
+.tile__number { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--ink); }
 .tile__unit { display: block; font-size: .6rem; letter-spacing: .1em; color: var(--dim); }
 .tile__reading--up .tile__arrow { color: var(--alert); }
 .tile__reading--down .tile__arrow { color: #38bdf8; }
 
 .tile__map { margin-top: .35rem; }
 .tile__foot { display: flex; align-items: center; gap: .4rem; font-size: .55rem; letter-spacing: .08em; color: var(--dim); text-transform: uppercase; margin-top: .35rem; }
-.tile__ramp { flex: 1; height: 5px; border: 1px solid var(--line); }
+.tile__ramp { flex: 1; display: flex; gap: 2px; }
+.tile__ramp i { flex: 1; height: 5px; }
 .tile__rate { font-style: normal; color: var(--accent); opacity: .65; }
 
 .board__foot { margin-top: 1.5rem; font-size: .62rem; letter-spacing: .06em; color: var(--dim); }

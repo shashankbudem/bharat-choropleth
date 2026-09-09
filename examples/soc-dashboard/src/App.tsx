@@ -1,7 +1,7 @@
 import { BharatChoropleth, type GeometrySource } from "bharat-choropleth";
 import { useEffect, useMemo, useState } from "react";
 import statesTopoUrl from "../../../data/generated/current-2019-states/states.topo.json?url";
-import { FEEDS, type Feed, format, rollUp, seed, tick, trend, type Values } from "./feeds";
+import { FEEDS, type Feed, format, RAMPS, rollUp, seed, tick, trend, type Values } from "./feeds";
 
 /**
  * One fetch for the whole board. Every tile is handed this same promise, so the
@@ -50,7 +50,7 @@ function Tile({ feed }: { feed: Feed }) {
 
   // `values` changes every tick, so only the parts that don't are worth memoizing.
   const formatValue = useMemo(() => (value: number) => format(feed, value), [feed]);
-  const ramp = useMemo(() => `linear-gradient(90deg, ${feed.colorScale.join(", ")})`, [feed]);
+  const ramp = RAMPS[feed.ramp];
 
   return (
     <section className="tile">
@@ -70,7 +70,7 @@ function Tile({ feed }: { feed: Feed }) {
       <BharatChoropleth
         values={values}
         geometry={GEOMETRY}
-        colorScale={feed.colorScale}
+        colorScale={ramp}
         formatValue={formatValue}
         showLegend={false}
         showBreadcrumb={false}
@@ -88,7 +88,13 @@ function Tile({ feed }: { feed: Feed }) {
 
       <footer className="tile__foot">
         <span>{feed.legendLabels[0]}</span>
-        <i className="tile__ramp" style={{ background: ramp }} aria-hidden="true" />
+        {/* Five swatches, not a gradient: the renderer buckets values into exactly
+            these five fills, and a smooth bar would promise a continuum it doesn't paint. */}
+        <span className="tile__ramp" aria-hidden="true">
+          {ramp.map((color) => (
+            <i key={color} style={{ background: color }} />
+          ))}
+        </span>
         <span>{feed.legendLabels[1]}</span>
         <em className="tile__rate">{feed.interval}ms</em>
       </footer>
