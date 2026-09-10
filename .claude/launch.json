@@ -4,13 +4,28 @@
     {
       "name": "static-root",
       "runtimeExecutable": "npx",
-      "runtimeArgs": ["--yes", "serve", "-l", "8123", "/Users/shashankbudem/Documents/Bharath Choropleth"],
+      "runtimeArgs": [
+        "--yes",
+        "serve",
+        "-l",
+        "8123",
+        "/Users/shashankbudem/Documents/Bharath Choropleth"
+      ],
       "port": 8123
     },
     {
       "name": "react-demo",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["--prefix", "apps/demo", "run", "dev", "--", "--port", "5199", "--strictPort"],
+      "runtimeArgs": [
+        "--prefix",
+        "apps/demo",
+        "run",
+        "dev",
+        "--",
+        "--port",
+        "5199",
+        "--strictPort"
+      ],
       "port": 5199
     },
     {
@@ -21,6 +36,65 @@
         "cd packages/flutter/example && PATH=/opt/homebrew/bin:$PATH flutter run -d web-server --web-port 5200 --web-hostname 127.0.0.1"
       ],
       "port": 5200
+    },
+    {
+      "name": "soc-dashboard",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "examples/soc-dashboard/node_modules/vite/bin/vite.js",
+        "--port",
+        "5178",
+        "--strictPort",
+        "--host",
+        "127.0.0.1",
+        "examples/soc-dashboard"
+      ],
+      "port": 5178
+    },
+    {
+      "name": "regional-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "apps/demo/node_modules/vite/bin/vite.js",
+        "--port",
+        "5181",
+        "--strictPort",
+        "--host",
+        "127.0.0.1",
+        "apps/demo"
+      ],
+      "port": 5181
+    },
+    {
+      "name": "observatory-demo",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "examples/observatory/react/node_modules/vite/bin/vite.js",
+        "--port",
+        "5182",
+        "--strictPort",
+        "--host",
+        "127.0.0.1",
+        "examples/observatory/react"
+      ],
+      "port": 5182
+    },
+    {
+      "name": "observatory-site",
+      "runtimeExecutable": "node",
+      "runtimeArgs": [
+        "examples/observatory/react/node_modules/vite/bin/vite.js",
+        "preview",
+        "--outDir",
+        "../../../dist/observatory",
+        "--port",
+        "5183",
+        "--strictPort",
+        "--host",
+        "127.0.0.1",
+        "examples/observatory/react"
+      ],
+      "port": 5183
     }
   ]
 }

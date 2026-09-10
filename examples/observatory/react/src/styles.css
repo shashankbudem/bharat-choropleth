@@ -80,7 +80,10 @@ footer { margin-top: 1.5rem; padding-top: 1rem; border-block-start: 1px solid va
 footer p { max-width: 90ch; margin: 0; }
 
 /* The renderer's own surface, tuned for a dark page. */
-.india-choropleth { --india-map-stroke: #0b1017; --india-map-text: #e8eef2; --india-map-empty: #223041; --india-map-muted: #93a4b3; }
+/* The dark map needs a dark tooltip too. `--india-map-text` colours the tooltip
+   as well as the map, so overriding it without `--india-map-tooltip-bg` left
+   #e8eef2 text on the default white card — 1.17:1, invisible. */
+.india-choropleth { --india-map-stroke: #0b1017; --india-map-text: #e8eef2; --india-map-empty: #223041; --india-map-muted: #93a4b3; --india-map-tooltip-bg: #0f1720; --india-map-tooltip-border: #2b3d4f; }
 
 /* Region values sit on the ramp itself, which runs pale at the low end, so they
    are dark ink rather than the page's near-white text colour — the renderer

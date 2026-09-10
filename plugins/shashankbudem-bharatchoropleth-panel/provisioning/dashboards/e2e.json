@@ -1,0 +1,126 @@
+{
+  "uid": "bharat-e2e",
+  "title": "Bharat Choropleth e2e",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": true,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "state",
+        "type": "textbox",
+        "label": "State",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "shashankbudem-bharatchoropleth-panel",
+      "title": "E2E fixture",
+      "gridPos": {
+        "h": 18,
+        "w": 18,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "testdata",
+        "uid": "trlxrdZVk"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "scenarioId": "csv_content",
+          "csvContent": "state,district,subdistrict,incidents\nMaharashtra,,,412\nKarnataka,,,388\nTamil Nadu,,,351\nRajasthan,,,198\nKerala,,,259\nGoa,,,72\nSikkim,,,21\nLadakh,,,18\nMaharashtra,Pune,,37\nMaharashtra,Nagpur,,26\nMaharashtra,Nashik,,19\nMaharashtra,Raigarh,,44\nMaharashtra,Solapur,,8\nMaharashtra,Pune,Mulshi,4\nMaharashtra,Pune,Khed,16\nMaharashtra,Pune,Haveli,14\nMaharashtra,Pune,Pune City,27\n"
+        }
+      ],
+      "options": {
+        "regionField": "state",
+        "districtField": "district",
+        "subDistrictField": "subdistrict",
+        "valueField": "incidents",
+        "drillDown": true,
+        "drillDownVariable": "state",
+        "palette": "teal",
+        "scaleMode": "relative",
+        "thresholds": "",
+        "districtThresholds": "",
+        "subDistrictThresholds": "",
+        "borderColor": "#FFFFFF",
+        "labelColor": "text",
+        "borderWidth": 2.5,
+        "labelSize": 11,
+        "showLegend": true,
+        "showValues": false,
+        "dataBaseUrl": ""
+      }
+    },
+    {
+      "id": 2,
+      "type": "text",
+      "title": "Echo",
+      "gridPos": {
+        "h": 18,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "state=$state"
+      }
+    },
+    {
+      "id": 3,
+      "type": "shashankbudem-bharatchoropleth-panel",
+      "title": "E2E fixed bands",
+      "gridPos": {
+        "h": 18,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "datasource": {
+        "type": "testdata",
+        "uid": "trlxrdZVk"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "scenarioId": "csv_content",
+          "csvContent": "state,district,subdistrict,incidents\nMaharashtra,,,412\nKarnataka,,,388\nTamil Nadu,,,351\nRajasthan,,,198\nKerala,,,259\nGoa,,,72\nSikkim,,,21\nLadakh,,,18\nMaharashtra,Pune,,37\nMaharashtra,Nagpur,,26\nMaharashtra,Nashik,,19\nMaharashtra,Raigarh,,44\nMaharashtra,Solapur,,8\nMaharashtra,Pune,Mulshi,4\nMaharashtra,Pune,Khed,16\nMaharashtra,Pune,Haveli,14\nMaharashtra,Pune,Pune City,27\n"
+        }
+      ],
+      "options": {
+        "regionField": "state",
+        "districtField": "district",
+        "subDistrictField": "subdistrict",
+        "valueField": "incidents",
+        "drillDown": true,
+        "drillDownVariable": "",
+        "palette": "teal",
+        "scaleMode": "thresholds",
+        "thresholds": "25, 50, 100, 200",
+        "districtThresholds": "",
+        "subDistrictThresholds": "",
+        "borderColor": "#FFFFFF",
+        "labelColor": "text",
+        "borderWidth": 2.5,
+        "labelSize": 11,
+        "showLegend": true,
+        "showValues": false,
+        "dataBaseUrl": ""
+      }
+    }
+  ]
+}

@@ -1,0 +1,118 @@
+:root {
+  --ink: #000;
+  --panel: #0a1016;
+  --line: #16452f;
+  --text: #b8f5d8;
+  --dim: #4d7f74;
+  --accent: #22ff88;
+  --alert: #ff2d55;
+  font-family: "JetBrains Mono", "SFMono-Regular", ui-monospace, Menlo, Consolas, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+}
+
+/* The whole board is one screenful: a flex column whose middle row is the grid,
+   and every map scales to whatever height is left rather than setting it. `dvh`
+   so a mobile browser's collapsing toolbar doesn't cut the bottom row off. */
+.board {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: .55rem;
+  padding: .7rem clamp(.6rem, 1.6vw, 1.4rem) .55rem;
+}
+
+.board__head { border-bottom: 1px solid var(--line); padding-bottom: .5rem; position: relative; flex: none; }
+.board__head h1 { margin: 0; font-size: clamp(1.1rem, 2.2vw, 1.6rem); letter-spacing: .22em; color: var(--accent); text-shadow: 0 0 18px rgb(34 255 136 / .45); }
+.board__glyph { opacity: .7; }
+.board__sub { margin: .35rem 0 0; font-size: .75rem; letter-spacing: .16em; color: var(--dim); text-transform: uppercase; }
+.board__sub b { color: var(--alert); }
+.board__clock { position: absolute; right: 0; top: 0; margin: 0; font-size: .8rem; letter-spacing: .12em; color: var(--dim); }
+.board__pulse { display: inline-block; width: .5rem; height: .5rem; border-radius: 50%; background: var(--accent); box-shadow: 0 0 10px var(--accent); margin: 0 .35rem; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: .2; } }
+
+/* minmax(0, 1fr) on both axes: without the 0 minimum a grid track floors at its
+   content's size and the board grows past the viewport instead of the maps
+   shrinking to fit. */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+  gap: .55rem;
+  flex: 1;
+  min-height: 0;
+}
+/* Below a screenful's worth of room the nine stop fitting: let the board grow
+   and scroll rather than squeezing nine unreadable maps into the viewport. */
+@media (max-width: 1000px), (max-height: 620px) {
+  .board { height: auto; }
+  .grid { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: none; }
+  .tile__map { min-height: 13rem; }
+  .tile__map .india-choropleth__svg { height: auto; }
+}
+@media (max-width: 720px) { .grid { grid-template-columns: 1fr; } }
+
+.tile {
+  background: linear-gradient(180deg, var(--panel), #060a0e);
+  border: 1px solid var(--line);
+  padding: .5rem .6rem .45rem;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+/* Corner ticks — cheap HUD framing, no extra markup. */
+.tile::before, .tile::after {
+  content: ""; position: absolute; width: 14px; height: 14px; border: 1px solid var(--accent); opacity: .55;
+}
+.tile::before { top: -1px; left: -1px; border-width: 1px 0 0 1px; }
+.tile::after { bottom: -1px; right: -1px; border-width: 0 1px 1px 0; }
+
+.tile__head { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; }
+.tile__title { margin: 0; font-size: .7rem; letter-spacing: .14em; color: var(--text); }
+.tile__caption { margin: .2rem 0 0; font-size: .62rem; letter-spacing: .06em; color: var(--dim); }
+.tile__badge { margin-left: .4rem; padding: 0 .25rem; border: 1px solid currentColor; border-radius: 2px; font-weight: 500; font-size: .9em; color: var(--accent); opacity: .8; }
+.tile__reading { text-align: right; line-height: 1.05; }
+.tile__number { font-size: 1.35rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--accent); text-shadow: 0 0 14px rgb(34 255 136 / .4); }
+.tile__unit { display: block; font-size: .6rem; letter-spacing: .1em; color: var(--dim); }
+.tile__reading--up .tile__arrow { color: var(--alert); }
+.tile__reading--down .tile__arrow { color: #38bdf8; }
+
+/* The map takes the leftover height. The SVG's viewBox letterboxes inside it,
+   so the map fits the cell in both axes instead of setting the cell's height
+   from its own aspect ratio. */
+.tile__map { flex: 1; min-height: 0; display: flex; flex-direction: column; margin-top: .3rem; }
+.tile__map .india-choropleth__canvas { flex: 1; min-height: 0; }
+.tile__map .india-choropleth__svg { width: 100%; height: 100%; }
+.tile__foot { flex: none; display: flex; align-items: center; gap: .4rem; font-size: .55rem; letter-spacing: .08em; color: var(--dim); text-transform: uppercase; margin-top: .35rem; }
+.tile__scale { flex: 1; display: flex; align-items: center; gap: 2px; }
+.tile__scale i { flex: 1; height: 5px; min-width: .5rem; }
+.tile__scale b { font-weight: 500; font-variant-numeric: tabular-nums; color: var(--dim); }
+.tile__rate { font-style: normal; color: var(--accent); opacity: .65; }
+
+.board__foot { flex: none; font-size: .62rem; letter-spacing: .06em; color: var(--dim); }
+
+/* Retheme the renderer through its own public variables rather than overriding rules. */
+.india-choropleth {
+  --india-map-stroke: #071018;
+  --india-map-stroke-active: var(--accent);
+  --india-map-border-width: 1;
+  --india-map-border-width-active: 1.6;
+  --india-map-empty: #0d161d;
+  --india-map-focus: var(--accent);
+  --india-map-active: var(--accent);
+  --india-map-tooltip-bg: #071018;
+  --india-map-tooltip-border: var(--accent);
+  --india-map-text: var(--text);
+  --india-map-muted: var(--dim);
+  --india-map-line: var(--line);
+}
+.india-choropleth__toolbar { display: none; }
+.india-choropleth__status { min-height: 0; height: 100%; border-color: var(--line); color: var(--dim); font-family: inherit; }
