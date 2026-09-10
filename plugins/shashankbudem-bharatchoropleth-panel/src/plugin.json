@@ -1,0 +1,40 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "panel",
+  "name": "Bharat Choropleth",
+  "id": "shashankbudem-bharatchoropleth-panel",
+  "info": {
+    "keywords": [
+      "panel",
+      "map",
+      "choropleth",
+      "india",
+      "geo"
+    ],
+    "description": "Accessible India choropleth: 36 states & UTs, 788 districts and 5,950 sub-districts, each level loaded on demand.",
+    "author": {
+      "name": "Shashankbudem"
+    },
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [
+      {
+        "name": "Website",
+        "url": "https://github.com/shashankbudem/bharat-choropleth"
+      },
+      {
+        "name": "License",
+        "url": "https://github.com/shashankbudem/bharat-choropleth/blob/main/LICENSE"
+      }
+    ],
+    "screenshots": [],
+    "version": "%VERSION%",
+    "updated": "%TODAY%"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=12.3.0",
+    "plugins": []
+  }
+}

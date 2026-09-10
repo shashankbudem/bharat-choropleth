@@ -1,0 +1,82 @@
+{
+  "title": "Bharat Choropleth panel",
+  "uid": "bharat-panel-demo",
+  "schemaVersion": 39,
+  "time": {
+    "from": "now-6h",
+    "to": "now"
+  },
+  "templating": {
+    "list": [
+      {
+        "name": "state",
+        "type": "textbox",
+        "label": "State",
+        "query": "",
+        "current": {
+          "text": "",
+          "value": ""
+        }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "type": "shashankbudem-bharatchoropleth-panel",
+      "title": "Open incidents by state",
+      "gridPos": {
+        "h": 18,
+        "w": 16,
+        "x": 0,
+        "y": 0
+      },
+      "datasource": {
+        "type": "testdata",
+        "uid": "trlxrdZVk"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "scenarioId": "csv_content",
+          "csvContent": "state,district,subdistrict,incidents\nMaharashtra,,,412\nKarnataka,,,388\nTelangana,,,402\nTamil Nadu,,,351\nDelhi,,,341\nGujarat,,,297\nAndhra Pradesh,,,274\nUttar Pradesh,,,268\nKerala,,,259\nHaryana,,,246\nWest Bengal,,,233\nRajasthan,,,198\nMadhya Pradesh,,,187\nOdisha,,,176\nPunjab,,,165\nBihar,,,142\nJharkhand,,,121\nChhattisgarh,,,114\nAssam,,,108\nUttarakhand,,,97\nHimachal Pradesh,,,83\nGoa,,,72\nChandigarh,,,68\nJammu & Kashmir,,,61\nPuducherry,,,47\nTripura,,,44\nManipur,,,36\nMeghalaya,,,34\nNagaland,,,29\nArunachal Pradesh,,,26\nMizoram,,,24\nAndaman & Nicobar,,,22\nSikkim,,,21\nLadakh,,,18\nLakshadweep,,,12\nDadra and Nagar Haveli and Daman and Diu,,,31\nMaharashtra,Ahmednagar,,13\nMaharashtra,Akola,,14\nMaharashtra,Amravati,,17\nMaharashtra,Beed,,6\nMaharashtra,Bhandara,,4\nMaharashtra,Buldhana,,15\nMaharashtra,Chandrapur,,8\nMaharashtra,Chhatrapati Sambhajinagar,,9\nMaharashtra,Dharashiv,,15\nMaharashtra,Dhule,,6\nMaharashtra,Gadchiroli,,17\nMaharashtra,Gondia,,10\nMaharashtra,Hingoli,,4\nMaharashtra,Jalgaon,,17\nMaharashtra,Jalna,,12\nMaharashtra,Kolhapur,,4\nMaharashtra,Latur,,16\nMaharashtra,Mumbai,,15\nMaharashtra,Mumbai Suburban,,14\nMaharashtra,Nagpur,,13\nMaharashtra,Nanded,,18\nMaharashtra,Nandurbar,,3\nMaharashtra,Nashik,,18\nMaharashtra,Palghar,,13\nMaharashtra,Parbhani,,7\nMaharashtra,Pune,,12\nMaharashtra,Pune,Junnar,1\nMaharashtra,Pune,Ambegaon,1\nMaharashtra,Pune,Shirur,1\nMaharashtra,Pune,Khed,1\nMaharashtra,Pune,Mawal,2\nMaharashtra,Pune,Mulshi,1\nMaharashtra,Pune,Haveli,1\nMaharashtra,Pune,Pune City,1\nMaharashtra,Pune,Daund,1\nMaharashtra,Pune,Purandhar,1\nMaharashtra,Pune,Velhe,1\nMaharashtra,Pune,Bhor,1\nMaharashtra,Pune,Baramati,1\nMaharashtra,Pune,Indapur,1\nMaharashtra,Raigarh,,8\nMaharashtra,Ratnagiri,,13\nMaharashtra,Sangli,,14\nMaharashtra,Satara,,11\nMaharashtra,Sindhudurg,,5\nMaharashtra,Solapur,,9\nMaharashtra,Thane,,8\nMaharashtra,Wardha,,14\nMaharashtra,Washim,,17\nMaharashtra,Yavatmal,,15\nRajasthan,Ajmer,,6\nRajasthan,Ajmer,Kishangarh,2\nRajasthan,Ajmer,Ajmer,1\nRajasthan,Ajmer,Peesangan,2\nRajasthan,Ajmer,Nasirabad,1\nRajasthan,Alwar,,3\nRajasthan,Anoopgarh,,3\nRajasthan,Balotra,,6\nRajasthan,Banswara,,2\nRajasthan,Baran,,3\nRajasthan,Barmer,,4\nRajasthan,Beawar,,4\nRajasthan,Bharatpur,,2\nRajasthan,Bhilwara,,6\nRajasthan,Bikaner,,4\nRajasthan,Bundi,,2\nRajasthan,Chittaurgarh,,3\nRajasthan,Churu,,2\nRajasthan,Dausa,,3\nRajasthan,Deeg,,2\nRajasthan,Dhaulpur,,3\nRajasthan,Didwana-Kuchaman,,5\nRajasthan,Dudu,,5\nRajasthan,Dungarpur,,3\nRajasthan,Ganganagar,,4\nRajasthan,Gangapurcity,,4\nRajasthan,Hanumangarh,,5\nRajasthan,Jaipur,,7\nRajasthan,Jaipur(Gramin),,2\nRajasthan,Jaisalmer,,6\nRajasthan,Jalor,,4\nRajasthan,Jhalawar,,7\nRajasthan,Jhunjhunun,,5\nRajasthan,Jodhpur,,1\nRajasthan,Jodhpur Gramin,,2\nRajasthan,Karauli,,6\nRajasthan,Kekri,,3\nRajasthan,Khairthal-Tijara,,5\nRajasthan,Kota,,2\nRajasthan,Kotputli-Behror,,5\nRajasthan,Nagaur,,4\nRajasthan,Neem-Ka-Thana,,4\nRajasthan,Pali,,1\nRajasthan,Phalodi,,7\nRajasthan,Pratapgarh,,6\nRajasthan,Rajsamand,,6\nRajasthan,Salumbar,,5\nRajasthan,Sanchore,,3\nRajasthan,Sawai Madhopur,,2\nRajasthan,Shahpura,,6\nRajasthan,Sikar,,3\nRajasthan,Sirohi,,3\nRajasthan,Tonk,,6\nRajasthan,Udaipur,,3\n",
+          "datasource": {
+            "type": "testdata",
+            "uid": "trlxrdZVk"
+          }
+        }
+      ],
+      "options": {
+        "regionField": "state",
+        "valueField": "incidents",
+        "drillDown": true,
+        "drillDownVariable": "state",
+        "showLegend": true,
+        "showValues": true,
+        "dataBaseUrl": "",
+        "districtField": "district",
+        "palette": "teal",
+        "borderColor": "#FFFFFF",
+        "borderWidth": 2.5,
+        "subDistrictField": "subdistrict",
+        "labelSize": 11
+      },
+      "id": 1
+    },
+    {
+      "type": "text",
+      "title": "Dashboard variable, set by clicking the map",
+      "gridPos": {
+        "h": 18,
+        "w": 8,
+        "x": 16,
+        "y": 0
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "## Selected\n\n# $state\n\nThe map writes this variable when you activate a state, so every panel bound to `$state` follows the drill-down."
+      },
+      "id": 2
+    }
+  ],
+  "editable": true
+}
