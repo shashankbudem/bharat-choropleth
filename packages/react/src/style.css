@@ -10,6 +10,9 @@
   --india-map-focus: #0f766e;
   --india-map-active: #ff725f;
   --india-map-empty: #e7edf0;
+  /* Paired with --india-map-text: that variable colours the tooltip as well as the
+     map, so a dark theme that sets it must set this too, or it puts light text on
+     a white card. */
   --india-map-tooltip-bg: #fff;
   --india-map-tooltip-border: #b8c2ce;
   --india-map-text: #081435;
