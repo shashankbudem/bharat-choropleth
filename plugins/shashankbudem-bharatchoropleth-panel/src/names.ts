@@ -146,6 +146,10 @@ export function collectByName(
 ): Record<string, number> | undefined {
   const target = canonicalOf(wanted);
   const wantedForms = new Set([target, compact(target)]);
+  // ponytail: a child key present under two spellings of the parent resolves to
+  // whichever row the query returned last, silently. Deterministic for a fixed
+  // row order, but a query with no ORDER BY can flip it. Reporting the clash
+  // needs a second channel out of here — worth it if anyone hits it.
   let found: Record<string, number> | undefined;
   // Own properties only — `values.constructor` is a function, not a district.
   for (const [key, value] of Object.entries(values)) {

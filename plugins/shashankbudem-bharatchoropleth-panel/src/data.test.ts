@@ -139,3 +139,33 @@ describe('bandIndexOf', () => {
     }
   });
 });
+
+// A row naming a state `__proto__` used to write through a plain {} onto
+// Object.prototype, so `({}).Ajmer === 5` for every script on the Grafana page.
+describe('splitRows does not let query data reach the prototype', () => {
+  const keys: RowKeys = {
+    regionKey: 'state',
+    districtKey: 'district',
+    subDistrictKey: 'subdistrict',
+    valueKey: 'incidents',
+  };
+
+  it.each(['__proto__', 'constructor', 'toString'])('survives a state named %s', (name) => {
+    const { districtValues } = splitRows(
+      [{ state: name, district: 'Ajmer', subdistrict: '', incidents: 5 }],
+      keys
+    );
+    expect(({} as Record<string, unknown>).Ajmer).toBeUndefined();
+    expect((Object as unknown as Record<string, unknown>).Ajmer).toBeUndefined();
+    expect(districtValues?.[name]).toEqual({ Ajmer: 5 });
+  });
+
+  it('survives a district named __proto__', () => {
+    const { subDistrictValues } = splitRows(
+      [{ state: 'Rajasthan', district: '__proto__', subdistrict: 'Kishangarh', incidents: 2 }],
+      keys
+    );
+    expect(({} as Record<string, unknown>).Kishangarh).toBeUndefined();
+    expect(subDistrictValues['__proto__']).toEqual({ Kishangarh: 2 });
+  });
+});

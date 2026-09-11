@@ -486,8 +486,20 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
    * shown?" at the moment a fetch lands has no such ordering to get wrong, and
    * it covers every way a level can change — a click, the breadcrumb, or the
    * dashboard variable.
+   *
+   * The state is tracked here rather than read from `drillDownId`, because that
+   * is only populated when a drill-down variable is configured — and the option
+   * defaults to empty. Deriving identity from it meant the library's real state
+   * id was compared against null on every default panel, so the comparison never
+   * held and the district notice never appeared, while sub-districts kept
+   * reporting: a warning missing from one level and present on the one below,
+   * which is this bug wearing a different hat.
    */
-  const shownLevel = { state: drillDownId ?? null, district: subDistrictId };
+  const [mapStateId, setMapStateId] = useState<string | null>(null);
+  const shownLevel = {
+    state: options.drillDownVariable ? drillDownId ?? null : mapStateId,
+    district: subDistrictId,
+  };
   const shownRef = useRef(shownLevel);
   shownRef.current = shownLevel;
   const isStillShown = useCallback(
@@ -519,9 +531,11 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
    * sub-districts nothing re-runs, so the district misses are restored here.
    */
   useEffect(() => {
-    const restore = !subDistrictId && districtMisses.current.state === (drillDownId ?? null);
+    const restore = !subDistrictId && districtMisses.current.state === shownLevel.state;
     setUnmatched(restore ? districtMisses.current.names : []);
-  }, [drillDownId, subDistrictId]);
+    // shownLevel is derived from exactly these two.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [shownLevel.state, subDistrictId]);
 
   const loadDistricts = useMemo(() => {
     if (!districtKey) {
@@ -595,6 +609,7 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
     (stateId: string | null, state?: MapRegion) => {
       // Changing state drops the level below it, in the renderer and here. The
       // notice is cleared by the level effect, whatever caused the change.
+      setMapStateId(stateId);
       setSubDistrictId(null);
       onDrillDownChange(stateId, state);
     },
