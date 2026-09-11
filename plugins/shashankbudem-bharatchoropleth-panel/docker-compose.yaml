@@ -3,3 +3,8 @@ services:
     extends:
       file: .config/docker-compose-base.yaml
       service: grafana
+    environment:
+      # The plugin is privately signed for this root URL, so it loads on its
+      # signature rather than on the scaffold's allow-unsigned escape hatch.
+      # Emptying the list is the only honest test that the signature works.
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: ''
