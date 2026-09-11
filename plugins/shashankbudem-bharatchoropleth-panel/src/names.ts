@@ -155,7 +155,12 @@ export function collectByName(
   for (const [key, value] of Object.entries(values)) {
     const canonical = canonicalOf(key);
     if (wantedForms.has(canonical) || wantedForms.has(compact(canonical))) {
-      found = Object.assign(found ?? {}, value);
+      // The target is prototype-free for the same reason splitRows' maps are:
+      // these keys are query data. A plain {} here put the chain back one step
+      // later — a district named `__proto__` hit the inherited setter, its value
+      // vanished, and it was not even reported as unmatched, so the documented
+      // alias escape hatch could not recover it.
+      found = Object.assign(found ?? (Object.create(null) as Record<string, number>), value);
     }
   }
   return found;

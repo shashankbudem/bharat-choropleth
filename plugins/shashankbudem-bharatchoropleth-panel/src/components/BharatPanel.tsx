@@ -533,9 +533,28 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
   useEffect(() => {
     const restore = !subDistrictId && districtMisses.current.state === shownLevel.state;
     setUnmatched(restore ? districtMisses.current.names : []);
-    // shownLevel is derived from exactly these two.
+    // shownLevel.state is the value this body reads; the option it is sourced
+    // from is handled by the effect below, which resets that source.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [shownLevel.state, subDistrictId]);
+
+  /**
+   * Both of these mirror something the library does to itself without telling us.
+   * A controlled prop change is not an event, so neither fires a callback, and
+   * anything mirrored here goes stale silently — the level identity then names a
+   * level the map has already left, and the notice for the level it moved to is
+   * never reported.
+   */
+  useEffect(() => {
+    // Changing the state from outside drops the sub-district level under it.
+    setSubDistrictId(null);
+  }, [shownLevel.state]);
+  useEffect(() => {
+    // Configuring or clearing the variable switches which source is
+    // authoritative. Clearing it hands the library back its own uncontrolled
+    // state, which starts at null, so the id mirrored from clicks must go too.
+    setMapStateId(null);
+  }, [options.drillDownVariable]);
 
   const loadDistricts = useMemo(() => {
     if (!districtKey) {

@@ -112,3 +112,33 @@ describe('collectByName', () => {
     expect(collectByName({}, 'toString', canonical)).toBeUndefined();
   });
 });
+
+// splitRows keeps such a row; the merge used to drop it one step later, because
+// Object.assign onto a plain {} hits the inherited __proto__ setter, which
+// swallows a non-object value. It was not reported as unmatched either, so the
+// Aliases escape hatch could not recover it.
+describe('collectByName keeps query data off the prototype', () => {
+  const canonical = (n: string) => normalizeName(n);
+
+  it.each(['__proto__', 'constructor', 'toString'])('keeps a district named %s', (name) => {
+    const values = { Rajasthan: Object.assign(Object.create(null), { [name]: 7, Ajmer: 1 }) };
+    const found = collectByName(values, 'Rajasthan', canonical);
+    expect(found?.[name]).toBe(7);
+    expect(found?.Ajmer).toBe(1);
+    expect(({} as Record<string, unknown>)[name === '__proto__' ? 'nothing' : name]).not.toBe(7);
+  });
+
+  it('reports such a district as unmatched when no region answers to it', () => {
+    const values = { Rajasthan: Object.assign(Object.create(null), { ['__proto__']: 7 }) };
+    const found = collectByName(values, 'Rajasthan', canonical) ?? {};
+    expect(matchNames(found, ['Ajmer']).unmatched).toEqual(['__proto__']);
+  });
+
+  it('lets an alias rescue it, as the option promises', () => {
+    const values = { Rajasthan: Object.assign(Object.create(null), { ['__proto__']: 7 }) };
+    const found = collectByName(values, 'Rajasthan', canonical) ?? {};
+    const match = matchNames(found, ['Ajmer'], parseAliases('__proto__ = Ajmer'));
+    expect(match.valueFor('Ajmer')).toBe(7);
+    expect(match.unmatched).toEqual([]);
+  });
+});
