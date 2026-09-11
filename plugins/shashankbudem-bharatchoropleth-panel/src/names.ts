@@ -118,3 +118,32 @@ export function matchNames(
     },
   };
 }
+
+/**
+ * Find the entry whose key names the same place as `wanted`.
+ *
+ * The values map is keyed by whatever the query wrote; the caller asks using the
+ * name the *geometry* uses. Those differ constantly — `Orissa` against `Odisha`,
+ * `pune-city` against `Pune City` — and an exact lookup quietly returned nothing,
+ * which switched off aliases and the unmatched notice for that whole level.
+ *
+ * `canonicalOf` decides what "same place" means: the state registry one level up,
+ * plain normalization below it, where no registry exists.
+ */
+export function lookupByName<T>(
+  values: Readonly<Record<string, T>>,
+  wanted: string,
+  canonicalOf: (name: string) => string
+): T | undefined {
+  const direct = values[wanted];
+  if (direct !== undefined) {
+    return direct;
+  }
+  const target = canonicalOf(wanted);
+  for (const [key, value] of Object.entries(values)) {
+    if (canonicalOf(key) === target) {
+      return value;
+    }
+  }
+  return undefined;
+}

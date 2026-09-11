@@ -1,6 +1,7 @@
 import type { Configuration } from 'webpack';
 import { merge } from 'webpack-merge';
 import ReplaceInFileWebpackPlugin from 'replace-in-file-webpack-plugin';
+import CopyWebpackPlugin from 'copy-webpack-plugin';
 import path from 'path';
 
 import grafanaConfig from './.config/webpack/webpack.config';
@@ -20,15 +21,38 @@ import { version } from './package.json';
  * Production builds keep the real semver — that is the number users see, and it
  * changes on release, which is exactly when the cache should be invalidated.
  */
+/**
+ * Ship the boundary data inside the plugin.
+ *
+ * Grafana serves a plugin's own files from /public/plugins/<id>/, so bundling
+ * them means the map is same-origin: no second host to run, no CORS headers to
+ * get right, and nothing fetched from a third party in a viewer's browser. It
+ * also works in an air-gapped Grafana with no configuration at all.
+ *
+ * Only the current-2019 levels are copied — the panel never requests the
+ * historical Census-2011 bundle or the claim outline, and every file copied here
+ * ends up in the signed manifest.
+ */
+const BOUNDARY_DIRS = ['current-2019-states', 'current-2019-districts', 'current-2019-subdistricts'];
+const DATA_SRC = path.resolve(__dirname, '../../data/generated');
+
+const copyBoundaries = new CopyWebpackPlugin({
+  patterns: BOUNDARY_DIRS.map((dir) => ({
+    from: path.join(DATA_SRC, dir),
+    to: path.resolve(__dirname, 'dist/data/generated', dir),
+  })),
+});
+
 const config = async (env: Record<string, unknown>): Promise<Configuration> => {
   const base = await grafanaConfig(env as never);
   if (env.production) {
-    return base;
+    return merge(base, { plugins: [copyBoundaries] });
   }
 
   const devVersion = `${version}-dev.${Date.now()}`;
   return merge(base, {
     plugins: [
+      copyBoundaries,
       new ReplaceInFileWebpackPlugin([
         {
           dir: path.resolve(process.cwd(), 'dist'),

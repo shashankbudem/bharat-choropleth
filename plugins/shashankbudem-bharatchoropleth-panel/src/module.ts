@@ -156,9 +156,9 @@ export const plugin = new PanelPlugin<BharatOptions>(BharatPanel).setPanelOption
       path: 'dataBaseUrl',
       name: 'Boundary data base URL',
       description:
-        'Where the boundary bundles are fetched from. Leave empty for the public CDN; point at your own copy of data/generated for an air-gapped Grafana.',
+        'Where boundary geometry is fetched from. Empty uses the copy bundled with this plugin, served by Grafana itself — same-origin, no CORS, works with no egress. Set it to use a CDN or your own host instead.',
       defaultValue: '',
-      settings: { placeholder: 'https://cdn.jsdelivr.net/gh/... (default)' },
+      settings: { placeholder: 'bundled with the plugin (default)' },
       category: ['Boundary data'],
     })
 );

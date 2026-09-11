@@ -57,10 +57,17 @@ describe('bandColors', () => {
     expect(bandColors(ramp, 1)).toEqual([ramp[ramp.length - 1]]);
   });
 
-  it('still returns a colour for every band when bands outnumber ramp steps', () => {
-    const colors = bandColors(ramp, ramp.length + 4);
-    expect(colors).toHaveLength(ramp.length + 4);
-    expect(colors.every((c) => typeof c === 'string' && c.startsWith('#'))).toBe(true);
+  // Two bands sharing a colour breaks more than looks: the legend filter dims by
+  // fill, so picking one band highlights every band painted the same shade.
+  it('never repeats a colour, however many bands are asked for', () => {
+    for (const count of [2, 5, 7, 11, 40]) {
+      const colors = bandColors(ramp, count);
+      expect(new Set(colors).size).toBe(colors.length);
+    }
+  });
+
+  it('cannot return more bands than the ramp has steps', () => {
+    expect(bandColors(ramp, ramp.length + 4)).toHaveLength(ramp.length);
   });
 });
 

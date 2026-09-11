@@ -1,4 +1,4 @@
-import { matchNames, normalizeName, parseAliases } from './names';
+import { lookupByName, matchNames, normalizeName, parseAliases } from './names';
 
 describe('normalizeName', () => {
   it('ignores case, punctuation and spacing', () => {
@@ -64,5 +64,30 @@ describe('matchNames', () => {
 
   it('reports nothing when every name is claimed', () => {
     expect(matchNames({ Pune: 1, 'Bengaluru Urban': 2 }, regions).unmatched).toEqual([]);
+  });
+});
+
+describe('lookupByName', () => {
+  const canonical = (n: string) => normalizeName(n);
+
+  it('finds an exact key', () => {
+    expect(lookupByName({ Pune: { Mulshi: 4 } }, 'Pune', canonical)).toEqual({ Mulshi: 4 });
+  });
+
+  it('finds a key that differs only in spelling', () => {
+    expect(lookupByName({ 'pune city': 1 }, 'Pune City', canonical)).toBe(1);
+  });
+
+  // The bug this exists for: the query wrote the state one way, the geometry
+  // names it another, and the exact lookup silently returned nothing — which
+  // switched off aliases and the unmatched notice for that level.
+  it('follows a caller-supplied notion of sameness', () => {
+    const registry: Record<string, string> = { orissa: 'odisha', odisha: 'odisha' };
+    const viaRegistry = (n: string) => registry[normalizeName(n)] ?? normalizeName(n);
+    expect(lookupByName({ Orissa: { Cuttack: 7 } }, 'Odisha', viaRegistry)).toEqual({ Cuttack: 7 });
+  });
+
+  it('returns undefined rather than guessing at a near miss', () => {
+    expect(lookupByName({ Pune: 1 }, 'Puna', canonical)).toBeUndefined();
   });
 });
