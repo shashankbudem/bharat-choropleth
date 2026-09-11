@@ -15,9 +15,9 @@ import {
 } from 'bharat-choropleth';
 import 'bharat-choropleth/style.css';
 import { BharatOptions } from '../types';
-import { PALETTES, bandColors, maxThresholds, parseThresholds } from '../palettes';
+import { bandColors, maxThresholds, parseThresholds, rampFor } from '../palettes';
 import { bandIndexOf, splitRows } from '../data';
-import { lookupByName, matchNames, normalizeName, parseAliases } from '../names';
+import { collectByName, matchNames, normalizeName, parseAliases } from '../names';
 import { asFeatureNames } from '../geometry';
 
 interface Props extends PanelProps<BharatOptions> {}
@@ -350,7 +350,7 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
     return own.length > 0 ? own : districtBands;
   }, [options.subDistrictThresholds, districtBands]);
 
-  const ramp = PALETTES[options.palette] ?? PALETTES.teal;
+  const ramp = rampFor(options.palette);
   const requestedBands = subDistrictId ? subDistrictBands : drillDownId ? districtBands : stateBands;
   // A ramp of N steps can express N-1 thresholds. Beyond that the extra bands
   // would have to share a shade, which the map cannot distinguish and the legend
@@ -471,57 +471,76 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
   }, [base]);
 
   /**
-   * Only the newest load may report its unmatched names.
+   * A load may only report its unmatched names if its level is still on screen.
    *
    * A slow fetch used to resolve after the user had moved on and write its misses
-   * over whatever level was then on screen — Rajasthan's junk names against
+   * over whatever level was then showing — Rajasthan's junk names against
    * Maharashtra's map, which is exactly the misattribution this file refuses to
    * do anywhere else.
-   */
-  const loadSeq = useRef(0);
-  const reportUnmatched = useCallback((token: number, misses: string[]) => {
-    if (token === loadSeq.current) {
-      setUnmatched(misses);
-    }
-  }, []);
-
-  /**
-   * Leaving a level invalidates anything still loading for it.
    *
-   * The token alone was not enough: it only advances when a *new* load starts,
-   * and navigating up starts none — so a slow fetch for the level you just left
-   * still matched the current token and wrote its misses over the level above.
+   * This is identity, not a sequence counter. A counter only advances when a new
+   * load *starts*, so it could not see a level left behind by the breadcrumb,
+   * and bumping it from an effect here would have invalidated the incoming
+   * level's own load instead: the library's loader runs in a child effect, which
+   * React flushes before this component's. Asking "is this still the level being
+   * shown?" at the moment a fetch lands has no such ordering to get wrong, and
+   * it covers every way a level can change — a click, the breadcrumb, or the
+   * dashboard variable.
    */
-  const abandonPendingLoads = useCallback(() => {
-    loadSeq.current += 1;
-  }, []);
+  const shownLevel = { state: drillDownId ?? null, district: subDistrictId };
+  const shownRef = useRef(shownLevel);
+  shownRef.current = shownLevel;
+  const isStillShown = useCallback(
+    (level: { state: string | null; district: string | null }) =>
+      shownRef.current.state === level.state && shownRef.current.district === level.district,
+    []
+  );
+  const reportUnmatched = useCallback(
+    (level: { state: string | null; district: string | null }, misses: string[]) => {
+      if (isStillShown(level)) {
+        setUnmatched(misses);
+      }
+    },
+    [isStillShown]
+  );
 
   /**
-   * The district level's misses, kept so returning from sub-districts can restore
-   * them. Nothing re-runs on the way up — the library's district effect does not
+   * The district level's misses, tagged with the state they belong to so
+   * returning from sub-districts restores them and switching states does not.
+   * Nothing re-runs on the way up — the library's district effect does not
    * re-fire — so without this the warning silently disappears on a level that
    * still has unmatched names.
    */
-  const districtMisses = useRef<string[]>([]);
+  const districtMisses = useRef<{ state: string | null; names: string[] }>({ state: null, names: [] });
+
+  /**
+   * The notice belongs to the level on screen, so changing level clears it and
+   * the incoming level's loader reports its own. Coming back up from
+   * sub-districts nothing re-runs, so the district misses are restored here.
+   */
+  useEffect(() => {
+    const restore = !subDistrictId && districtMisses.current.state === (drillDownId ?? null);
+    setUnmatched(restore ? districtMisses.current.names : []);
+  }, [drillDownId, subDistrictId]);
 
   const loadDistricts = useMemo(() => {
     if (!districtKey) {
       return undefined;
     }
     return async (stateId: string, state: MapRegion): Promise<MapLayer> => {
-      const token = (loadSeq.current += 1);
+      const level = { state: stateId, district: null };
       const geometry = (await fetchTopology(`d|${base}|${stateId}`, () =>
         loadDistrictTopology(base, stateId)
       )) as GeometrySource;
       // Keyed by the query's spelling, asked for by the geometry's — resolve both
       // through the same registry that resolves state names everywhere else.
       const values =
-        lookupByName(districtValues ?? {}, state.label, (n) => resolveState(n)?.id ?? normalizeName(n)) ?? {};
+        collectByName(districtValues ?? {}, state.label, (n) => resolveState(n)?.id ?? normalizeName(n)) ?? {};
       const match = matchNames(values, asFeatureNames(geometry, nameOf), aliases);
-      if (token === loadSeq.current) {
-        districtMisses.current = match.unmatched;
+      if (isStillShown(level)) {
+        districtMisses.current = { state: stateId, names: match.unmatched };
       }
-      reportUnmatched(token, match.unmatched);
+      reportUnmatched(level, match.unmatched);
       return {
         geometry,
         getId: (feature) => String(feature.properties?.id ?? nameOf(feature)),
@@ -529,26 +548,27 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
         getValue: (feature) => match.valueFor(nameOf(feature)),
       };
     };
-  }, [districtKey, base, districtValues, aliases, nameOf, fetchTopology, reportUnmatched]);
+  }, [districtKey, base, districtValues, aliases, nameOf, fetchTopology, reportUnmatched, isStillShown]);
 
   const loadSubDistricts = useMemo(() => {
     if (!subDistrictKey) {
       return undefined;
     }
     return async (districtId: string, district: MapRegion): Promise<MapLayer | null> => {
-      const token = (loadSeq.current += 1);
+      // Captured at the start: the state we were in when this drill began.
+      const level = { state: shownRef.current.state, district: districtId };
       const geometry = await fetchTopology(`s|${base}|${districtId}`, () =>
         loadSubDistrictTopology(base, districtId)
       );
       if (!geometry) {
-        reportUnmatched(token, []);
+        reportUnmatched(level, []);
         return null;
       }
       // No registry one level down, so plain normalization is the most that can
       // be claimed — a rename still has to be declared in Aliases.
-      const values = lookupByName(subDistrictValues, district.label, normalizeName) ?? {};
+      const values = collectByName(subDistrictValues, district.label, normalizeName) ?? {};
       const match = matchNames(values, asFeatureNames(geometry, nameOf), aliases);
-      reportUnmatched(token, match.unmatched);
+      reportUnmatched(level, match.unmatched);
       return {
         geometry,
         getId: (feature) => String(feature.properties?.id ?? nameOf(feature)),
@@ -573,14 +593,12 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
 
   const onStateChange = useCallback(
     (stateId: string | null, state?: MapRegion) => {
-      // Changing state drops the level below it, in the renderer and here.
-      abandonPendingLoads();
+      // Changing state drops the level below it, in the renderer and here. The
+      // notice is cleared by the level effect, whatever caused the change.
       setSubDistrictId(null);
-      districtMisses.current = [];
-      setUnmatched([]);
       onDrillDownChange(stateId, state);
     },
-    [onDrillDownChange, abandonPendingLoads]
+    [onDrillDownChange]
   );
 
   if (frames.length === 0 || !regionKey || !valueKey) {
@@ -604,15 +622,7 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
         showRegionValues={options.showValues}
         drillDownId={drillDownId}
         onDrillDownChange={onStateChange}
-        onSubDistrictDrillDownChange={(districtId) => {
-          // Misses belong to the level that reported them. Going down, the
-          // sub-district loader will report its own; coming back up, nothing
-          // re-runs, so the district level's are restored from the last load
-          // rather than left blank on a level that still has unmatched names.
-          abandonPendingLoads();
-          setSubDistrictId(districtId);
-          setUnmatched(districtId ? [] : districtMisses.current);
-        }}
+        onSubDistrictDrillDownChange={setSubDistrictId}
         ariaLabel="India choropleth of the panel query"
       />
       {useBands && ignoredBands.length > 0 && (

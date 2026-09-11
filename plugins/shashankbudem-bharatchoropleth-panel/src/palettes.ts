@@ -60,3 +60,18 @@ export function bandColors(ramp: readonly string[], bandCount: number): string[]
 export function maxThresholds(ramp: readonly string[]): number {
   return ramp.length - 1;
 }
+
+/**
+ * The ramp a scheme name asks for, or teal.
+ *
+ * Indexing PALETTES directly and falling back with `??` looked equivalent and is
+ * not: every object answers to `toString`, `constructor` and `__proto__`, so an
+ * unknown scheme saved in a dashboard's JSON resolved to a function or to
+ * Object.prototype instead of undefined, the fallback never ran, and the panel
+ * died on `.map is not a function`. Own properties only.
+ */
+export function rampFor(name: string): readonly string[] {
+  return Object.prototype.hasOwnProperty.call(PALETTES, name)
+    ? PALETTES[name as PaletteName]
+    : PALETTES.teal;
+}

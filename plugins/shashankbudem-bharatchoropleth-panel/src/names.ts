@@ -120,30 +120,39 @@ export function matchNames(
 }
 
 /**
- * Find the entry whose key names the same place as `wanted`.
+ * Gather every entry whose key names the same place as `wanted`.
  *
  * The values map is keyed by whatever the query wrote; the caller asks using the
  * name the *geometry* uses. Those differ constantly — `Orissa` against `Odisha`,
  * `pune-city` against `Pune City` — and an exact lookup quietly returned nothing,
  * which switched off aliases and the unmatched notice for that whole level.
  *
+ * Every match is merged rather than the first one winning. A query can spell one
+ * state two ways across its rows, and returning only the first spelling's
+ * districts dropped the rest with no notice anywhere — wrong data under the
+ * right name, which is the one outcome this file exists to prevent.
+ *
+ * Keys are compared by `canonicalOf` and by its separator-free form, the same
+ * pair `matchNames` tries. Without the second, a level could match a name that
+ * the level above had refused to find.
+ *
  * `canonicalOf` decides what "same place" means: the state registry one level up,
  * plain normalization below it, where no registry exists.
  */
-export function lookupByName<T>(
-  values: Readonly<Record<string, T>>,
+export function collectByName(
+  values: Readonly<Record<string, Readonly<Record<string, number>>>>,
   wanted: string,
   canonicalOf: (name: string) => string
-): T | undefined {
-  const direct = values[wanted];
-  if (direct !== undefined) {
-    return direct;
-  }
+): Record<string, number> | undefined {
   const target = canonicalOf(wanted);
+  const wantedForms = new Set([target, compact(target)]);
+  let found: Record<string, number> | undefined;
+  // Own properties only — `values.constructor` is a function, not a district.
   for (const [key, value] of Object.entries(values)) {
-    if (canonicalOf(key) === target) {
-      return value;
+    const canonical = canonicalOf(key);
+    if (wantedForms.has(canonical) || wantedForms.has(compact(canonical))) {
+      found = Object.assign(found ?? {}, value);
     }
   }
-  return undefined;
+  return found;
 }

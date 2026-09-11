@@ -1,4 +1,4 @@
-import { PALETTES, PALETTE_OPTIONS, bandColors, parseThresholds } from './palettes';
+import { PALETTES, PALETTE_OPTIONS, bandColors, maxThresholds, parseThresholds, rampFor } from './palettes';
 
 describe('parseThresholds', () => {
   it('reads a comma separated list', () => {
@@ -87,5 +87,27 @@ describe('PALETTES', () => {
         expect(`${name}:${step}`).toMatch(/^[a-z]+:#[0-9a-f]{6}$/);
       }
     }
+  });
+});
+
+describe('rampFor', () => {
+  it('returns the named ramp', () => {
+    expect(rampFor('blue')).toBe(PALETTES.blue);
+  });
+
+  // `PALETTES[name] ?? PALETTES.teal` looked equivalent and was not: every
+  // object answers to these, so an unknown scheme in a dashboard's JSON
+  // resolved to a function or Object.prototype and killed the panel.
+  it.each(['__proto__', 'constructor', 'toString', 'valueOf', 'hasOwnProperty'])(
+    'falls back for the inherited property %s',
+    (name) => {
+      expect(rampFor(name)).toBe(PALETTES.teal);
+      expect(maxThresholds(rampFor(name))).toBe(6);
+    }
+  );
+
+  it('falls back for an unknown or empty name', () => {
+    expect(rampFor('nonsense')).toBe(PALETTES.teal);
+    expect(rampFor('')).toBe(PALETTES.teal);
   });
 });

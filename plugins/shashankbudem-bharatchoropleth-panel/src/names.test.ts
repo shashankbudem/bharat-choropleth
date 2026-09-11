@@ -1,4 +1,4 @@
-import { lookupByName, matchNames, normalizeName, parseAliases } from './names';
+import { collectByName, matchNames, normalizeName, parseAliases } from './names';
 
 describe('normalizeName', () => {
   it('ignores case, punctuation and spacing', () => {
@@ -67,15 +67,15 @@ describe('matchNames', () => {
   });
 });
 
-describe('lookupByName', () => {
+describe('collectByName', () => {
   const canonical = (n: string) => normalizeName(n);
 
   it('finds an exact key', () => {
-    expect(lookupByName({ Pune: { Mulshi: 4 } }, 'Pune', canonical)).toEqual({ Mulshi: 4 });
+    expect(collectByName({ Pune: { Mulshi: 4 } }, 'Pune', canonical)).toEqual({ Mulshi: 4 });
   });
 
   it('finds a key that differs only in spelling', () => {
-    expect(lookupByName({ 'pune city': 1 }, 'Pune City', canonical)).toBe(1);
+    expect(collectByName({ 'pune city': { Mulshi: 1 } }, 'Pune City', canonical)).toEqual({ Mulshi: 1 });
   });
 
   // The bug this exists for: the query wrote the state one way, the geometry
@@ -84,10 +84,31 @@ describe('lookupByName', () => {
   it('follows a caller-supplied notion of sameness', () => {
     const registry: Record<string, string> = { orissa: 'odisha', odisha: 'odisha' };
     const viaRegistry = (n: string) => registry[normalizeName(n)] ?? normalizeName(n);
-    expect(lookupByName({ Orissa: { Cuttack: 7 } }, 'Odisha', viaRegistry)).toEqual({ Cuttack: 7 });
+    expect(collectByName({ Orissa: { Cuttack: 7 } }, 'Odisha', viaRegistry)).toEqual({ Cuttack: 7 });
   });
 
   it('returns undefined rather than guessing at a near miss', () => {
-    expect(lookupByName({ Pune: 1 }, 'Puna', canonical)).toBeUndefined();
+    expect(collectByName({ Pune: { Mulshi: 1 } }, 'Puna', canonical)).toBeUndefined();
+  });
+
+  // Returning only the first spelling dropped the other's districts with no
+  // notice anywhere — wrong data under the right name.
+  it('merges every spelling of the same place', () => {
+    const registry: Record<string, string> = { orissa: 'odisha', odisha: 'odisha' };
+    const viaRegistry = (n: string) => registry[normalizeName(n)] ?? normalizeName(n);
+    expect(
+      collectByName({ Orissa: { Khordha: 1 }, 'Odisha ': { Cuttack: 2 } }, 'Odisha', viaRegistry)
+    ).toEqual({ Khordha: 1, Cuttack: 2 });
+  });
+
+  // matchNames tries the separator-free form, so this must too, or a name
+  // matches at one level and vanishes at the one below.
+  it('matches the separator-free form, as matchNames does', () => {
+    expect(collectByName({ punecity: { Haveli: 3 } }, 'Pune City', canonical)).toEqual({ Haveli: 3 });
+  });
+
+  it('does not mistake an inherited property for data', () => {
+    expect(collectByName({}, 'constructor', canonical)).toBeUndefined();
+    expect(collectByName({}, 'toString', canonical)).toBeUndefined();
   });
 });
