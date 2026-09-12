@@ -264,6 +264,44 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
   const subDistrictKey = options.subDistrictField;
 
   /**
+   * Field options that name a column the query does not return.
+   *
+   * Region and value go through `pickField`, which falls back to the first field
+   * of the right type, so a stale name there paints an empty map — visibly wrong.
+   * The two hierarchy fields are read straight off the options, and a stale name
+   * there is read out of every row as `undefined`, which `splitRows` cannot tell
+   * from "this row names no district". Every row then becomes a state row and the
+   * last one wins, so a state silently shows one of its districts' numbers
+   * instead of its own total. A believed wrong number is the worst thing this
+   * panel can do, so it says so and shows nothing rather than guessing.
+   */
+  const columnNames = useMemo(() => {
+    const names = new Set<string>();
+    for (const frame of frames) {
+      for (const field of frame.fields) {
+        names.add(field.name);
+        names.add(getFieldDisplayName(field, frame));
+      }
+    }
+    return names;
+  }, [frames]);
+
+  const missingFields = useMemo(
+    () =>
+      (
+        [
+          ['Region field', options.regionField],
+          ['District field', options.districtField],
+          ['Sub-district field', options.subDistrictField],
+          ['Value field', options.valueField],
+        ] as const
+      )
+        .filter(([, name]) => name && !columnNames.has(name))
+        .map(([label, name]) => `${label} \u201c${name}\u201d`),
+    [columnNames, options.regionField, options.districtField, options.subDistrictField, options.valueField]
+  );
+
+  /**
    * Every frame's rows, flattened.
    *
    * Levels are told apart by the district column, never by which query they came
@@ -331,9 +369,9 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
     return () => subscription.unsubscribe();
   }, []);
 
-  const variableStateId = useMemo(() => {
+  const variableLabel = useMemo(() => {
     if (!options.drillDownVariable) {
-      return null;
+      return '';
     }
     const fromUrl = locationService.getSearchObject()[`var-${options.drillDownVariable}`];
     const token = `$${options.drillDownVariable}`;
@@ -342,13 +380,22 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
         ? getTemplateSrv().replace(token)
         : String(Array.isArray(fromUrl) ? (fromUrl[0] ?? '') : fromUrl)
     ).trim();
-    if (!label || label === token) {
-      return null;
-    }
-    return resolveState(label)?.id ?? null;
+    return !label || label === token ? '' : label;
     // locationTick is the subscription's re-read trigger, not an input.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options.drillDownVariable, locationTick]);
+
+  const variableStateId = useMemo(() => (variableLabel ? (resolveState(variableLabel)?.id ?? null) : null), [variableLabel]);
+
+  /**
+   * A variable that names nothing.
+   *
+   * The dashboard then asserts one thing and the map shows another — the picker
+   * reads "Atlantis" while the map sits at all-states — with nothing on screen
+   * to connect the two. Silence here reads as "that state has no data", which is
+   * a different and much more alarming claim than "that is not a state".
+   */
+  const unresolvedVariable = variableLabel && !variableStateId ? variableLabel : null;
 
   /**
    * Keep both drill levels controlled by the panel.
@@ -590,6 +637,18 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
     return <PanelDataErrorView fieldConfig={fieldConfig} panelId={id} data={data} needsStringField needsNumberField />;
   }
 
+  if (missingFields.length > 0) {
+    return (
+      <div className={themeClass}>
+        <div className={noticeClass} role="status">
+          {missingFields.join(' and ')} {missingFields.length === 1 ? 'names a column' : 'name columns'} this query does
+          not return. Pick the right column under Field mapping — a name that is not in the data cannot be told apart
+          from a row that leaves it blank, which would show one region&rsquo;s number as another&rsquo;s.
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className={cx(themeClass, dimClass)} onKeyDown={(e) => e.key === 'Escape' && setPickedBandState(null)}>
       <BharatChoropleth
@@ -615,6 +674,12 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
         <div className={noticeClass} role="status">
           This scheme has {ramp.length} shades, so it can show {maxThresholds(ramp)} band edges. Ignoring{' '}
           <b>{ignoredBands.join(', ')}</b>.
+        </div>
+      )}
+      {unresolvedVariable && (
+        <div className={noticeClass} role="status">
+          The variable <b>{options.drillDownVariable}</b> is set to <b>{unresolvedVariable}</b>, which is not a state
+          this map knows. Showing all states.
         </div>
       )}
       {unmatched.length > 0 && (
