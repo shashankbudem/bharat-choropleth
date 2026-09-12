@@ -342,6 +342,70 @@ describe("IndiaChoropleth (plain JS)", () => {
     expect(onInspect).toHaveBeenCalledWith(expect.objectContaining({ label: "Alpha" }), "state");
   });
 
+  // Stepping back out has an obvious focus target; going in does not, and without
+  // one focus fell to <body>, dropping a keyboard user at the top of the document.
+  it("moves focus into the level it drills into", async () => {
+    new IndiaChoropleth(container, { states: stateLayer, loadDistricts: async () => districtLayer });
+    const alpha = byLabel(container, /alpha, 42/i);
+    alpha.focus();
+    alpha.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => byLabel(container, /delta, 9/i));
+    await vi.waitFor(() => expect(document.activeElement).toBe(byLabel(container, /delta, 9/i)));
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  // A level can load successfully and still hold nothing; focus has to land on
+  // the message saying so.
+  it("moves focus to the message when the level it enters is empty", async () => {
+    new IndiaChoropleth(container, {
+      states: stateLayer,
+      loadDistricts: async () => ({ ...districtLayer, geometry: { type: "FeatureCollection", features: [] } }),
+    });
+    const alpha = byLabel(container, /alpha, 42/i);
+    alpha.focus();
+    alpha.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => {
+      const status = container.querySelector<HTMLElement>(".india-choropleth__status");
+      expect(status?.textContent).toMatch(/no district data is available/i);
+      expect(document.activeElement).toBe(status);
+    });
+  });
+
+  // The component drops its own sub level when the state changes. Doing that in
+  // silence left anything mirroring the level pointing at a district of the state
+  // just left.
+  it("tells the host when changing state drops the sub-district level", async () => {
+    const onSubDistrictDrillDownChange = vi.fn();
+    const map = new IndiaChoropleth(container, {
+      states: stateLayer,
+      drillDownId: "27",
+      loadDistricts: async () => districtLayer,
+      loadSubDistricts: async () => districtLayer,
+      onSubDistrictDrillDownChange,
+    });
+    await vi.waitFor(() => byLabel(container, /delta, 9/i));
+    byLabel(container, /delta, 9/i).dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    await vi.waitFor(() => expect(onSubDistrictDrillDownChange).toHaveBeenCalledWith("D1", expect.anything()));
+
+    onSubDistrictDrillDownChange.mockClear();
+    map.update({ drillDownId: "29" });
+    expect(onSubDistrictDrillDownChange).toHaveBeenCalledTimes(1);
+    expect(onSubDistrictDrillDownChange).toHaveBeenCalledWith(null, undefined);
+  });
+
+  it("does not announce a dropped sub level when none was open", async () => {
+    const onSubDistrictDrillDownChange = vi.fn();
+    const map = new IndiaChoropleth(container, {
+      states: stateLayer,
+      drillDownId: "27",
+      loadDistricts: async () => districtLayer,
+      onSubDistrictDrillDownChange,
+    });
+    await vi.waitFor(() => byLabel(container, /delta, 9/i));
+    map.update({ drillDownId: "29" });
+    expect(onSubDistrictDrillDownChange).not.toHaveBeenCalled();
+  });
+
   it("loads districts only after a state activation and supports breadcrumb return", async () => {
     const loadDistricts = vi.fn(async () => districtLayer);
     const onDrillDownChange = vi.fn();

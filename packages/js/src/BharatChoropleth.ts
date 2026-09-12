@@ -177,11 +177,15 @@ export class BharatChoropleth {
     this.getId = merged.getId ?? ((feature) => String(feature.properties?.id ?? feature.properties?.name));
     this.getLabel = merged.getLabel ?? ((feature) => String(feature.properties?.name ?? feature.properties?.id));
 
+    const seeded = new Map<string, string>();
     for (const [name, value] of Object.entries(merged.values ?? {})) {
       const key = this.keyFor(name);
+      const first = seeded.get(key);
+      if (first !== undefined) this.warnDuplicate(name, first);
+      else seeded.set(key, name);
       this.values.set(key, value);
       this.exactKeys.set(name, key);
-      this.writtenAs.set(key, name);
+      if (!this.writtenAs.has(key)) this.writtenAs.set(key, name);
     }
 
     this._colorScale = merged.colorScale;
@@ -337,6 +341,22 @@ export class BharatChoropleth {
     console.warn(`BharatChoropleth: "${name}" is not a recognized state/UT — its value is ignored.`);
   }
 
+  /**
+   * Two spellings in one batch that name the same state.
+   *
+   * `{ Orissa: 1, Odisha: 2 }` resolved to the last silently, which is how a
+   * mis-shaped dataset becomes a believed wrong number. The last value still
+   * wins — changing that would move numbers under existing callers — but it is
+   * no longer a secret. Scoped to a single batch, so updating a state later is
+   * not mistaken for a clash.
+   */
+  private warnDuplicate(name: string, first: string) {
+    console.warn(
+      `BharatChoropleth: "${first}" and "${name}" name the same state — the last one is shown. ` +
+        `Use one spelling if that is not what you meant.`,
+    );
+  }
+
   // ---------------------------------------------------------------- mounting
 
   private mount(geometry: GeometrySource) {
@@ -479,8 +499,12 @@ export class BharatChoropleth {
 
   /** Set many values at once with a single re-render. Unlisted states are left untouched. */
   setValues(values: Record<string, number | null>) {
+    const seen = new Map<string, string>();
     for (const [name, value] of Object.entries(values)) {
       const key = this.keyFor(name);
+      const first = seen.get(key);
+      if (first !== undefined) this.warnDuplicate(name, first);
+      else seen.set(key, name);
       this.values.set(key, value);
       this.exactKeys.set(name, key);
       if (!this.writtenAs.has(key)) this.writtenAs.set(key, name);
