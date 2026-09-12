@@ -338,6 +338,8 @@ export function IndiaChoropleth({
    * to be a leaf and steps straight back out does not move focus at all.
    */
   const focusFirstFromLevel = useRef<string | null>(null);
+  /** The "nothing here" message, so a drill into an empty level can land on it. */
+  const emptyLevelRef = useRef<HTMLDivElement | null>(null);
 
   // Keyed on the geometry, not the layer: a caller that repaints by handing over
   // a new `MapLayer` with the same geometry — which is how values change — gets
@@ -600,10 +602,21 @@ export function IndiaChoropleth({
     // into a leaf that steps back out leaves focus where the user put it.
     if (!focusFirstFromLevel.current || focusFirstFromLevel.current === level) return;
     const first = regions[0];
-    if (!first) return;
-    focusFirstFromLevel.current = null;
-    pathRefs.current[first.id]?.focus();
-  }, [level, regions]);
+    if (first) {
+      focusFirstFromLevel.current = null;
+      pathRefs.current[first.id]?.focus();
+      return;
+    }
+    // A level can arrive with nothing in it — a state whose districts loaded but
+    // hold no regions. It still has to take focus, or the drill leaves a keyboard
+    // user at the top of the document with only a live region to explain it. The
+    // message is the honest target: it says why there is nothing, and the
+    // breadcrumb out of here is its neighbour.
+    if (emptyLevelRef.current) {
+      focusFirstFromLevel.current = null;
+      emptyLevelRef.current.focus();
+    }
+  }, [level, regions, loadingState, loadingDistrict]);
 
   useEffect(() => {
     if (!inspectedId) return;
@@ -893,7 +906,7 @@ export function IndiaChoropleth({
             {loadError ? loadError.message : loadingState ? "Loading districts…" : "District data is unavailable for this state."}
           </div>
         ) : regions.length === 0 ? (
-          <div className="india-choropleth__status" role="status">
+          <div className="india-choropleth__status" role="status" tabIndex={-1} ref={emptyLevelRef}>
             {level === "subdistrict" ? "No sub-district data is available for this district." : "No district data is available for this state."}
           </div>
         ) : (

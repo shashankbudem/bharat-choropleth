@@ -204,6 +204,20 @@ describe("IndiaChoropleth", () => {
     expect(delta).toHaveFocus();
   });
 
+  // A level can load successfully and still hold nothing. Focus has to land on
+  // the message saying so, or the drill drops the user at the top of the page.
+  it("moves focus to the message when the level it enters is empty", async () => {
+    const emptyLayer: MapLayer = { ...stateLayer, geometry: { type: "FeatureCollection", features: [] } };
+    render(<IndiaChoropleth states={stateLayer} loadDistricts={async () => emptyLayer} />);
+    const alpha = screen.getByRole("button", { name: /alpha, 42/i });
+    alpha.focus();
+    fireEvent.click(alpha);
+
+    const status = await screen.findByText(/no district data is available/i);
+    await waitFor(() => expect(status).toHaveFocus());
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
   // An optimistic drill into a district with nothing under it steps straight back
   // out, so focus must stay where the user left it.
   it("leaves focus alone when a drill turns out to be a leaf", async () => {
