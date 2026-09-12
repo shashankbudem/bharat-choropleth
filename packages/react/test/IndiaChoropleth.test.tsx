@@ -222,6 +222,48 @@ describe("IndiaChoropleth", () => {
     expect(screen.getByRole("button", { name: /delta, 9/i })).toHaveFocus();
   });
 
+  // The component drops the sub level when the state changes. It used to do that
+  // in silence, so anything mirroring the level kept pointing at a district of
+  // the state just left — the wrong level, reported against the wrong map.
+  it("tells the host when changing state drops the sub-district level", async () => {
+    const onSubDistrictDrillDownChange = vi.fn();
+    const { rerender } = render(
+      <IndiaChoropleth
+        states={stateLayer}
+        drillDownId="27"
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => districtLayer}
+        onSubDistrictDrillDownChange={onSubDistrictDrillDownChange}
+      />
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /delta, 9/i }));
+    await waitFor(() => expect(onSubDistrictDrillDownChange).toHaveBeenCalledWith("D1", expect.anything()));
+
+    onSubDistrictDrillDownChange.mockClear();
+    rerender(
+      <IndiaChoropleth
+        states={stateLayer}
+        drillDownId="29"
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => districtLayer}
+        onSubDistrictDrillDownChange={onSubDistrictDrillDownChange}
+      />
+    );
+    await waitFor(() => expect(onSubDistrictDrillDownChange).toHaveBeenCalledWith(null, undefined));
+  });
+
+  // Dropping control used to hand back whatever the uncontrolled slot held
+  // before control began, which could be many interactions stale.
+  it("keeps what is on screen when the host stops controlling the drill-down", async () => {
+    const { rerender } = render(
+      <IndiaChoropleth states={stateLayer} drillDownId="27" loadDistricts={async () => districtLayer} />
+    );
+    expect(await screen.findByRole("button", { name: /delta, 9/i })).toBeInTheDocument();
+
+    rerender(<IndiaChoropleth states={stateLayer} loadDistricts={async () => districtLayer} />);
+    expect(await screen.findByRole("button", { name: /delta, 9/i })).toBeInTheDocument();
+  });
+
   it("loads districts only after a state activation and supports breadcrumb return", async () => {
     const loadDistricts = vi.fn(async () => districtLayer);
     const onDrillDownChange = vi.fn();

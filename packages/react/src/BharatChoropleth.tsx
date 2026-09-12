@@ -202,7 +202,7 @@ export function BharatChoropleth({
     return [];
   }, [data, regionKey, valueKey, values]);
 
-  const { valueMap, exactKeys, writtenAs } = useMemo(() => {
+  const { valueMap, exactKeys, writtenAs, duplicated } = useMemo(() => {
     const valueMap = new Map<string, number | null>();
     /**
      * The caller's keys exactly as written, checked before the registry.
@@ -216,14 +216,25 @@ export function BharatChoropleth({
      */
     const exactKeys = new Map<string, string>();
     const writtenAs = new Map<string, string>();
+    /**
+     * Rows that name a region already seen.
+     *
+     * The last one used to win in silence, which is how a mis-shaped query turns
+     * into a believed wrong number: a state showing one of its districts' totals
+     * looks exactly like a state showing its own. The last value still wins —
+     * changing that would move numbers under existing callers — but it is no
+     * longer a secret, and the spelling kept below is deliberately the first.
+     */
+    const duplicated = new Map<string, number>();
     for (const [name, value] of entries) {
       const key = keyFor(name);
+      if (valueMap.has(key)) duplicated.set(key, (duplicated.get(key) ?? 1) + 1);
       valueMap.set(key, value);
       exactKeys.set(name, key);
       // Keep the caller's own spelling so a warning quotes what they typed.
       if (!writtenAs.has(key)) writtenAs.set(key, name);
     }
-    return { valueMap, exactKeys, writtenAs };
+    return { valueMap, exactKeys, writtenAs, duplicated };
   }, [entries]);
 
   /**
@@ -351,7 +362,16 @@ export function BharatChoropleth({
         `BharatChoropleth: "${writtenAs.get(key) ?? key}" is not a recognized state/UT — its value is ignored.`,
       );
     }
-  }, [getId, getLabel, resolvedGeometry, statesLayer, valueSignature, writtenAs]);
+    for (const [key, count] of duplicated) {
+      const seen = `duplicate:${key}`;
+      if (warned.current.has(seen)) continue;
+      warned.current.add(seen);
+      console.warn(
+        `BharatChoropleth: "${writtenAs.get(key) ?? key}" appears in ${count} rows — the last one is shown. ` +
+          `Aggregate it in the query if that is not what you meant.`,
+      );
+    }
+  }, [duplicated, getId, getLabel, resolvedGeometry, statesLayer, valueSignature, writtenAs]);
 
   // Drill-down geometry is fetched once per id and held for the component's life.
   // IndiaChoropleth re-runs its district effect whenever the state layer changes

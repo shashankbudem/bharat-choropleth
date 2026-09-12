@@ -568,10 +568,20 @@ export function IndiaChoropleth({
   // value so an initial state + district pair survives: this must fire on a
   // change, not on arrival.
   const priorDrillDownId = useRef(activeDrillDownId);
+  // Mirrors the sub level so the effect below can read it without depending on
+  // it, which would re-run this on every sub-district drill.
+  const activeSubDrillDownIdRef = useRef(activeSubDrillDownId);
+  activeSubDrillDownIdRef.current = activeSubDrillDownId;
   useEffect(() => {
     if (priorDrillDownId.current === activeDrillDownId) return;
     priorDrillDownId.current = activeDrillDownId;
+    if (activeSubDrillDownIdRef.current === null) return;
     setActiveSubDrillDownId(null);
+    // The host is told, because it cannot see this happen. Dropping the level
+    // silently left anything mirroring it pointing at a district of the state
+    // just left — the wrong level, reported against the wrong map. There is no
+    // prior district to hand back: it belonged to the state that is gone.
+    onSubDistrictDrillDownChange?.(null, undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeDrillDownId]);
 
