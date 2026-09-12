@@ -327,6 +327,17 @@ export function IndiaChoropleth({
   const [subLoadError, setSubLoadError] = useState<Error | null>(null);
   const pathRefs = useRef<Record<string, SVGPathElement | null>>({});
   const restoreFocusId = useRef<string | null>(null);
+  /**
+   * The level a drill started from, so focus can land on the level it arrives at.
+   *
+   * Going back has an obvious target — the region stepped out of — and going in
+   * does not: the activated region is no longer on screen. Without one, focus
+   * fell to <body> on every drill-in, dropping a keyboard user at the top of the
+   * document and telling a screen reader nothing about where they now are. It
+   * holds the departing level rather than a flag, so a district that turns out
+   * to be a leaf and steps straight back out does not move focus at all.
+   */
+  const focusFirstFromLevel = useRef<string | null>(null);
 
   // Keyed on the geometry, not the layer: a caller that repaints by handing over
   // a new `MapLayer` with the same geometry — which is how values change — gets
@@ -532,6 +543,11 @@ export function IndiaChoropleth({
           // selected, rather than opening a level with nothing in it.
           setLeafDistrictIds((known) => known.has(activeSubDrillDownId) ? known : new Set(known).add(activeSubDrillDownId));
           setActiveSubDrillDownId(null);
+          // The optimistic drill unmounted the district that was activated, so
+          // focus has to be put back on it deliberately — a keyboard user who
+          // opened a district with nothing under it should not be dropped.
+          restoreFocusId.current = sourceDistrict.id;
+          focusFirstFromLevel.current = null;
           setActiveSelectedId(sourceDistrict.id);
           onSubDistrictDrillDownChange?.(null, sourceDistrict);
           return;
@@ -561,12 +577,22 @@ export function IndiaChoropleth({
 
   useEffect(() => {
     const regionId = restoreFocusId.current;
-    if (!regionId) return;
-    // Focus is restored onto the region that was just stepped out of, so it waits
-    // until the level holding that region is the one being drawn.
-    if (!regions.some((region) => region.id === regionId)) return;
-    restoreFocusId.current = null;
-    pathRefs.current[regionId]?.focus();
+    if (regionId) {
+      // Focus is restored onto the region that was just stepped out of, so it waits
+      // until the level holding that region is the one being drawn.
+      if (!regions.some((region) => region.id === regionId)) return;
+      restoreFocusId.current = null;
+      focusFirstFromLevel.current = null;
+      pathRefs.current[regionId]?.focus();
+      return;
+    }
+    // Drilling in: the level has to have actually changed, so an optimistic drill
+    // into a leaf that steps back out leaves focus where the user put it.
+    if (!focusFirstFromLevel.current || focusFirstFromLevel.current === level) return;
+    const first = regions[0];
+    if (!first) return;
+    focusFirstFromLevel.current = null;
+    pathRefs.current[first.id]?.focus();
   }, [level, regions]);
 
   useEffect(() => {
@@ -595,6 +621,7 @@ export function IndiaChoropleth({
     onSelectedChange?.(region, level);
     if (level === "state" && loadDistricts) {
       setActiveSelectedId(null);
+      focusFirstFromLevel.current = level;
       setActiveDrillDownId(region.id);
       onDrillDownChange?.(region.id, region);
       return;
@@ -604,6 +631,7 @@ export function IndiaChoropleth({
     // so the drill is entered optimistically and stepped back out if it returns null.
     if (level === "district" && loadSubDistricts && !leafDistrictIds.has(region.id)) {
       setActiveSelectedId(null);
+      focusFirstFromLevel.current = level;
       setActiveSubDrillDownId(region.id);
       onSubDistrictDrillDownChange?.(region.id, region);
     }
@@ -611,6 +639,7 @@ export function IndiaChoropleth({
 
   /** Steps up exactly one level, so the breadcrumb and the back button agree. */
   const goBack = () => {
+    focusFirstFromLevel.current = null;
     if (level === "subdistrict") {
       const priorDistrict = drilledDistrict ?? undefined;
       setActiveSubDrillDownId(null);
@@ -633,6 +662,7 @@ export function IndiaChoropleth({
 
   /** Jumps straight to the national map from any level. */
   const goToStates = () => {
+    focusFirstFromLevel.current = null;
     const priorState = drilledState ?? undefined;
     const wasDrilledDistrict = drilledDistrict ?? undefined;
     setActiveSubDrillDownId(null);

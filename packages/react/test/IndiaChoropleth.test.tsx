@@ -190,6 +190,38 @@ describe("IndiaChoropleth", () => {
     expect(onInspect).toHaveBeenCalledWith(expect.objectContaining({ label: "Alpha" }), "state");
   });
 
+  // Going back has an obvious focus target; going in does not, and without one
+  // focus fell to <body>, dropping a keyboard user at the top of the document.
+  it("moves focus into the level it drills into", async () => {
+    render(<IndiaChoropleth states={stateLayer} loadDistricts={async () => districtLayer} />);
+    const alpha = screen.getByRole("button", { name: /alpha, 42/i });
+    alpha.focus();
+    expect(alpha).toHaveFocus();
+
+    fireEvent.click(alpha);
+    const delta = await screen.findByRole("button", { name: /delta, 9/i });
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+    expect(delta).toHaveFocus();
+  });
+
+  // An optimistic drill into a district with nothing under it steps straight back
+  // out, so focus must stay where the user left it.
+  it("leaves focus alone when a drill turns out to be a leaf", async () => {
+    render(
+      <IndiaChoropleth
+        states={stateLayer}
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => null}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /alpha, 42/i }));
+    const delta = await screen.findByRole("button", { name: /delta, 9/i });
+    delta.focus();
+    fireEvent.click(delta);
+    await waitFor(() => expect(screen.getByRole("button", { name: /delta, 9/i })).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /delta, 9/i })).toHaveFocus();
+  });
+
   it("loads districts only after a state activation and supports breadcrumb return", async () => {
     const loadDistricts = vi.fn(async () => districtLayer);
     const onDrillDownChange = vi.fn();
