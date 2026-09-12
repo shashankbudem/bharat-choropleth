@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.3.1 - 2026-09-13
+
+### Fixed
+
+- Drilling in no longer loses keyboard focus. Stepping back out had an obvious
+  target — the region just left — and going in had none, so focus fell to
+  `<body>` on every drill-down, dropping a keyboard user at the top of the
+  document and telling a screen reader nothing about where they now were. Focus
+  now lands on the first region of the level entered; on the message when that
+  level holds nothing; and back on the district itself when an optimistic drill
+  turns out to be a leaf, which had unmounted the region under the cursor.
+- Changing the state now tells the host that the sub-district level was dropped.
+  The component clears that level itself and fired no
+  `onSubDistrictDrillDownChange`, so anything mirroring the level kept pointing
+  at a district of the state just left — the wrong level, reported against the
+  wrong map. There is no prior district to hand back, because it belonged to the
+  state that is gone, so the callback receives `(null, undefined)`.
+- A host that stops controlling a prop now keeps what is on screen. The
+  uncontrolled slot held whatever it contained before control began, often many
+  interactions stale, and that was what came back.
+- Two rows naming the same region warn instead of resolving in silence. That
+  silence is how a mis-shaped query becomes a believed wrong number: a state
+  showing one of its districts' totals looks exactly like a state showing its
+  own. The last value still wins — changing that would move numbers under
+  existing callers — and the warning quotes the spelling the caller wrote.
+- Legend swatches size from the legend row rather than the viewport. `vw`
+  measures the browser window, so in any embed narrower than the page the
+  swatches pinned to their maximum and overflowed the map they belong to.
+
 ## 0.3.0 - 2026-09-05
 
 ### Fixed
