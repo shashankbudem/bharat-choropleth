@@ -19,6 +19,7 @@ import { bandColors, maxThresholds, parseThresholds, rampFor } from '../palettes
 import { bandIndexOf, splitRows } from '../data';
 import { collectByName, matchNames, normalizeName, parseAliases } from '../names';
 import { asFeatureNames } from '../geometry';
+import { SettledPromiseLru } from '../promiseLru';
 
 interface Props extends PanelProps<BharatOptions> {}
 
@@ -100,7 +101,11 @@ function useThemeVars(borderColor: string, borderWidth: number, labelColor: stri
           // is a fixed ~438px however narrow the panel is. In a dashboard that
           // overflows and wraps, eating map height. Sharing the row with flex
           // makes the swatches track the panel instead.
-          '& .india-choropleth__legend': { flexWrap: 'nowrap', gap: theme.spacing(1), fontSize: theme.typography.bodySmall.fontSize },
+          '& .india-choropleth__legend': {
+            flexWrap: 'nowrap',
+            gap: theme.spacing(1),
+            fontSize: theme.typography.bodySmall.fontSize,
+          },
           '& .india-choropleth__swatches': { flex: '1 1 auto', minWidth: 0 },
           '& .india-choropleth__swatch': { width: 'auto', flex: '1 1 0', minWidth: '6px' },
         },
@@ -164,6 +169,24 @@ function useNoticeStyles() {
   );
 }
 
+/** Keep the renderer's scale prop stable until a palette or band actually changes. */
+function useColorScale(palette: string, bandKey: string, useBands: boolean) {
+  return useMemo(() => {
+    if (!useBands) {
+      return rampFor(palette);
+    }
+    const bands = bandKey.split(',').map(Number);
+    const fills = bandColors(rampFor(palette), bands.length + 1);
+    return (value: number | null) => {
+      if (value === null || !Number.isFinite(value)) {
+        return 'var(--india-map-empty)';
+      }
+      const index = bandIndexOf(value, bands);
+      return index === null ? 'var(--india-map-empty)' : (fills[index] as string);
+    };
+  }, [palette, bandKey, useBands]);
+}
+
 /**
  * The key a row is actually readable by.
  *
@@ -218,8 +241,7 @@ function frameRows(frame: Props['data']['series'][number]): Array<Record<string,
   for (let index = 0; index < frame.length; index += 1) {
     const row: Record<string, unknown> = {};
     for (const { field, display } of columns) {
-      const values = field.values as unknown as { get?: (i: number) => unknown } & Array<unknown>;
-      const value = typeof values.get === 'function' ? values.get(index) : values[index];
+      const value = field.values[index];
       row[display] = value;
       if (!(field.name in row)) {
         row[field.name] = value;
@@ -305,15 +327,13 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
    */
   const [locationTick, setLocationTick] = useState(0);
   useEffect(() => {
-    const subscription = locationService
-      .getLocationObservable()
-      .subscribe(() => setLocationTick((tick) => tick + 1));
+    const subscription = locationService.getLocationObservable().subscribe(() => setLocationTick((tick) => tick + 1));
     return () => subscription.unsubscribe();
   }, []);
 
-  const drillDownId = useMemo(() => {
+  const variableStateId = useMemo(() => {
     if (!options.drillDownVariable) {
-      return undefined;
+      return null;
     }
     const fromUrl = locationService.getSearchObject()[`var-${options.drillDownVariable}`];
     const token = `$${options.drillDownVariable}`;
@@ -331,61 +351,33 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
   }, [options.drillDownVariable, locationTick]);
 
   /**
-   * Fixed bands need a *function* scale: an array scale is always stretched
-   * between the current min and max, which is the behaviour we're replacing.
-   * Falls back to the plain ramp if the thresholds field is empty or unparseable,
-   * so a typo degrades to the old behaviour rather than to a blank map.
-   */
-  // Which level is on screen. The renderer reports both drill-downs; a state
-  // change clears the one below it, so the reset is mirrored here too.
-  const [subDistrictId, setSubDistrictId] = useState<string | null>(null);
-
-  const stateBands = useMemo(() => parseThresholds(options.thresholds), [options.thresholds]);
-  const districtBands = useMemo(() => {
-    const own = parseThresholds(options.districtThresholds);
-    return own.length > 0 ? own : stateBands;
-  }, [options.districtThresholds, stateBands]);
-  const subDistrictBands = useMemo(() => {
-    const own = parseThresholds(options.subDistrictThresholds);
-    return own.length > 0 ? own : districtBands;
-  }, [options.subDistrictThresholds, districtBands]);
-
-  const ramp = rampFor(options.palette);
-  const requestedBands = subDistrictId ? subDistrictBands : drillDownId ? districtBands : stateBands;
-  // A ramp of N steps can express N-1 thresholds. Beyond that the extra bands
-  // would have to share a shade, which the map cannot distinguish and the legend
-  // filter would mis-select; the surplus is dropped and said out loud instead.
-  const bands = requestedBands.slice(0, maxThresholds(ramp));
-  const ignoredBands = requestedBands.slice(maxThresholds(ramp));
-
-  /**
-   * Which band the legend is filtering to.
+   * Keep both drill levels controlled by the panel.
    *
-   * The package legend filters itself, but it is suppressed in fixed-band mode —
-   * it describes bands it computed from min/max, which are not the ones on
-   * screen. So the filter is rebuilt here. Each band has one exact fill, so
-   * "everything not painted this colour" is a plain attribute selector.
+   * The dashboard variable controls the state when configured; otherwise the
+   * callback state below does. Tagging local state with that source invalidates
+   * it synchronously when the option changes, without an effect/reset render.
+   * A district is only valid under the exact state it was selected from, so an
+   * external variable change also drops it synchronously before child effects
+   * can start a cached load for the new state.
    */
-  const [pickedBand, setPickedBand] = useState<number | null>(null);
-  const bandKey = bands.join(',');
-  useEffect(() => setPickedBand(null), [bandKey, drillDownId, subDistrictId]);
-  const useBands = options.scaleMode === 'thresholds' && bands.length > 0;
-  const bandFills = useMemo(() => bandColors(ramp, bands.length + 1), [ramp, bands.length]);
+  const [localLevel, setLocalLevel] = useState<{
+    source: string;
+    state: string | null;
+    district: string | null;
+  }>({ source: options.drillDownVariable, state: null, district: null });
+  const currentLocalLevel =
+    localLevel.source === options.drillDownVariable
+      ? localLevel
+      : { source: options.drillDownVariable, state: null, district: null };
+  const shownStateId = options.drillDown
+    ? options.drillDownVariable
+      ? variableStateId
+      : currentLocalLevel.state
+    : null;
+  const shownDistrictId =
+    options.drillDown && currentLocalLevel.state === shownStateId ? currentLocalLevel.district : null;
 
-  const colorScale = useMemo(() => {
-    if (!useBands) {
-      return ramp;
-    }
-    return (value: number | null) => {
-      if (value === null || !Number.isFinite(value)) {
-        return 'var(--india-map-empty)';
-      }
-      const index = bandIndexOf(value, bands);
-      return index === null ? 'var(--india-map-empty)' : (bandFills[index] as string);
-    };
-  }, [useBands, ramp, bands, bandFills]);
-
-  const onDrillDownChange = useCallback(
+  const publishState = useCallback(
     (stateId: string | null, state?: MapRegion) => {
       if (!options.drillDownVariable) {
         return;
@@ -400,6 +392,63 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
     [options.drillDownVariable]
   );
 
+  const onStateChange = useCallback(
+    (stateId: string | null, state?: MapRegion) => {
+      setLocalLevel({ source: options.drillDownVariable, state: stateId, district: null });
+      publishState(stateId, state);
+    },
+    [options.drillDownVariable, publishState]
+  );
+
+  const onSubDistrictChange = useCallback(
+    (districtId: string | null) => {
+      setLocalLevel({ source: options.drillDownVariable, state: shownStateId, district: districtId });
+    },
+    [options.drillDownVariable, shownStateId]
+  );
+
+  /**
+   * Fixed bands need a *function* scale: an array scale is always stretched
+   * between the current min and max, which is the behaviour we're replacing.
+   * Falls back to the plain ramp if the thresholds field is empty or unparseable,
+   * so a typo degrades to the old behaviour rather than to a blank map.
+   */
+  const stateBands = useMemo(() => parseThresholds(options.thresholds), [options.thresholds]);
+  const districtBands = useMemo(() => {
+    const own = parseThresholds(options.districtThresholds);
+    return own.length > 0 ? own : stateBands;
+  }, [options.districtThresholds, stateBands]);
+  const subDistrictBands = useMemo(() => {
+    const own = parseThresholds(options.subDistrictThresholds);
+    return own.length > 0 ? own : districtBands;
+  }, [options.subDistrictThresholds, districtBands]);
+
+  const ramp = rampFor(options.palette);
+  const requestedBands = shownDistrictId ? subDistrictBands : shownStateId ? districtBands : stateBands;
+  // A ramp of N steps can express N-1 thresholds. Beyond that the extra bands
+  // would have to share a shade, which the map cannot distinguish and the legend
+  // filter would mis-select; the surplus is dropped and said out loud instead.
+  const bands = requestedBands.slice(0, maxThresholds(ramp));
+  const ignoredBands = requestedBands.slice(maxThresholds(ramp));
+
+  /**
+   * Which band the legend is filtering to.
+   *
+   * The package legend filters itself, but it is suppressed in fixed-band mode —
+   * it describes bands it computed from min/max, which are not the ones on
+   * screen. So the filter is rebuilt here. Each band has one exact fill, so
+   * "everything not painted this colour" is a plain attribute selector.
+   */
+  const [pickedBandState, setPickedBandState] = useState<{ key: string; index: number } | null>(null);
+  const bandKey = bands.join(',');
+  const bandSelectionKey = JSON.stringify([shownStateId, shownDistrictId, bandKey]);
+  const pickedBand = pickedBandState?.key === bandSelectionKey ? pickedBandState.index : null;
+  const useBands = options.scaleMode === 'thresholds' && bands.length > 0;
+  const bandCount = bands.length + 1;
+  const bandFills = useMemo(() => bandColors(rampFor(options.palette), bandCount), [options.palette, bandCount]);
+
+  const colorScale = useColorScale(options.palette, bandKey, useBands);
+
   /**
    * Load the two lower levels ourselves, so names can be matched and misses
    * reported.
@@ -411,7 +460,26 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
    * surface on the panel.
    */
   const aliases = useMemo(() => parseAliases(options.aliases), [options.aliases]);
-  const [unmatched, setUnmatched] = useState<string[]>([]);
+  const [missesByLevel, setMissesByLevel] = useState<Record<string, string[]>>({});
+  const reportUnmatched = useCallback((levelKey: string, misses: string[]) => {
+    setMissesByLevel((current) => {
+      const previous = current[levelKey];
+      if (!previous && misses.length === 0) {
+        return current;
+      }
+      if (previous?.length === misses.length && previous.every((name, index) => name === misses[index])) {
+        return current;
+      }
+      if (misses.length === 0) {
+        const next = { ...current };
+        delete next[levelKey];
+        return next;
+      }
+      return { ...current, [levelKey]: misses };
+    });
+  }, []);
+  const visibleLevelKey = JSON.stringify([shownStateId, shownDistrictId]);
+  const unmatched = missesByLevel[visibleLevelKey] ?? [];
   /**
    * Where boundary geometry comes from.
    *
@@ -431,10 +499,7 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
     options.dataBaseUrl ||
     `${config.appSubUrl ?? ''}/public/plugins/shashankbudem-bharatchoropleth-panel/data/generated`;
 
-  const nameOf = useCallback(
-    (feature: MapFeature) => String(feature.properties?.name ?? feature.properties?.id),
-    []
-  );
+  const nameOf = useCallback((feature: MapFeature) => String(feature.properties?.name ?? feature.properties?.id), []);
 
   /**
    * Cache the fetched-and-decoded topology per level.
@@ -447,121 +512,22 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
    * once more per tick on an auto-refreshing dashboard, forever.
    *
    * Caching the promise keeps the churn (values still propagate) and drops the
-   * repeated work. Keyed on the base URL too, so changing it is not stale.
+   * repeated work. Keys include the base URL, so changing it is not stale. The
+   * settled-entry LRU keeps the eight most recent levels; pending loads are never
+   * evicted, and failures remain retryable.
    */
-  const topologies = useRef(new Map<string, Promise<GeometrySource | null>>());
+  const topologies = useRef(new SettledPromiseLru<string, GeometrySource | null>(8));
   const fetchTopology = useCallback(
-    (key: string, load: () => Promise<GeometrySource | null>) => {
-      const cached = topologies.current.get(key);
-      if (cached) {
-        return cached;
-      }
-      const pending = load().catch((error) => {
-        // A failed fetch must not be remembered as a result.
-        topologies.current.delete(key);
-        throw error;
-      });
-      topologies.current.set(key, pending);
-      return pending;
-    },
+    (key: string, load: () => Promise<GeometrySource | null>) => topologies.current.getOrCreate(key, load),
     []
   );
-  useEffect(() => {
-    topologies.current.clear();
-  }, [base]);
-
-  /**
-   * A load may only report its unmatched names if its level is still on screen.
-   *
-   * A slow fetch used to resolve after the user had moved on and write its misses
-   * over whatever level was then showing — Rajasthan's junk names against
-   * Maharashtra's map, which is exactly the misattribution this file refuses to
-   * do anywhere else.
-   *
-   * This is identity, not a sequence counter. A counter only advances when a new
-   * load *starts*, so it could not see a level left behind by the breadcrumb,
-   * and bumping it from an effect here would have invalidated the incoming
-   * level's own load instead: the library's loader runs in a child effect, which
-   * React flushes before this component's. Asking "is this still the level being
-   * shown?" at the moment a fetch lands has no such ordering to get wrong, and
-   * it covers every way a level can change — a click, the breadcrumb, or the
-   * dashboard variable.
-   *
-   * The state is tracked here rather than read from `drillDownId`, because that
-   * is only populated when a drill-down variable is configured — and the option
-   * defaults to empty. Deriving identity from it meant the library's real state
-   * id was compared against null on every default panel, so the comparison never
-   * held and the district notice never appeared, while sub-districts kept
-   * reporting: a warning missing from one level and present on the one below,
-   * which is this bug wearing a different hat.
-   */
-  const [mapStateId, setMapStateId] = useState<string | null>(null);
-  const shownLevel = {
-    state: options.drillDownVariable ? drillDownId ?? null : mapStateId,
-    district: subDistrictId,
-  };
-  const shownRef = useRef(shownLevel);
-  shownRef.current = shownLevel;
-  const isStillShown = useCallback(
-    (level: { state: string | null; district: string | null }) =>
-      shownRef.current.state === level.state && shownRef.current.district === level.district,
-    []
-  );
-  const reportUnmatched = useCallback(
-    (level: { state: string | null; district: string | null }, misses: string[]) => {
-      if (isStillShown(level)) {
-        setUnmatched(misses);
-      }
-    },
-    [isStillShown]
-  );
-
-  /**
-   * The district level's misses, tagged with the state they belong to so
-   * returning from sub-districts restores them and switching states does not.
-   * Nothing re-runs on the way up — the library's district effect does not
-   * re-fire — so without this the warning silently disappears on a level that
-   * still has unmatched names.
-   */
-  const districtMisses = useRef<{ state: string | null; names: string[] }>({ state: null, names: [] });
-
-  /**
-   * The notice belongs to the level on screen, so changing level clears it and
-   * the incoming level's loader reports its own. Coming back up from
-   * sub-districts nothing re-runs, so the district misses are restored here.
-   */
-  useEffect(() => {
-    const restore = !subDistrictId && districtMisses.current.state === shownLevel.state;
-    setUnmatched(restore ? districtMisses.current.names : []);
-    // shownLevel.state is the value this body reads; the option it is sourced
-    // from is handled by the effect below, which resets that source.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [shownLevel.state, subDistrictId]);
-
-  /**
-   * Both of these mirror something the library does to itself without telling us.
-   * A controlled prop change is not an event, so neither fires a callback, and
-   * anything mirrored here goes stale silently — the level identity then names a
-   * level the map has already left, and the notice for the level it moved to is
-   * never reported.
-   */
-  useEffect(() => {
-    // Changing the state from outside drops the sub-district level under it.
-    setSubDistrictId(null);
-  }, [shownLevel.state]);
-  useEffect(() => {
-    // Configuring or clearing the variable switches which source is
-    // authoritative. Clearing it hands the library back its own uncontrolled
-    // state, which starts at null, so the id mirrored from clicks must go too.
-    setMapStateId(null);
-  }, [options.drillDownVariable]);
 
   const loadDistricts = useMemo(() => {
-    if (!districtKey) {
+    if (!options.drillDown || !districtKey) {
       return undefined;
     }
     return async (stateId: string, state: MapRegion): Promise<MapLayer> => {
-      const level = { state: stateId, district: null };
+      const levelKey = JSON.stringify([stateId, null]);
       const geometry = (await fetchTopology(`d|${base}|${stateId}`, () =>
         loadDistrictTopology(base, stateId)
       )) as GeometrySource;
@@ -570,10 +536,7 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
       const values =
         collectByName(districtValues ?? {}, state.label, (n) => resolveState(n)?.id ?? normalizeName(n)) ?? {};
       const match = matchNames(values, asFeatureNames(geometry, nameOf), aliases);
-      if (isStillShown(level)) {
-        districtMisses.current = { state: stateId, names: match.unmatched };
-      }
-      reportUnmatched(level, match.unmatched);
+      reportUnmatched(levelKey, match.unmatched);
       return {
         geometry,
         getId: (feature) => String(feature.properties?.id ?? nameOf(feature)),
@@ -581,27 +544,26 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
         getValue: (feature) => match.valueFor(nameOf(feature)),
       };
     };
-  }, [districtKey, base, districtValues, aliases, nameOf, fetchTopology, reportUnmatched, isStillShown]);
+  }, [options.drillDown, districtKey, base, districtValues, aliases, nameOf, fetchTopology, reportUnmatched]);
 
   const loadSubDistricts = useMemo(() => {
-    if (!subDistrictKey) {
+    if (!options.drillDown || !subDistrictKey) {
       return undefined;
     }
-    return async (districtId: string, district: MapRegion): Promise<MapLayer | null> => {
-      // Captured at the start: the state we were in when this drill began.
-      const level = { state: shownRef.current.state, district: districtId };
-      const geometry = await fetchTopology(`s|${base}|${districtId}`, () =>
-        loadSubDistrictTopology(base, districtId)
-      );
+    return async (districtId: string, district: MapRegion, stateId: string): Promise<MapLayer | null> => {
+      const levelKey = JSON.stringify([stateId, districtId]);
+      const geometry = await fetchTopology(`s|${base}|${districtId}`, () => loadSubDistrictTopology(base, districtId));
       if (!geometry) {
-        reportUnmatched(level, []);
+        reportUnmatched(levelKey, []);
         return null;
       }
       // No registry one level down, so plain normalization is the most that can
       // be claimed — a rename still has to be declared in Aliases.
-      const values = collectByName(subDistrictValues, district.label, normalizeName) ?? {};
+      const byDistrict =
+        collectByName(subDistrictValues, stateId, (name) => resolveState(name)?.id ?? normalizeName(name)) ?? {};
+      const values = collectByName(byDistrict, district.label, normalizeName) ?? {};
       const match = matchNames(values, asFeatureNames(geometry, nameOf), aliases);
-      reportUnmatched(level, match.unmatched);
+      reportUnmatched(levelKey, match.unmatched);
       return {
         geometry,
         getId: (feature) => String(feature.properties?.id ?? nameOf(feature)),
@@ -609,9 +571,9 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
         getValue: (feature) => match.valueFor(nameOf(feature)),
       };
     };
-  }, [subDistrictKey, base, subDistrictValues, aliases, nameOf, fetchTopology, reportUnmatched]);
+  }, [options.drillDown, subDistrictKey, base, subDistrictValues, aliases, nameOf, fetchTopology, reportUnmatched]);
 
-  const dimClass = useMemo(() => {
+  const dimClass = (() => {
     if (pickedBand === null) {
       return undefined;
     }
@@ -622,30 +584,19 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
         filter: 'grayscale(0.7)',
       },
     });
-  }, [pickedBand, bandFills]);
-
-  const onStateChange = useCallback(
-    (stateId: string | null, state?: MapRegion) => {
-      // Changing state drops the level below it, in the renderer and here. The
-      // notice is cleared by the level effect, whatever caused the change.
-      setMapStateId(stateId);
-      setSubDistrictId(null);
-      onDrillDownChange(stateId, state);
-    },
-    [onDrillDownChange]
-  );
+  })();
 
   if (frames.length === 0 || !regionKey || !valueKey) {
     return <PanelDataErrorView fieldConfig={fieldConfig} panelId={id} data={data} needsStringField needsNumberField />;
   }
 
   return (
-    <div className={cx(themeClass, dimClass)} onKeyDown={(e) => e.key === 'Escape' && setPickedBand(null)}>
+    <div className={cx(themeClass, dimClass)} onKeyDown={(e) => e.key === 'Escape' && setPickedBandState(null)}>
       <BharatChoropleth
         data={stateRows}
         regionKey={regionKey}
         valueKey={valueKey}
-        districtValues={districtValues}
+        districtValues={options.drillDown ? districtValues : undefined}
         districts={options.drillDown}
         subDistricts={options.drillDown}
         loadDistricts={loadDistricts}
@@ -654,15 +605,16 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
         colorScale={colorScale}
         showLegend={options.showLegend && !useBands}
         showRegionValues={options.showValues}
-        drillDownId={drillDownId}
+        drillDownId={shownStateId}
+        subDistrictDrillDownId={shownDistrictId}
         onDrillDownChange={onStateChange}
-        onSubDistrictDrillDownChange={setSubDistrictId}
+        onSubDistrictDrillDownChange={onSubDistrictChange}
         ariaLabel="India choropleth of the panel query"
       />
       {useBands && ignoredBands.length > 0 && (
         <div className={noticeClass} role="status">
-          This scheme has {ramp.length} shades, so it can show{' '}
-          {maxThresholds(ramp)} band edges. Ignoring <b>{ignoredBands.join(', ')}</b>.
+          This scheme has {ramp.length} shades, so it can show {maxThresholds(ramp)} band edges. Ignoring{' '}
+          <b>{ignoredBands.join(', ')}</b>.
         </div>
       )}
       {unmatched.length > 0 && (
@@ -687,7 +639,13 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
                       ? `Highlight regions ${bands[bands.length - 1]} and above`
                       : `Highlight regions ${bands[i - 1]} to ${bands[i]}`
                 }
-                onClick={() => setPickedBand((current) => (current === i ? null : i))}
+                onClick={() =>
+                  setPickedBandState((current) =>
+                    current?.key === bandSelectionKey && current.index === i
+                      ? null
+                      : { key: bandSelectionKey, index: i }
+                  )
+                }
               />
               {i < bands.length && <b>{bands[i]}</b>}
             </Fragment>

@@ -96,9 +96,10 @@ describe('collectByName', () => {
   it('merges every spelling of the same place', () => {
     const registry: Record<string, string> = { orissa: 'odisha', odisha: 'odisha' };
     const viaRegistry = (n: string) => registry[normalizeName(n)] ?? normalizeName(n);
-    expect(
-      collectByName({ Orissa: { Khordha: 1 }, 'Odisha ': { Cuttack: 2 } }, 'Odisha', viaRegistry)
-    ).toEqual({ Khordha: 1, Cuttack: 2 });
+    expect(collectByName({ Orissa: { Khordha: 1 }, 'Odisha ': { Cuttack: 2 } }, 'Odisha', viaRegistry)).toEqual({
+      Khordha: 1,
+      Cuttack: 2,
+    });
   });
 
   // matchNames tries the separator-free form, so this must too, or a name
@@ -130,13 +131,13 @@ describe('collectByName keeps query data off the prototype', () => {
 
   it('reports such a district as unmatched when no region answers to it', () => {
     const values = { Rajasthan: Object.assign(Object.create(null), { ['__proto__']: 7 }) };
-    const found = collectByName(values, 'Rajasthan', canonical) ?? {};
+    const found = collectByName<number>(values, 'Rajasthan', canonical) ?? {};
     expect(matchNames(found, ['Ajmer']).unmatched).toEqual(['__proto__']);
   });
 
   it('lets an alias rescue it, as the option promises', () => {
     const values = { Rajasthan: Object.assign(Object.create(null), { ['__proto__']: 7 }) };
-    const found = collectByName(values, 'Rajasthan', canonical) ?? {};
+    const found = collectByName<number>(values, 'Rajasthan', canonical) ?? {};
     const match = matchNames(found, ['Ajmer'], parseAliases('__proto__ = Ajmer'));
     expect(match.valueFor('Ajmer')).toBe(7);
     expect(match.unmatched).toEqual([]);

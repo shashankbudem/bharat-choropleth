@@ -13,6 +13,7 @@ export interface RowKeys {
 }
 
 export type ValuesByParent = Record<string, Record<string, number>>;
+export type ValuesByGrandparent = Record<string, ValuesByParent>;
 
 /**
  * A map whose keys come from query data, so it must have no prototype.
@@ -31,8 +32,8 @@ export interface SplitRows {
   stateRows: Array<Record<string, unknown>>;
   /** District values, nested under the state they belong to. */
   districtValues: ValuesByParent | undefined;
-  /** Sub-district values, nested under their district. */
-  subDistrictValues: ValuesByParent;
+  /** Sub-district values, nested under state and then district. */
+  subDistrictValues: ValuesByGrandparent;
 }
 
 function text(value: unknown): string {
@@ -48,14 +49,14 @@ function text(value: unknown): string {
  * nothing.
  */
 export function splitRows(rows: ReadonlyArray<Record<string, unknown>>, keys: RowKeys): SplitRows {
-  const empty: ValuesByParent = bare();
+  const empty: ValuesByGrandparent = bare();
   if (!keys.districtKey) {
     return { stateRows: [...rows], districtValues: undefined, subDistrictValues: empty };
   }
 
   const stateRows: Array<Record<string, unknown>> = [];
   const districtValues: ValuesByParent = bare();
-  const subDistrictValues: ValuesByParent = bare();
+  const subDistrictValues: ValuesByGrandparent = bare();
 
   for (const row of rows) {
     const state = text(row[keys.regionKey]);
@@ -71,7 +72,8 @@ export function splitRows(rows: ReadonlyArray<Record<string, unknown>>, keys: Ro
       continue;
     }
     if (sub) {
-      (subDistrictValues[district] ??= bare())[sub] = value;
+      const districts = (subDistrictValues[state] ??= bare());
+      (districts[district] ??= bare())[sub] = value;
     } else {
       (districtValues[state] ??= bare())[district] = value;
     }

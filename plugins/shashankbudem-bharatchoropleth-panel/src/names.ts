@@ -139,18 +139,18 @@ export function matchNames(
  * `canonicalOf` decides what "same place" means: the state registry one level up,
  * plain normalization below it, where no registry exists.
  */
-export function collectByName(
-  values: Readonly<Record<string, Readonly<Record<string, number>>>>,
+export function collectByName<T>(
+  values: Readonly<Record<string, Readonly<Record<string, T>>>>,
   wanted: string,
   canonicalOf: (name: string) => string
-): Record<string, number> | undefined {
+): Record<string, T> | undefined {
   const target = canonicalOf(wanted);
   const wantedForms = new Set([target, compact(target)]);
   // ponytail: a child key present under two spellings of the parent resolves to
   // whichever row the query returned last, silently. Deterministic for a fixed
   // row order, but a query with no ORDER BY can flip it. Reporting the clash
   // needs a second channel out of here — worth it if anyone hits it.
-  let found: Record<string, number> | undefined;
+  let found: Record<string, T> | undefined;
   // Own properties only — `values.constructor` is a function, not a district.
   for (const [key, value] of Object.entries(values)) {
     const canonical = canonicalOf(key);
@@ -160,7 +160,7 @@ export function collectByName(
       // later — a district named `__proto__` hit the inherited setter, its value
       // vanished, and it was not even reported as unmatched, so the documented
       // alias escape hatch could not recover it.
-      found = Object.assign(found ?? (Object.create(null) as Record<string, number>), value);
+      found = Object.assign(found ?? (Object.create(null) as Record<string, T>), value);
     }
   }
   return found;

@@ -78,8 +78,7 @@ async function activate(page: Page, name: string) {
 const varState = (page: Page) => new URL(page.url()).searchParams.get('var-state');
 const breadcrumb = (page: Page) =>
   page.evaluate(
-    () =>
-      document.querySelector('.india-choropleth__breadcrumb')?.textContent?.replace(/\s+/g, ' ').trim() ?? null
+    () => document.querySelector('.india-choropleth__breadcrumb')?.textContent?.replace(/\s+/g, ' ').trim() ?? null
   );
 
 test.describe('drill-down and the dashboard variable', () => {
@@ -163,6 +162,57 @@ test.describe('levels', () => {
     // Values come from the sub-district column, via the custom loader.
     expect(named.mulshi).toContain('4');
     expect(named.withData).toBeGreaterThan(0);
+  });
+
+  test('keeps state activation at the national level when drill-down is disabled', async ({
+    page,
+    readProvisionedDashboard,
+    gotoDashboardPage,
+  }) => {
+    const dashboard = await readProvisionedDashboard({ fileName: 'drill-off.json' });
+    await gotoDashboardPage({ uid: dashboard.uid });
+    await waitForRegions(page, 8);
+
+    await activate(page, 'Maharashtra');
+    await page.waitForTimeout(800);
+
+    expect(await breadcrumb(page)).toBe('All states');
+  });
+
+  test('restores the correct unmatched notice after a cached external state switch', async ({
+    page,
+    readProvisionedDashboard,
+    gotoDashboardPage,
+  }) => {
+    const dashboard = await readProvisionedDashboard({ fileName: 'unmatched-switch.json' });
+    const queryParams = new URLSearchParams({ 'var-state': 'Maharashtra' });
+    await gotoDashboardPage({ uid: dashboard.uid, queryParams });
+    await waitForLevel(page, 'Maharashtra');
+    await expect(page.getByRole('status')).toContainText('Imaginary District');
+
+    const stateVariable = page.getByRole('textbox', { name: /State|Enter value/i });
+    await stateVariable.fill('Karnataka');
+    await stateVariable.press('Enter');
+    await waitForLevel(page, 'Karnataka');
+    await activate(page, 'Bengaluru (Urban)');
+    await waitForLevel(page, 'Bengaluru (Urban)');
+
+    await stateVariable.fill('Maharashtra');
+    await stateVariable.press('Enter');
+    await waitForLevel(page, 'Maharashtra');
+
+    await expect(page.getByRole('status')).toContainText('Imaginary District');
+  });
+
+  test('stays inside a narrow dashboard viewport', async ({ page, readProvisionedDashboard, gotoDashboardPage }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    const dashboard = await readProvisionedDashboard({ fileName: 'drill-off.json' });
+    await gotoDashboardPage({ uid: dashboard.uid });
+    await waitForRegions(page, 8);
+
+    await expect(page.getByRole('group', { name: 'India choropleth of the panel query' })).toBeVisible();
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
   });
 });
 
