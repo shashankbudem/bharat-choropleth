@@ -1,5 +1,6 @@
 {
-  "name": "bharat-choropleth",
+  "name": "shashankbudem-bharatchoropleth-panel",
+  "private": true,
   "version": "0.1.0",
   "scripts": {
     "build": "webpack -c ./webpack.config.ts --env production",
