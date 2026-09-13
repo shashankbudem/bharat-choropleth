@@ -1,0 +1,95 @@
+# Mirror the Grafana panel into its own repository.
+#
+# shashankbudem/shashankbudem-bharatchoropleth-panel is a publishing mirror, not
+# a fork: this repository is the source of truth, and anything committed only
+# over there is overwritten the next time this runs. The mirror exists because
+# the Grafana catalog wants a plugin it can review and build on its own.
+#
+# The export is verified before it is pushed. A mirror nobody watches is exactly
+# where a broken build hides, so this refuses to publish a tree that does not
+# compile rather than leaving that to be discovered downstream.
+name: Sync standalone panel repository
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'plugins/shashankbudem-bharatchoropleth-panel/**'
+      - 'data/generated/current-2019-states/**'
+      - 'data/generated/current-2019-districts/**'
+      - 'data/generated/current-2019-subdistricts/**'
+      - 'scripts/export-standalone-panel.sh'
+      - '.github/workflows/sync-standalone-panel.yml'
+  workflow_dispatch:
+
+# Two pushes in quick succession would otherwise race to write the same branch.
+concurrency:
+  group: sync-standalone-panel
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out this repository
+        uses: actions/checkout@v4
+
+      - name: Check the mirror token is present
+        env:
+          TOKEN: ${{ secrets.STANDALONE_PANEL_TOKEN }}
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "::error::STANDALONE_PANEL_TOKEN is not set. Create a fine-grained token with" \
+                 "Contents: read and write on shashankbudem-bharatchoropleth-panel and add it as" \
+                 "a repository secret. Until then the mirror will not be updated."
+            exit 1
+          fi
+
+      - name: Check out the mirror
+        uses: actions/checkout@v4
+        with:
+          repository: shashankbudem/shashankbudem-bharatchoropleth-panel
+          token: ${{ secrets.STANDALONE_PANEL_TOKEN }}
+          path: mirror
+          fetch-depth: 0
+
+      - name: Build the export
+        run: ./scripts/export-standalone-panel.sh mirror
+
+      - name: Verify the export compiles before publishing it
+        working-directory: mirror
+        run: |
+          npm ci --no-audit --no-fund
+          npx tsc --noEmit -p .
+          npx jest --ci
+          npm run build
+          test -f dist/plugin.json
+          # The plugin serves its own boundaries; shipping none looks healthy
+          # until someone opens a map.
+          topologies=$(find dist/data -name '*.topo.json' | wc -l | tr -d ' ')
+          echo "topologies in dist: $topologies"
+          [ "$topologies" -gt 700 ]
+
+      - name: Push if anything changed
+        working-directory: mirror
+        env:
+          SOURCE_SHA: ${{ github.sha }}
+          SOURCE_REPO: ${{ github.repository }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # node_modules and dist are produced by the verification step above and
+          # are ignored by the mirror's .gitignore, but be explicit.
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Mirror already matches ${SOURCE_SHA}."
+            exit 0
+          fi
+          git commit -m "Sync from ${SOURCE_REPO}@${SOURCE_SHA:0:7}
+
+          Mirrored by .github/workflows/sync-standalone-panel.yml. This repository
+          is generated from the monorepo; commit changes there, not here.
+
+          Source: https://github.com/${SOURCE_REPO}/commit/${SOURCE_SHA}"
+          git push origin HEAD:main
+          echo "Pushed to the mirror."

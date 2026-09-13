@@ -12,7 +12,8 @@
     "lint:fix": "npm run lint -- --fix && prettier --write --list-different .",
     "e2e": "playwright test",
     "server": "docker compose up --build",
-    "sign": "sign-plugin"
+    "sign": "sign-plugin",
+    "sync:geometry": "./scripts/sync-geometry.sh"
   },
   "author": "Shashankbudem",
   "license": "Apache-2.0",

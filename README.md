@@ -53,14 +53,19 @@ The Flutter example's boundary assets are generated data and are not committed, 
 
 ## Availability
 
-Version `0.3.0` is published for all four packages.
+The packages are versioned independently — a fix in one does not oblige the
+others to move — so check the registry rather than assuming they match.
 
 | Target | Package | Registry | Source |
 | --- | --- | --- | --- |
-| React | [`bharat-choropleth@0.3.0`](https://www.npmjs.com/package/bharat-choropleth) | npm | [`packages/react`](./packages/react) |
-| Plain JavaScript | [`bharat-choropleth-js@0.3.0`](https://www.npmjs.com/package/bharat-choropleth-js) | npm | [`packages/js`](./packages/js) |
+| React | [`bharat-choropleth@0.3.1`](https://www.npmjs.com/package/bharat-choropleth) | npm | [`packages/react`](./packages/react) |
+| Plain JavaScript | [`bharat-choropleth-js@0.3.1`](https://www.npmjs.com/package/bharat-choropleth-js) | npm | [`packages/js`](./packages/js) |
 | Flutter | [`bharat_choropleth@0.3.0`](https://pub.dev/packages/bharat_choropleth) | pub.dev | [`packages/flutter`](./packages/flutter) |
 | Python | [`bharat-choropleth@0.3.0`](https://pypi.org/project/bharat-choropleth/) | PyPI | [`packages/python`](./packages/python) |
+
+The Grafana panel is released separately as
+[`shashankbudem-bharatchoropleth-panel`](https://github.com/shashankbudem/shashankbudem-bharatchoropleth-panel),
+which vendors its own copy of the boundaries so it installs without this repository.
 
 Install with:
 
@@ -122,7 +127,7 @@ For plain JavaScript — or any framework that can load a plain JS library — [
 
 ```html
 <div id="map"></div>
-<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js@0.3.0"></script>
+<script src="https://cdn.jsdelivr.net/npm/bharat-choropleth-js@0.3.1"></script>
 <script>
   var map = new BharatChoropleth("#map");
   map.fontColor = "maroon";
@@ -326,4 +331,4 @@ pnpm prepare:flutter-assets
 
 ## Release status
 
-All four packages are published at `0.3.0` — see [Availability](#availability) for the registry links. Future releases follow the [publishing guide](./docs/PUBLISHING.md); increment a package's version before publishing because registries do not permit reusing one, and run `pnpm verify:data-pin` so the release does not repeat the 0.2.0 mistake of shipping a renderer whose default data source predates the level it renders. The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.
+The JavaScript packages are published at `0.3.1`, and the Flutter and Python ones at `0.3.0` — see [Availability](#availability) for the registry links, and trust the registry over this sentence. Future releases follow the [publishing guide](./docs/PUBLISHING.md); increment a package's version before publishing because registries do not permit reusing one, and run `pnpm verify:data-pin` so the release does not repeat the 0.2.0 mistake of shipping a renderer whose default data source predates the level it renders. The boundary datasets are deliberately not published as a single generic dependency: preserve each generated bundle's manifest, source attribution and licence when redistributing it.

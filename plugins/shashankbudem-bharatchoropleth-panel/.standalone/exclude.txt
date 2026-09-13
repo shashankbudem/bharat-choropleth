@@ -1,0 +1,19 @@
+# Paths not carried into the standalone plugin repository, one rsync pattern per
+# line. Agent instructions and editor scratch are internal; the two workflows
+# below are monorepo-wide; the rest is build output or test residue.
+.git/
+.claude/
+.codex/
+.standalone/
+AGENTS.md
+CLAUDE.md
+GEMINI.md
+node_modules/
+dist/
+coverage/
+test-results/
+playwright-report/
+playwright/
+.eslintcache
+.github/workflows/cp-update.yml
+.github/workflows/bundle-stats.yml
