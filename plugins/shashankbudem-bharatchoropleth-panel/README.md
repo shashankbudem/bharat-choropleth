@@ -4,6 +4,16 @@ An India choropleth for Grafana: 36 states & UTs, drilling into 788 districts an
 5,950 sub-districts, with each level's boundary geometry fetched only when you
 open it. Wraps [`bharat-choropleth`](https://github.com/shashankbudem/bharat-choropleth).
 
+## Releasing
+
+Releases are cut from
+[shashankbudem/shashankbudem-bharatchoropleth-panel](https://github.com/shashankbudem/shashankbudem-bharatchoropleth-panel),
+not from this repository, so there is exactly one zip and one SHA1 per version
+for a Grafana reviewer or an installer to choose between. That repository is a
+mirror of this directory — `.github/workflows/sync-standalone-panel.yml` pushes
+to it on every change here — so commit the change here and let it flow, rather
+than editing over there where the next sync will overwrite it.
+
 ## Shape your query like this
 
 The panel tells the two levels apart by a **district column**, never by which
