@@ -286,20 +286,26 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
     return names;
   }, [frames]);
 
-  const missingFields = useMemo(
-    () =>
-      (
-        [
-          ['Region field', options.regionField],
-          ['District field', options.districtField],
-          ['Sub-district field', options.subDistrictField],
-          ['Value field', options.valueField],
-        ] as const
-      )
-        .filter(([, name]) => name && !columnNames.has(name))
-        .map(([label, name]) => `${label} \u201c${name}\u201d`),
-    [columnNames, options.regionField, options.districtField, options.subDistrictField, options.valueField]
-  );
+  const missingFields = useMemo(() => {
+    // Nothing to compare against. A query that failed, or returned before its
+    // schema was known, carries no columns at all — and every configured field
+    // then looks missing, so the panel blamed the field mapping for what is
+    // really an absence of data. Let it fall through to "No data" instead: that
+    // sends the reader to the query, which is where the problem is.
+    if (columnNames.size === 0) {
+      return [];
+    }
+    return (
+      [
+        ['Region field', options.regionField],
+        ['District field', options.districtField],
+        ['Sub-district field', options.subDistrictField],
+        ['Value field', options.valueField],
+      ] as const
+    )
+      .filter(([, name]) => name && !columnNames.has(name))
+      .map(([label, name]) => `${label} \u201c${name}\u201d`);
+  }, [columnNames, options.regionField, options.districtField, options.subDistrictField, options.valueField]);
 
   /**
    * Every frame's rows, flattened.
