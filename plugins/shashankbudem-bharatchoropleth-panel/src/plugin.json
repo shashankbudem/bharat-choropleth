@@ -9,11 +9,14 @@
       "map",
       "choropleth",
       "india",
-      "geo"
+      "geo",
+      "districts",
+      "drilldown"
     ],
-    "description": "Accessible India choropleth: 36 states & UTs, 788 districts and 5,950 sub-districts, each level loaded on demand.",
+    "description": "Choropleth map of India for Grafana: 36 states and union territories, 788 districts and 5,950 sub-districts, with click-through drill-down. Boundaries ship with the plugin, so it works offline.",
     "author": {
-      "name": "Shashankbudem"
+      "name": "Shashank Budem",
+      "url": "https://github.com/shashankbudem"
     },
     "logos": {
       "small": "img/logo.svg",
@@ -25,11 +28,32 @@
         "url": "https://github.com/shashankbudem/bharat-choropleth"
       },
       {
+        "name": "Documentation",
+        "url": "https://github.com/shashankbudem/bharat-choropleth/tree/main/plugins/shashankbudem-bharatchoropleth-panel#readme"
+      },
+      {
+        "name": "Report an issue",
+        "url": "https://github.com/shashankbudem/bharat-choropleth/issues"
+      },
+      {
         "name": "License",
         "url": "https://github.com/shashankbudem/bharat-choropleth/blob/main/LICENSE"
       }
     ],
-    "screenshots": [],
+    "screenshots": [
+      {
+        "name": "States, coloured by value",
+        "path": "img/screenshot-states.png"
+      },
+      {
+        "name": "Drilled into a state's districts",
+        "path": "img/screenshot-districts.png"
+      },
+      {
+        "name": "Fixed bands, with a filtering legend",
+        "path": "img/screenshot-bands.png"
+      }
+    ],
     "version": "%VERSION%",
     "updated": "%TODAY%"
   },
