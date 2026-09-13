@@ -9,7 +9,10 @@ open it. Wraps [`bharat-choropleth`](https://github.com/shashankbudem/bharat-cho
 Releases are cut from
 [shashankbudem/shashankbudem-bharatchoropleth-panel](https://github.com/shashankbudem/shashankbudem-bharatchoropleth-panel),
 not from this repository, so there is exactly one zip and one SHA1 per version
-for a Grafana reviewer or an installer to choose between. That repository is a
+for a Grafana reviewer or an installer to choose between. Tag it `v1.0.1` there —
+plain, unprefixed — and `.github/workflows/release.yml` builds the zip and
+attaches it to a release. The existing `panel-v1.0.0` tag predates that and is
+matched too, so the old form still works; new tags do not need the prefix. That repository is a
 mirror of this directory — `.github/workflows/sync-standalone-panel.yml` pushes
 to it on every change here — so commit the change here and let it flow, rather
 than editing over there where the next sync will overwrite it.

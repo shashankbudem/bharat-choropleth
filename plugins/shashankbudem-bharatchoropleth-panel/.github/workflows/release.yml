@@ -2,10 +2,20 @@
 # (For more information, see https://github.com/grafana/plugin-actions/blob/main/build-plugin/README.md)
 name: Release
 
+# This workflow only runs in the standalone plugin repository, which is where
+# panel releases are cut. In the monorepo it sits under plugins/ and GitHub
+# never reads it, because only .github/workflows at the repository root is live.
 on:
   push:
     tags:
-      - 'v*' # Run workflow on version tags, e.g. v1.0.0.
+      # Plain `v1.0.1` is the convention here: this repository holds one thing,
+      # so there is nothing for a prefix to disambiguate. `panel-v*` is matched
+      # too because the first release was tagged `panel-v1.0.0`, carried over
+      # from the monorepo where the prefix keeps panel tags apart from the four
+      # package ones — and a tag that looks like it publishes but silently does
+      # not is worse than matching two patterns.
+      - 'v*'
+      - 'panel-v*'
 
 permissions: read-all
 
