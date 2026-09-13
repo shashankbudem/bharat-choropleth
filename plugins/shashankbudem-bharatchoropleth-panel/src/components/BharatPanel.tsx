@@ -13,13 +13,13 @@ import {
   type MapLayer,
   type MapRegion,
 } from 'bharat-choropleth';
-import 'bharat-choropleth/style.css';
 import { BharatOptions } from '../types';
 import { bandColors, maxThresholds, parseThresholds, rampFor } from '../palettes';
 import { bandIndexOf, splitRows } from '../data';
 import { collectByName, matchNames, normalizeName, parseAliases } from '../names';
 import { asFeatureNames } from '../geometry';
 import { SettledPromiseLru } from '../promiseLru';
+import { vendorStyles } from '../vendorStyles';
 
 interface Props extends PanelProps<BharatOptions> {}
 
@@ -42,74 +42,82 @@ function useThemeVars(borderColor: string, borderWidth: number, labelColor: stri
   const theme = useTheme2();
   return useMemo(
     () =>
-      css({
-        // A column, so anything rendered after the map (the fixed-band legend)
-        // gets its own row instead of being pushed past the panel's clipped edge.
-        height: '100%',
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: 0,
-        '& .india-choropleth': {
-          flex: '1 1 auto',
-          minHeight: 0,
-          // Contain the map inside its own row.
-          //
-          // The package sizes the SVG `width: 100%; height: auto`, so in a wide
-          // panel its aspect ratio makes it taller than the space it has, and the
-          // overflow paints straight over anything below — which swallowed a band
-          // edge on the legend. Giving the SVG both dimensions lets its viewBox
-          // letterbox inside the box instead of bursting out of it.
+      css([
+        // The renderer's own stylesheet, nested rather than imported. Grafana
+        // does not allow a plugin to import CSS: that injects a global
+        // stylesheet, which would style every other panel on the dashboard too.
+        // Nesting it here scopes every rule to this class, so the map is styled
+        // and nothing outside it is touched.
+        vendorStyles,
+        {
+          // A column, so anything rendered after the map (the fixed-band legend)
+          // gets its own row instead of being pushed past the panel's clipped edge.
+          height: '100%',
           display: 'flex',
           flexDirection: 'column',
-          '& .india-choropleth__canvas': { flex: '1 1 auto', minHeight: 0 },
-          '& .india-choropleth__svg': { width: '100%', height: '100%' },
-          // One lever for all three levels: states, districts and sub-districts
-          // share a region class. `getColorByName` resolves a Grafana palette
-          // name ("green", "dark-blue") as well as a plain hex.
-          '--india-map-stroke': theme.visualization.getColorByName(borderColor),
-          '--india-map-border-width': borderWidth,
-          '--india-map-border-width-active': Math.max(1, borderWidth * 0.8),
-          '--india-map-stroke-active': theme.colors.text.primary,
-          // An empty setting follows the theme. The tooltip surface stays
-          // theme-derived either way, so a light label colour can never end up on
-          // a light card — the pairing that makes this variable easy to get wrong.
-          '--india-map-text': labelColor ? theme.visualization.getColorByName(labelColor) : theme.colors.text.primary,
-          '--india-map-muted': theme.colors.text.secondary,
-          '--india-map-empty': theme.colors.background.secondary,
-          '--india-map-line': theme.colors.border.weak,
-          // Breadcrumb links and the focus ring. The link colour is tuned for
-          // reading against the app background; primary.main is a button fill.
-          '--india-map-focus': theme.colors.text.link,
-          '--india-map-active': theme.colors.text.link,
-          '--india-map-tooltip-bg': theme.colors.background.elevated ?? theme.colors.background.secondary,
-          '--india-map-tooltip-border': theme.colors.border.medium,
-          // The package haloes on-map values in fixed white so they read over dark
-          // fills. That fights a light label colour, so track the panel instead.
-          '& .india-choropleth__region-values': {
-            stroke: theme.colors.background.primary,
-            // One size at every level. The package's own rule drops the district
-            // variant to 9px, and sub-districts reuse that class, so without the
-            // second selector the deeper levels stay small whatever is set here.
-            fontSize: `${labelSize}px`,
+          minHeight: 0,
+          '& .india-choropleth': {
+            flex: '1 1 auto',
+            minHeight: 0,
+            // Contain the map inside its own row.
+            //
+            // The package sizes the SVG `width: 100%; height: auto`, so in a wide
+            // panel its aspect ratio makes it taller than the space it has, and the
+            // overflow paints straight over anything below — which swallowed a band
+            // edge on the legend. Giving the SVG both dimensions lets its viewBox
+            // letterbox inside the box instead of bursting out of it.
+            display: 'flex',
+            flexDirection: 'column',
+            '& .india-choropleth__canvas': { flex: '1 1 auto', minHeight: 0 },
+            '& .india-choropleth__svg': { width: '100%', height: '100%' },
+            // One lever for all three levels: states, districts and sub-districts
+            // share a region class. `getColorByName` resolves a Grafana palette
+            // name ("green", "dark-blue") as well as a plain hex.
+            '--india-map-stroke': theme.visualization.getColorByName(borderColor),
+            '--india-map-border-width': borderWidth,
+            '--india-map-border-width-active': Math.max(1, borderWidth * 0.8),
+            '--india-map-stroke-active': theme.colors.text.primary,
+            // An empty setting follows the theme. The tooltip surface stays
+            // theme-derived either way, so a light label colour can never end up on
+            // a light card — the pairing that makes this variable easy to get wrong.
+            '--india-map-text': labelColor ? theme.visualization.getColorByName(labelColor) : theme.colors.text.primary,
+            '--india-map-muted': theme.colors.text.secondary,
+            '--india-map-empty': theme.colors.background.secondary,
+            '--india-map-line': theme.colors.border.weak,
+            // Breadcrumb links and the focus ring. The link colour is tuned for
+            // reading against the app background; primary.main is a button fill.
+            '--india-map-focus': theme.colors.text.link,
+            '--india-map-active': theme.colors.text.link,
+            '--india-map-tooltip-bg': theme.colors.background.elevated ?? theme.colors.background.secondary,
+            '--india-map-tooltip-border': theme.colors.border.medium,
+            // The package haloes on-map values in fixed white so they read over dark
+            // fills. That fights a light label colour, so track the panel instead.
+            '& .india-choropleth__region-values': {
+              stroke: theme.colors.background.primary,
+              // One size at every level. The package's own rule drops the district
+              // variant to 9px, and sub-districts reuse that class, so without the
+              // second selector the deeper levels stay small whatever is set here.
+              fontSize: `${labelSize}px`,
+            },
+            '& .india-choropleth__region-values--district': { fontSize: `${labelSize}px` },
+            // Make the legend fit the panel.
+            //
+            // Its swatches are sized `clamp(1.75rem, 7vw, 4.25rem)`, and `vw` is the
+            // browser window — not this panel. At any normal window width 7vw is
+            // past the 4.25rem cap, so every swatch sits at its maximum and the row
+            // is a fixed ~438px however narrow the panel is. In a dashboard that
+            // overflows and wraps, eating map height. Sharing the row with flex
+            // makes the swatches track the panel instead.
+            '& .india-choropleth__legend': {
+              flexWrap: 'nowrap',
+              gap: theme.spacing(1),
+              fontSize: theme.typography.bodySmall.fontSize,
+            },
+            '& .india-choropleth__swatches': { flex: '1 1 auto', minWidth: 0 },
+            '& .india-choropleth__swatch': { width: 'auto', flex: '1 1 0', minWidth: '6px' },
           },
-          '& .india-choropleth__region-values--district': { fontSize: `${labelSize}px` },
-          // Make the legend fit the panel.
-          //
-          // Its swatches are sized `clamp(1.75rem, 7vw, 4.25rem)`, and `vw` is the
-          // browser window — not this panel. At any normal window width 7vw is
-          // past the 4.25rem cap, so every swatch sits at its maximum and the row
-          // is a fixed ~438px however narrow the panel is. In a dashboard that
-          // overflows and wraps, eating map height. Sharing the row with flex
-          // makes the swatches track the panel instead.
-          '& .india-choropleth__legend': {
-            flexWrap: 'nowrap',
-            gap: theme.spacing(1),
-            fontSize: theme.typography.bodySmall.fontSize,
-          },
-          '& .india-choropleth__swatches': { flex: '1 1 auto', minWidth: 0 },
-          '& .india-choropleth__swatch': { width: 'auto', flex: '1 1 0', minWidth: '6px' },
         },
-      }),
+      ]),
     [theme, borderColor, borderWidth, labelColor, labelSize]
   );
 }
@@ -391,7 +399,10 @@ export const BharatPanel: React.FC<Props> = ({ options, data, fieldConfig, id })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [options.drillDownVariable, locationTick]);
 
-  const variableStateId = useMemo(() => (variableLabel ? (resolveState(variableLabel)?.id ?? null) : null), [variableLabel]);
+  const variableStateId = useMemo(
+    () => (variableLabel ? (resolveState(variableLabel)?.id ?? null) : null),
+    [variableLabel]
+  );
 
   /**
    * A variable that names nothing.

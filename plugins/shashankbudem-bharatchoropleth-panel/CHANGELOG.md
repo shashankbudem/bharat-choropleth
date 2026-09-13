@@ -1,5 +1,17 @@
 # Changelog
 
+## 1.0.2 - 2026-09-14
+
+### Fixed
+
+- The panel no longer injects a global stylesheet. It imported the renderer's
+  CSS directly, which Grafana rejects — and rightly: a global stylesheet from
+  one panel applies to every other panel on the dashboard. The same rules are
+  now nested inside the panel's own emotion class, so they style this map and
+  stop there. Verified: a `.india-choropleth` element outside the panel picks up
+  none of them, where before all 56 rules were global, and the rendered panel is
+  pixel-identical to 1.0.1.
+
 ## 1.0.1 - 2026-09-14
 
 No change to the panel. The bundle is identical to 1.0.0 apart from its version
