@@ -3,6 +3,7 @@ import { merge } from 'webpack-merge';
 import ReplaceInFileWebpackPlugin from 'replace-in-file-webpack-plugin';
 import CopyWebpackPlugin from 'copy-webpack-plugin';
 import path from 'path';
+import fs from 'fs';
 
 import grafanaConfig from './.config/webpack/webpack.config';
 import { version } from './package.json';
@@ -34,7 +35,13 @@ import { version } from './package.json';
  * ends up in the signed manifest.
  */
 const BOUNDARY_DIRS = ['current-2019-states', 'current-2019-districts', 'current-2019-subdistricts'];
-const DATA_SRC = path.resolve(__dirname, '../../data/generated');
+// Two layouts, one config. In this monorepo the geometry is generated at the
+// root; in the standalone plugin repository it is vendored beside the source so
+// a clone builds without a sibling checkout. Preferring the local copy means the
+// export to that repository does not have to patch this file — a sync that
+// rewrites code is a sync that eventually rewrites it wrong.
+const LOCAL_DATA = path.resolve(__dirname, 'data/generated');
+const DATA_SRC = fs.existsSync(LOCAL_DATA) ? LOCAL_DATA : path.resolve(__dirname, '../../data/generated');
 
 const copyBoundaries = new CopyWebpackPlugin({
   patterns: BOUNDARY_DIRS.map((dir) => ({
