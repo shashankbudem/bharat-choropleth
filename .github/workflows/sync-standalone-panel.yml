@@ -91,5 +91,27 @@ jobs:
           is generated from the monorepo; commit changes there, not here.
 
           Source: https://github.com/${SOURCE_REPO}/commit/${SOURCE_SHA}"
-          git push origin HEAD:main
-          echo "Pushed to the mirror."
+          # A raw git rejection here is opaque, and this job is the kind nobody
+          # reads until the mirror is months stale — so name the two failures
+          # that actually happen and say how to fix them.
+          # Written outside the checkout, and not piped: `git push | tee` reports
+          # tee's exit status, which is always success.
+          log="$RUNNER_TEMP/push.log"
+          if git push origin HEAD:main >"$log" 2>&1; then
+            cat "$log"
+            echo "Pushed to the mirror."
+            exit 0
+          fi
+          cat "$log"
+          if grep -q 'workflow' "$log" && grep -q 'scope' "$log"; then
+            echo "::error::The mirror token may not change workflow files. Edit it at" \
+                 "https://github.com/settings/personal-access-tokens and add 'Workflows:" \
+                 "Read and write' beside the Contents permission (a classic token needs the" \
+                 "'workflow' scope). The token value does not change, so the secret stays as is."
+          elif grep -qE 'non-fast-forward|fetch first|rejected' "$log"; then
+            echo "::error::The mirror has commits this export does not, so it was not overwritten." \
+                 "That repository is generated: commit to plugins/shashankbudem-bharatchoropleth-panel" \
+                 "here instead. To discard what is over there, delete the divergent commits in the" \
+                 "mirror and re-run this workflow."
+          fi
+          exit 1
