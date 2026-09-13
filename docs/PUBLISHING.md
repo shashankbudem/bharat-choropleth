@@ -2,6 +2,16 @@
 
 This repository ships four independently versioned libraries. They must be validated and released separately:
 
+> **The Grafana panel is not released from here.** Its releases come from
+> [shashankbudem/shashankbudem-bharatchoropleth-panel](https://github.com/shashankbudem/shashankbudem-bharatchoropleth-panel),
+> which is mirrored from `plugins/shashankbudem-bharatchoropleth-panel` by
+> `.github/workflows/sync-standalone-panel.yml`. Tag and release there, never
+> here: two releases of one plugin means two zips with two SHA1 hashes for the
+> same version, and whoever is choosing between them — a Grafana reviewer, or
+> anyone installing — has no way to tell which is meant. The panel is still
+> developed in this repository; only its distribution moved. See
+> [the panel's own notes](../plugins/shashankbudem-bharatchoropleth-panel/README.md).
+
 | Package | Directory | Registry | Command |
 | --- | --- | --- | --- |
 | React | `packages/react` | npm | `npm publish` |
