@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.0.1 - 2026-09-14
+
+No change to the panel. The bundle is identical to 1.0.0 apart from its version
+string; this release exists so that the tag, the source tree and the published
+artifact correspond exactly, which 1.0.0's did not.
+
+Since 1.0.0 the repository gained fixes that do not reach the bundle but do
+reach anyone building or reviewing it:
+
+- The development stack refused to load the plugin. It emptied
+  `GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS`, correct while the plugin was
+  privately signed and wrong for the unsigned builds distributed during catalog
+  review — Grafana skips such a plugin outright rather than warning, so the
+  panel simply never appeared.
+- Release tags did not trigger a release. The workflow matched `v*` while the
+  only tag was `panel-v1.0.0`, so tagging looked like it published and silently
+  did not. Both forms now match; plain `v1.0.1` is the convention.
+- The build reads whichever boundary layout it finds, so the monorepo and this
+  repository compile from the same webpack config.
+- The plugin carried the Grafana scaffold's Apache 2.0 licence while the project
+  is MIT. Now MIT throughout.
+
 ## 1.0.0 - 2026-09-13
 
 First release.
