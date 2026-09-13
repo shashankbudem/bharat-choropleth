@@ -44,10 +44,34 @@ export function parseThresholds(input: string): number[] {
  * are fewer thresholds than steps, so the darkest shade would never appear.
  */
 export function bandColors(ramp: readonly string[], bandCount: number): string[] {
-  if (bandCount <= 1) {
+  // Clamped to the ramp's own length. Two bands sharing a shade is not merely
+  // ugly: the legend filters by fill, so picking one band would highlight every
+  // band painted the same colour — and the map could not tell them apart either.
+  const count = Math.min(Math.max(bandCount, 1), ramp.length);
+  if (count <= 1) {
     return [ramp[ramp.length - 1] as string];
   }
-  return Array.from({ length: bandCount }, (_, i) =>
-    ramp[Math.round((i / (bandCount - 1)) * (ramp.length - 1))] as string
+  return Array.from({ length: count }, (_, i) =>
+    ramp[Math.round((i / (count - 1)) * (ramp.length - 1))] as string
   );
+}
+
+/** How many thresholds a ramp can express — one fewer than its steps. */
+export function maxThresholds(ramp: readonly string[]): number {
+  return ramp.length - 1;
+}
+
+/**
+ * The ramp a scheme name asks for, or teal.
+ *
+ * Indexing PALETTES directly and falling back with `??` looked equivalent and is
+ * not: every object answers to `toString`, `constructor` and `__proto__`, so an
+ * unknown scheme saved in a dashboard's JSON resolved to a function or to
+ * Object.prototype instead of undefined, the fallback never ran, and the panel
+ * died on `.map is not a function`. Own properties only.
+ */
+export function rampFor(name: string): readonly string[] {
+  return Object.prototype.hasOwnProperty.call(PALETTES, name)
+    ? PALETTES[name as PaletteName]
+    : PALETTES.teal;
 }

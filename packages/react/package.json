@@ -1,6 +1,6 @@
 {
   "name": "bharat-choropleth",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Accessible, dependency-light SVG choropleths for India drill-down dashboards.",
   "keywords": [
     "choropleth",
@@ -24,8 +24,13 @@
     "url": "https://github.com/shashankbudem/bharat-choropleth/issues"
   },
   "type": "module",
-  "sideEffects": ["./dist/style.css"],
-  "files": ["dist", "CHANGELOG.md"],
+  "sideEffects": [
+    "./dist/style.css"
+  ],
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",

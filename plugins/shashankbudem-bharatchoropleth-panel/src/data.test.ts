@@ -28,14 +28,11 @@ describe('splitRows', () => {
     expect(stateRows).toHaveLength(1);
     expect(stateRows[0]).toMatchObject({ state: 'Maharashtra', incidents: 412 });
     expect(districtValues).toEqual({ Maharashtra: { Pune: 37 } });
-    expect(subDistrictValues).toEqual({ Pune: { Mulshi: 4 } });
+    expect(subDistrictValues).toEqual({ Maharashtra: { Pune: { Mulshi: 4 } } });
   });
 
   it('treats a blank or whitespace district as the state’s own row', () => {
-    const { stateRows, districtValues } = splitRows(
-      [row('Goa', '', null, 72), row('Kerala', '   ', null, 259)],
-      keys
-    );
+    const { stateRows, districtValues } = splitRows([row('Goa', '', null, 72), row('Kerala', '   ', null, 259)], keys);
 
     expect(stateRows).toHaveLength(2);
     expect(districtValues).toEqual({});
@@ -75,23 +72,36 @@ describe('splitRows', () => {
   });
 
   it('ignores sub-district names when no sub-district field is configured', () => {
-    const { districtValues, subDistrictValues } = splitRows(
-      [row('Maharashtra', 'Pune', 'Mulshi', 4)],
-      { ...keys, subDistrictKey: '' }
-    );
+    const { districtValues, subDistrictValues } = splitRows([row('Maharashtra', 'Pune', 'Mulshi', 4)], {
+      ...keys,
+      subDistrictKey: '',
+    });
 
     expect(districtValues).toEqual({ Maharashtra: { Pune: 4 } });
     expect(subDistrictValues).toEqual({});
   });
 
-  it('nests sub-districts under their district, not their state', () => {
+  it('nests sub-districts under both their state and district', () => {
     const { subDistrictValues } = splitRows(
       [row('Maharashtra', 'Pune', 'Khed', 16), row('Rajasthan', 'Ajmer', 'Khed', 3)],
       keys
     );
 
     // Same sub-district name in two states must not collide into one entry.
-    expect(subDistrictValues).toEqual({ Pune: { Khed: 16 }, Ajmer: { Khed: 3 } });
+    expect(subDistrictValues).toEqual({
+      Maharashtra: { Pune: { Khed: 16 } },
+      Rajasthan: { Ajmer: { Khed: 3 } },
+    });
+  });
+
+  it('keeps identically named districts in different states isolated', () => {
+    const { subDistrictValues } = splitRows(
+      [row('Himachal Pradesh', 'Hamirpur', 'Hamirpur', 11), row('Uttar Pradesh', 'Hamirpur', 'Hamirpur', 99)],
+      keys
+    );
+
+    expect(subDistrictValues['Himachal Pradesh'].Hamirpur.Hamirpur).toBe(11);
+    expect(subDistrictValues['Uttar Pradesh'].Hamirpur.Hamirpur).toBe(99);
   });
 });
 
@@ -137,5 +147,32 @@ describe('bandIndexOf', () => {
       expect(index).toBeGreaterThanOrEqual(0);
       expect(index).toBeLessThanOrEqual(bands.length);
     }
+  });
+});
+
+// A row naming a state `__proto__` used to write through a plain {} onto
+// Object.prototype, so `({}).Ajmer === 5` for every script on the Grafana page.
+describe('splitRows does not let query data reach the prototype', () => {
+  const keys: RowKeys = {
+    regionKey: 'state',
+    districtKey: 'district',
+    subDistrictKey: 'subdistrict',
+    valueKey: 'incidents',
+  };
+
+  it.each(['__proto__', 'constructor', 'toString'])('survives a state named %s', (name) => {
+    const { districtValues } = splitRows([{ state: name, district: 'Ajmer', subdistrict: '', incidents: 5 }], keys);
+    expect(({} as Record<string, unknown>).Ajmer).toBeUndefined();
+    expect((Object as unknown as Record<string, unknown>).Ajmer).toBeUndefined();
+    expect(districtValues?.[name]).toEqual({ Ajmer: 5 });
+  });
+
+  it('survives a district named __proto__', () => {
+    const { subDistrictValues } = splitRows(
+      [{ state: 'Rajasthan', district: '__proto__', subdistrict: 'Kishangarh', incidents: 2 }],
+      keys
+    );
+    expect(({} as Record<string, unknown>).Kishangarh).toBeUndefined();
+    expect(subDistrictValues.Rajasthan['__proto__']).toEqual({ Kishangarh: 2 });
   });
 });

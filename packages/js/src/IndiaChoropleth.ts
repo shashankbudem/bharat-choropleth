@@ -261,6 +261,17 @@ export class IndiaChoropleth {
   private subDistrictGeneration = 0;
   private overlayGeneration = 0;
   private restoreFocusId: string | null = null;
+  /**
+   * The level a drill started from, so focus can land on the level it arrives at.
+   *
+   * Stepping back out has an obvious target — the region just left — and going in
+   * does not: the activated region is no longer on screen. Without one, focus fell
+   * to <body> on every drill-in, dropping a keyboard user at the top of the
+   * document. It holds the departing level rather than a flag, so a district that
+   * turns out to be a leaf and steps straight back out does not move focus at all.
+   */
+  private focusFirstFromLevel: string | null = null;
+  private emptyStatusEl: HTMLElement | null = null;
   private destroyed = false;
   // Tracks which drill-down id we've already kicked off a load attempt for — including
   // failed ones — so a render triggered by a *failed* load (which leaves `loadedDistricts`
@@ -353,8 +364,16 @@ export class IndiaChoropleth {
     this.options = { ...this.options, ...next };
     if ("drillDownId" in next && next.drillDownId !== undefined) {
       // A district id means nothing outside the state it came from, so a changed
-      // state drops the level below it.
-      if (next.drillDownId !== this.activeDrillDownId) this.setActiveSubDrillDownId(null);
+      // state drops the level below it. The host is told, because it cannot see
+      // this happen: dropping the level silently left anything mirroring it
+      // pointing at a district of the state just left. There is no prior district
+      // to hand back — it belonged to the state that is gone.
+      if (next.drillDownId !== this.activeDrillDownId) {
+        const hadSubLevel = this.activeSubDrillDownId !== null;
+        this.setActiveSubDrillDownId(null);
+        this.activeSubDrillDownId = null;
+        if (hadSubLevel) this.options.onSubDistrictDrillDownChange?.(null, undefined);
+      }
       this.activeDrillDownId = next.drillDownId;
     }
     if ("subDistrictDrillDownId" in next && next.subDistrictDrillDownId !== undefined) this.activeSubDrillDownId = next.subDistrictDrillDownId;
@@ -384,7 +403,11 @@ export class IndiaChoropleth {
     }
     const region = this.derived.stateRegions.find((candidate) => candidate.id === id);
     if (!region) return;
-    if (id !== this.activeDrillDownId) this.setActiveSubDrillDownId(null);
+    if (id !== this.activeDrillDownId) {
+      const hadSubLevel = this.activeSubDrillDownId !== null;
+      this.setActiveSubDrillDownId(null);
+      if (hadSubLevel) this.options.onSubDistrictDrillDownChange?.(null, undefined);
+    }
     this.setActiveDrillDownId(id);
     this.options.onDrillDownChange?.(id, region);
     this.renderStructure();
@@ -627,6 +650,10 @@ export class IndiaChoropleth {
           // selected, rather than opening a level with nothing in it.
           this.leafDistrictIds.add(districtId);
           this.setActiveSubDrillDownId(null);
+          // The optimistic drill unmounted the district that was activated, so
+          // focus has to be put back on it deliberately.
+          this.restoreFocusId = sourceDistrict.id;
+          this.focusFirstFromLevel = null;
           this.setActiveSelectedId(sourceDistrict.id);
           options.onSubDistrictDrillDownChange?.(null, sourceDistrict);
           this.renderStructure();
@@ -727,6 +754,7 @@ export class IndiaChoropleth {
     options.onSelectedChange?.(region, this.derived.level);
     if (this.derived.level === "state" && options.loadDistricts) {
       this.setActiveSelectedId(null);
+      this.focusFirstFromLevel = this.derived.level;
       this.setActiveDrillDownId(region.id);
       options.onDrillDownChange?.(region.id, region);
       this.renderStructure();
@@ -737,6 +765,7 @@ export class IndiaChoropleth {
     // so the drill is entered optimistically and stepped back out if it returns null.
     if (this.derived.level === "district" && options.loadSubDistricts && !this.leafDistrictIds.has(region.id)) {
       this.setActiveSelectedId(null);
+      this.focusFirstFromLevel = this.derived.level;
       this.setActiveSubDrillDownId(region.id);
       options.onSubDistrictDrillDownChange?.(region.id, region);
       this.renderStructure();
@@ -747,6 +776,7 @@ export class IndiaChoropleth {
 
   /** Steps up exactly one level, so the breadcrumb and the back button agree. */
   private goBack() {
+    this.focusFirstFromLevel = null;
     if (this.derived.level === "subdistrict") {
       const priorDistrict = this.derived.drilledDistrict ?? undefined;
       this.setActiveSubDrillDownId(null);
@@ -762,6 +792,7 @@ export class IndiaChoropleth {
 
   /** Jumps straight to the national map from any level. */
   private goToStates() {
+    this.focusFirstFromLevel = null;
     const priorState = this.derived.drilledState ?? undefined;
     const wasDrilledDistrict = this.derived.drilledDistrict ?? undefined;
     this.setActiveSubDrillDownId(null);
@@ -836,10 +867,39 @@ export class IndiaChoropleth {
 
     // Focus is restored onto the region that was just stepped out of, so it waits
     // until the level holding that region is the one being drawn.
+    this.applyPendingFocus();
+  }
+
+  /**
+   * Put focus where the last navigation left it owing.
+   *
+   * Both render paths end here — the one that draws a map and the one that draws
+   * a "nothing here" message — because a drill that lands on an empty level still
+   * has to take focus.
+   */
+  private applyPendingFocus() {
     if (this.restoreFocusId && this.derived.regions.some((region) => region.id === this.restoreFocusId)) {
       const id = this.restoreFocusId;
       this.restoreFocusId = null;
+      this.focusFirstFromLevel = null;
       this.pathRefs.get(id)?.focus();
+      return;
+    }
+    // Drilling in: the level has to have actually changed, so an optimistic drill
+    // into a leaf that steps back out leaves focus where the user put it.
+    if (!this.focusFirstFromLevel || this.focusFirstFromLevel === this.derived.level) return;
+    const first = this.derived.regions[0];
+    if (first) {
+      this.focusFirstFromLevel = null;
+      this.pathRefs.get(first.id)?.focus();
+      return;
+    }
+    // A level can arrive holding nothing. It still has to take focus, or the drill
+    // leaves a keyboard user at the top of the document with only a live region to
+    // explain it.
+    if (this.emptyStatusEl) {
+      this.focusFirstFromLevel = null;
+      this.emptyStatusEl.focus();
     }
   }
 
@@ -902,9 +962,14 @@ export class IndiaChoropleth {
     const showLoadStatus = !showSubLoadStatus && isDrillRequested
       && (!this.loadedDistricts || this.loadedDistricts.stateId !== this.activeDrillDownId || this.loadError);
     const showEmptyStatus = !showSubLoadStatus && !showLoadStatus && this.derived.regions.length === 0;
+    this.emptyStatusEl = null;
     if (showSubLoadStatus || showLoadStatus || showEmptyStatus) {
       const failed = (showSubLoadStatus && this.subLoadError) || (showLoadStatus && this.loadError);
-      const status = el("div", { class: "india-choropleth__status", role: failed ? "alert" : "status" });
+      const status = el("div", {
+        class: "india-choropleth__status",
+        role: failed ? "alert" : "status",
+        ...(showEmptyStatus ? { tabindex: "-1" } : {}),
+      });
       status.textContent = showSubLoadStatus
         ? this.subLoadError ? this.subLoadError.message
           : this.loadingDistrict ? "Loading sub-districts…" : "Sub-district data is unavailable for this district."
@@ -912,7 +977,9 @@ export class IndiaChoropleth {
           ? isSubDrillRequested ? "No sub-district data is available for this district." : "No district data is available for this state."
           : this.loadError ? this.loadError.message : this.loadingState ? "Loading districts…" : "District data is unavailable for this state.";
       this.canvasEl.append(status);
+      this.emptyStatusEl = showEmptyStatus ? status : null;
       this.applyInteractionState();
+      this.applyPendingFocus();
       return;
     }
 

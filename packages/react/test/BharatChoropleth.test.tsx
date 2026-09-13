@@ -103,6 +103,31 @@ describe("BharatChoropleth", () => {
     expect(regionLabel(/^Jammu & Kashmir,/)).toMatch(/2/);
   });
 
+  // Two rows for one region used to resolve to the last in silence, which is how
+  // a mis-shaped query becomes a believed wrong number: a state showing one of
+  // its districts' totals looks exactly like a state showing its own.
+  it("says so when two rows name the same region", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const { rerender } = render(
+      <BharatChoropleth
+        geometry={geometry}
+        data={[{ region: "Goa", value: 99 }, { region: "Goa", value: 6 }]}
+      />
+    );
+    await waitFor(() => expect(warn).toHaveBeenCalledWith(expect.stringContaining("appears in 2 rows")));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Goa"));
+    // The last row still wins — the warning is the change, not the number.
+    expect(regionLabel(/^Goa,/)).toMatch(/6/);
+    // And it stays a single warning as values move around it.
+    rerender(
+      <BharatChoropleth
+        geometry={geometry}
+        data={[{ region: "Goa", value: 98 }, { region: "Goa", value: 7 }]}
+      />
+    );
+    expect(warn.mock.calls.filter(([m]) => String(m).includes("appears in 2 rows"))).toHaveLength(1);
+  });
+
   it("ignores an unrecognized name with a single warning quoting what the caller typed, without crashing", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
     let rerender: (ui: React.ReactElement) => void = () => {};

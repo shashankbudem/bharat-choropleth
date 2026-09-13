@@ -60,6 +60,28 @@ describe("BharatChoropleth", () => {
     map.destroy();
   });
 
+  // Two spellings of one state resolved to the last in silence, which is how a
+  // mis-shaped dataset becomes a believed wrong number.
+  it("warns when two spellings in one batch name the same state", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const map = new BharatChoropleth(container, { geometry, values: { Orissa: 1, Odisha: 2 } });
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("name the same state"));
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Orissa"));
+    // The last value still wins — the warning is the change, not the number.
+    expect(map.states["Odisha"]).toBe(2);
+    map.destroy();
+  });
+
+  it("does not mistake a later update to the same state for a clash", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const map = new BharatChoropleth(container, { geometry, values: { Odisha: 1 } });
+    map.setValues({ Odisha: 2 });
+    map.setValues({ Odisha: 3 });
+    expect(warn.mock.calls.filter(([m]) => String(m).includes("name the same state"))).toHaveLength(0);
+    expect(map.states["Odisha"]).toBe(3);
+    map.destroy();
+  });
+
   it("exposes a dot-notation shortcut (slugified label) that reads/writes the same value as .states", () => {
     const map = new BharatChoropleth(container, { geometry });
     (map as unknown as Record<string, unknown>).goa = 6;

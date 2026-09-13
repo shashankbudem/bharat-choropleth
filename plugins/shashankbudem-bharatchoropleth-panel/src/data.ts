@@ -13,14 +13,27 @@ export interface RowKeys {
 }
 
 export type ValuesByParent = Record<string, Record<string, number>>;
+export type ValuesByGrandparent = Record<string, ValuesByParent>;
+
+/**
+ * A map whose keys come from query data, so it must have no prototype.
+ *
+ * A row naming a state `__proto__` writes straight through a plain `{}` onto
+ * Object.prototype — `({}).Ajmer === 5` for every script on the Grafana page,
+ * from one CSV row, silently. Nothing here ever needs inherited keys, so the
+ * chain is simply not there to reach.
+ */
+function bare<T>(): Record<string, T> {
+  return Object.create(null) as Record<string, T>;
+}
 
 export interface SplitRows {
   /** Rows that name a state and no deeper region — the state's own value. */
   stateRows: Array<Record<string, unknown>>;
   /** District values, nested under the state they belong to. */
   districtValues: ValuesByParent | undefined;
-  /** Sub-district values, nested under their district. */
-  subDistrictValues: ValuesByParent;
+  /** Sub-district values, nested under state and then district. */
+  subDistrictValues: ValuesByGrandparent;
 }
 
 function text(value: unknown): string {
@@ -36,14 +49,14 @@ function text(value: unknown): string {
  * nothing.
  */
 export function splitRows(rows: ReadonlyArray<Record<string, unknown>>, keys: RowKeys): SplitRows {
-  const empty: ValuesByParent = {};
+  const empty: ValuesByGrandparent = bare();
   if (!keys.districtKey) {
     return { stateRows: [...rows], districtValues: undefined, subDistrictValues: empty };
   }
 
   const stateRows: Array<Record<string, unknown>> = [];
-  const districtValues: ValuesByParent = {};
-  const subDistrictValues: ValuesByParent = {};
+  const districtValues: ValuesByParent = bare();
+  const subDistrictValues: ValuesByGrandparent = bare();
 
   for (const row of rows) {
     const state = text(row[keys.regionKey]);
@@ -59,9 +72,10 @@ export function splitRows(rows: ReadonlyArray<Record<string, unknown>>, keys: Ro
       continue;
     }
     if (sub) {
-      (subDistrictValues[district] ??= {})[sub] = value;
+      const districts = (subDistrictValues[state] ??= bare());
+      (districts[district] ??= bare())[sub] = value;
     } else {
-      (districtValues[state] ??= {})[district] = value;
+      (districtValues[state] ??= bare())[district] = value;
     }
   }
 

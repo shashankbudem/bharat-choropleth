@@ -1,5 +1,31 @@
 # Changelog
 
+## 0.3.1 - 2026-09-13
+
+### Fixed
+
+- Drilling in no longer loses keyboard focus. Stepping back out had an obvious
+  target — the region just left — and going in had none, so focus fell to
+  `<body>` on every drill-down, dropping a keyboard user at the top of the
+  document. Focus now lands on the first region of the level entered; on the
+  message when that level holds nothing; and back on the district itself when
+  an optimistic drill turns out to be a leaf, which had unmounted the region
+  under the cursor.
+- Changing the state now tells the host that the sub-district level was dropped.
+  The map clears that level itself and fired no `onSubDistrictDrillDownChange`,
+  so anything mirroring the level kept pointing at a district of the state just
+  left — the wrong level, against the wrong map. There is no prior district to
+  hand back, because it belonged to the state that is gone, so the callback
+  receives `(null, undefined)`.
+- Two spellings of one state in a single batch now warn instead of resolving in
+  silence. `{ Orissa: 1, Odisha: 2 }` quietly kept the last; that silence is how
+  a mis-shaped dataset becomes a believed wrong number. The last value still
+  wins — changing that would move numbers under existing callers — and updating
+  a state later is not mistaken for a clash.
+- Legend swatches size from the legend row rather than the viewport. `vw`
+  measures the browser window, so in any embed narrower than the page the
+  swatches pinned to their maximum and overflowed the map they belong to.
+
 ## 0.3.0 - 2026-09-05
 
 ### Fixed

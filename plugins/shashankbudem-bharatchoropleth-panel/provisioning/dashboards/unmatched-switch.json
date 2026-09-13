@@ -1,0 +1,55 @@
+{
+  "uid": "bharat-unmatched-switch",
+  "title": "Bharat Choropleth unmatched state switch",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": true,
+  "time": { "from": "now-6h", "to": "now" },
+  "templating": {
+    "list": [
+      {
+        "name": "state",
+        "type": "textbox",
+        "label": "State",
+        "query": "",
+        "current": { "text": "Maharashtra", "value": "Maharashtra" }
+      }
+    ]
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "shashankbudem-bharatchoropleth-panel",
+      "title": "Unmatched switch fixture",
+      "gridPos": { "h": 18, "w": 24, "x": 0, "y": 0 },
+      "datasource": { "type": "testdata", "uid": "trlxrdZVk" },
+      "targets": [
+        {
+          "refId": "A",
+          "scenarioId": "csv_content",
+          "csvContent": "state,district,subdistrict,incidents\nMaharashtra,,,412\nKarnataka,,,388\nMaharashtra,Pune,,37\nMaharashtra,Imaginary District,,9\nKarnataka,Bengaluru (Urban),,40\nKarnataka,Bengaluru (Urban),Bangalore North,14\n"
+        }
+      ],
+      "options": {
+        "regionField": "state",
+        "districtField": "district",
+        "subDistrictField": "subdistrict",
+        "valueField": "incidents",
+        "drillDown": true,
+        "drillDownVariable": "state",
+        "palette": "teal",
+        "scaleMode": "relative",
+        "thresholds": "",
+        "districtThresholds": "",
+        "subDistrictThresholds": "",
+        "borderColor": "#FFFFFF",
+        "labelColor": "text",
+        "borderWidth": 2.5,
+        "labelSize": 11,
+        "showLegend": true,
+        "showValues": false,
+        "dataBaseUrl": ""
+      }
+    }
+  ]
+}

@@ -118,3 +118,50 @@ export function matchNames(
     },
   };
 }
+
+/**
+ * Gather every entry whose key names the same place as `wanted`.
+ *
+ * The values map is keyed by whatever the query wrote; the caller asks using the
+ * name the *geometry* uses. Those differ constantly — `Orissa` against `Odisha`,
+ * `pune-city` against `Pune City` — and an exact lookup quietly returned nothing,
+ * which switched off aliases and the unmatched notice for that whole level.
+ *
+ * Every match is merged rather than the first one winning. A query can spell one
+ * state two ways across its rows, and returning only the first spelling's
+ * districts dropped the rest with no notice anywhere — wrong data under the
+ * right name, which is the one outcome this file exists to prevent.
+ *
+ * Keys are compared by `canonicalOf` and by its separator-free form, the same
+ * pair `matchNames` tries. Without the second, a level could match a name that
+ * the level above had refused to find.
+ *
+ * `canonicalOf` decides what "same place" means: the state registry one level up,
+ * plain normalization below it, where no registry exists.
+ */
+export function collectByName<T>(
+  values: Readonly<Record<string, Readonly<Record<string, T>>>>,
+  wanted: string,
+  canonicalOf: (name: string) => string
+): Record<string, T> | undefined {
+  const target = canonicalOf(wanted);
+  const wantedForms = new Set([target, compact(target)]);
+  // ponytail: a child key present under two spellings of the parent resolves to
+  // whichever row the query returned last, silently. Deterministic for a fixed
+  // row order, but a query with no ORDER BY can flip it. Reporting the clash
+  // needs a second channel out of here — worth it if anyone hits it.
+  let found: Record<string, T> | undefined;
+  // Own properties only — `values.constructor` is a function, not a district.
+  for (const [key, value] of Object.entries(values)) {
+    const canonical = canonicalOf(key);
+    if (wantedForms.has(canonical) || wantedForms.has(compact(canonical))) {
+      // The target is prototype-free for the same reason splitRows' maps are:
+      // these keys are query data. A plain {} here put the chain back one step
+      // later — a district named `__proto__` hit the inherited setter, its value
+      // vanished, and it was not even reported as unmatched, so the documented
+      // alias escape hatch could not recover it.
+      found = Object.assign(found ?? (Object.create(null) as Record<string, T>), value);
+    }
+  }
+  return found;
+}

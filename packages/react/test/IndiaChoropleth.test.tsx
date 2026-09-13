@@ -190,6 +190,94 @@ describe("IndiaChoropleth", () => {
     expect(onInspect).toHaveBeenCalledWith(expect.objectContaining({ label: "Alpha" }), "state");
   });
 
+  // Going back has an obvious focus target; going in does not, and without one
+  // focus fell to <body>, dropping a keyboard user at the top of the document.
+  it("moves focus into the level it drills into", async () => {
+    render(<IndiaChoropleth states={stateLayer} loadDistricts={async () => districtLayer} />);
+    const alpha = screen.getByRole("button", { name: /alpha, 42/i });
+    alpha.focus();
+    expect(alpha).toHaveFocus();
+
+    fireEvent.click(alpha);
+    const delta = await screen.findByRole("button", { name: /delta, 9/i });
+    await waitFor(() => expect(document.activeElement).not.toBe(document.body));
+    expect(delta).toHaveFocus();
+  });
+
+  // A level can load successfully and still hold nothing. Focus has to land on
+  // the message saying so, or the drill drops the user at the top of the page.
+  it("moves focus to the message when the level it enters is empty", async () => {
+    const emptyLayer: MapLayer = { ...stateLayer, geometry: { type: "FeatureCollection", features: [] } };
+    render(<IndiaChoropleth states={stateLayer} loadDistricts={async () => emptyLayer} />);
+    const alpha = screen.getByRole("button", { name: /alpha, 42/i });
+    alpha.focus();
+    fireEvent.click(alpha);
+
+    const status = await screen.findByText(/no district data is available/i);
+    await waitFor(() => expect(status).toHaveFocus());
+    expect(document.activeElement).not.toBe(document.body);
+  });
+
+  // An optimistic drill into a district with nothing under it steps straight back
+  // out, so focus must stay where the user left it.
+  it("leaves focus alone when a drill turns out to be a leaf", async () => {
+    render(
+      <IndiaChoropleth
+        states={stateLayer}
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => null}
+      />
+    );
+    fireEvent.click(screen.getByRole("button", { name: /alpha, 42/i }));
+    const delta = await screen.findByRole("button", { name: /delta, 9/i });
+    delta.focus();
+    fireEvent.click(delta);
+    await waitFor(() => expect(screen.getByRole("button", { name: /delta, 9/i })).toBeInTheDocument());
+    expect(screen.getByRole("button", { name: /delta, 9/i })).toHaveFocus();
+  });
+
+  // The component drops the sub level when the state changes. It used to do that
+  // in silence, so anything mirroring the level kept pointing at a district of
+  // the state just left — the wrong level, reported against the wrong map.
+  it("tells the host when changing state drops the sub-district level", async () => {
+    const onSubDistrictDrillDownChange = vi.fn();
+    const { rerender } = render(
+      <IndiaChoropleth
+        states={stateLayer}
+        drillDownId="27"
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => districtLayer}
+        onSubDistrictDrillDownChange={onSubDistrictDrillDownChange}
+      />
+    );
+    fireEvent.click(await screen.findByRole("button", { name: /delta, 9/i }));
+    await waitFor(() => expect(onSubDistrictDrillDownChange).toHaveBeenCalledWith("D1", expect.anything()));
+
+    onSubDistrictDrillDownChange.mockClear();
+    rerender(
+      <IndiaChoropleth
+        states={stateLayer}
+        drillDownId="29"
+        loadDistricts={async () => districtLayer}
+        loadSubDistricts={async () => districtLayer}
+        onSubDistrictDrillDownChange={onSubDistrictDrillDownChange}
+      />
+    );
+    await waitFor(() => expect(onSubDistrictDrillDownChange).toHaveBeenCalledWith(null, undefined));
+  });
+
+  // Dropping control used to hand back whatever the uncontrolled slot held
+  // before control began, which could be many interactions stale.
+  it("keeps what is on screen when the host stops controlling the drill-down", async () => {
+    const { rerender } = render(
+      <IndiaChoropleth states={stateLayer} drillDownId="27" loadDistricts={async () => districtLayer} />
+    );
+    expect(await screen.findByRole("button", { name: /delta, 9/i })).toBeInTheDocument();
+
+    rerender(<IndiaChoropleth states={stateLayer} loadDistricts={async () => districtLayer} />);
+    expect(await screen.findByRole("button", { name: /delta, 9/i })).toBeInTheDocument();
+  });
+
   it("loads districts only after a state activation and supports breadcrumb return", async () => {
     const loadDistricts = vi.fn(async () => districtLayer);
     const onDrillDownChange = vi.fn();
