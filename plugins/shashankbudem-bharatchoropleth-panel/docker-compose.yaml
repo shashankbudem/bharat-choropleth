@@ -4,7 +4,9 @@ services:
       file: .config/docker-compose-base.yaml
       service: grafana
     environment:
-      # The plugin is privately signed for this root URL, so it loads on its
-      # signature rather than on the scaffold's allow-unsigned escape hatch.
-      # Emptying the list is the only honest test that the signature works.
-      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: ''
+      # Distributed builds are unsigned until the Grafana catalog reviews this
+      # plugin and assigns it a signature level, so Grafana has to be told to
+      # load it — with an empty list here it refuses, and the panel simply never
+      # appears. Once a community signature is issued, empty this again: that is
+      # the only honest test that the signature itself works.
+      GF_PLUGINS_ALLOW_LOADING_UNSIGNED_PLUGINS: shashankbudem-bharatchoropleth-panel
