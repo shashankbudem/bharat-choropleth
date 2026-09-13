@@ -37,6 +37,28 @@ so refresh it only with:
 npm run sync:geometry ../bharat-choropleth
 ```
 
+## Releasing
+
+This is where panel releases are cut, so there is exactly one zip and one SHA1
+per version for a Grafana reviewer or an installer to choose between. Tag it
+plain — no prefix, this repository holds one thing — and
+`.github/workflows/release.yml` builds the artifact and attaches it to a
+release:
+
+```bash
+git tag v1.0.1
+git push origin v1.0.1
+```
+
+The first release is tagged `panel-v1.0.0`, from before this repository was
+split out; that form still triggers the workflow, so the existing download URL
+keeps working.
+
+Do not edit files here to prepare a release. This repository is generated from
+`plugins/shashankbudem-bharatchoropleth-panel` in the monorepo and the next sync
+overwrites anything committed directly — change the version and CHANGELOG
+upstream, let the sync carry them, then tag here.
+
 ## Developing
 
 ```bash
