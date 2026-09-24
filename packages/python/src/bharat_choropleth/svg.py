@@ -12,6 +12,11 @@ from .states import normalize_state_key, resolve_state
 from .topojson import Feature, TopologyInput, decode_topology
 
 FeatureInput = Sequence[Feature]
+
+# Numbers each rendered map, so several on one page — a notebook shows many —
+# never share an element id. A repeated id makes a second map's
+# aria-labelledby resolve to the first map's title.
+_map_serial = count(1)
 ValueMapping = Mapping[str, object]
 
 
@@ -112,8 +117,9 @@ def render_svg(
     projector = _fit_projector(features, width, height, padding)
     value_formatter = format_value or _default_format
     serial = count(1)
-    title_id = "bharat-map-title"
-    description_id = "bharat-map-description"
+    map_id = "bharat-map-{}".format(next(_map_serial))
+    title_id = map_id + "-title"
+    description_id = map_id + "-description"
     aria_references = title_id + (" " + description_id if description else "")
 
     parts = [
@@ -131,7 +137,7 @@ def render_svg(
         value_text = value_formatter(numeric) if numeric is not None else "No data"
         label = "{}, {}".format(feature.name, value_text)
         path = _path_for_feature(feature, projector)
-        feature_id = "region-{}".format(next(serial))
+        feature_id = "{}-region-{}".format(map_id, next(serial))
         parts.append(
             '<path id="{id}" data-region-id="{data_id}" d="{path}" fill="{fill}" aria-label="{label}"><title>{label}</title></path>'.format(
                 id=feature_id,
@@ -143,7 +149,7 @@ def render_svg(
         )
     parts.append("</g>")
     if show_legend:
-        parts.append(_legend(scale, width, height, padding, value_formatter))
+        parts.append(_legend(scale, width, height, padding, value_formatter, map_id + "-legend"))
     parts.append("</svg>")
     return "".join(parts)
 
@@ -191,7 +197,9 @@ def _path_for_feature(feature: Feature, project: Callable[[float, float], Tuple[
     return " ".join(commands)
 
 
-def _legend(scale: FittedColorScale, width: int, height: int, padding: int, formatter: Callable[[float], str]) -> str:
+def _legend(
+    scale: FittedColorScale, width: int, height: int, padding: int, formatter: Callable[[float], str], legend_id: str
+) -> str:
     swatch_width = 24
     swatch_height = 12
     gap = 3
@@ -200,7 +208,7 @@ def _legend(scale: FittedColorScale, width: int, height: int, padding: int, form
     y = height - padding - swatch_height
     text_y = y + 10
     chunks = [
-        '<g id="bharat-map-legend" aria-label="Choropleth legend, lower values to higher values">',
+        '<g id="{}" aria-label="Choropleth legend, lower values to higher values">'.format(escape(legend_id, quote=True)),
         '<text x="{}" y="{}" font-family="system-ui, sans-serif" font-size="12" fill="#34495e">Lower</text>'.format(x - 42, text_y),
     ]
     for index, color in enumerate(scale.colors):
