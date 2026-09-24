@@ -324,11 +324,32 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
     super.initState();
     _prepare();
     _scheduleInsight();
+    // Built already drilled in, e.g. from a deep link. Nothing else starts this
+    // load — didUpdateWidget only sees changes — and setState is not allowed
+    // yet, so it starts after the first frame, which shows "Loading" meanwhile.
+    final drillDownId = _drillDownId;
+    if (drillDownId != null && widget.loadDistricts != null && _drilledState != null) {
+      _loading = true;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _drillDownId == drillDownId) _loadDistrictsFor(drillDownId);
+      });
+    }
   }
 
   @override
   void didUpdateWidget(IndiaChoropleth oldWidget) {
     super.didUpdateWidget(oldWidget);
+    // A null id reads as "uncontrolled", falling back to the widget's own. Keep
+    // that in step with what the host last said, or a host sending the map back
+    // to null would land on whatever was tapped before it took control.
+    if (oldWidget.drillDownId != widget.drillDownId) {
+      _internalDrillDownId = widget.drillDownId;
+      // A district id means nothing outside the state it came from.
+      _clearSubDrill();
+    }
+    if (oldWidget.subDistrictDrillDownId != widget.subDistrictDrillDownId) {
+      _internalSubDrillDownId = widget.subDistrictDrillDownId;
+    }
     if (!identical(oldWidget.features, widget.features)) {
       // A different map: which districts are leaves is a fact about the old one.
       _leafDistrictIds.clear();
@@ -559,6 +580,10 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
         _loading = false;
         _prepare();
       });
+      // A district asked for before its state's districts arrived — a deep link
+      // naming both — could not be loaded then, having nothing to load from.
+      final districtId = _subDrillDownId;
+      if (districtId != null && _subDistrictsFor != districtId && !_subLoading) _loadSubDistrictsFor(districtId);
     }).catchError((Object error) {
       if (!mounted || generation != _loadGeneration) return;
       setState(() {
