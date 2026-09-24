@@ -1000,6 +1000,34 @@ describe("repainting values without re-decoding the geometry", () => {
     map.destroy();
   });
 
+  it("decodes a district and a sub-district layer once across many value updates", async () => {
+    const districts = countingTopology();
+    const subDistricts = countingTopology();
+    const layer = (source: ReturnType<typeof countingTopology>): MapLayer => ({
+      geometry: { topology: source.topology as never, object: "states" },
+      getId: (feature) => String(feature.properties?.id),
+      getLabel: (feature) => String(feature.properties?.name),
+      getValue: (feature) => Number(feature.properties?.value),
+    });
+    const map = new IndiaChoropleth(host, {
+      states: stateLayer,
+      defaultDrillDownId: "27",
+      defaultSubDistrictDrillDownId: "a",
+      loadDistricts: async () => layer(districts),
+      loadSubDistricts: async () => layer(subDistricts),
+    });
+    for (let n = 0; n < 3; n++) await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(host.querySelector('[aria-current="page"]')?.textContent).toBe("Aland");
+    const districtReads = districts.reads();
+    const subDistrictReads = subDistricts.reads();
+    expect(subDistrictReads).toBeGreaterThan(0);
+
+    for (let n = 0; n < 5; n++) map.update({});
+    expect(districts.reads()).toBe(districtReads);
+    expect(subDistricts.reads()).toBe(subDistrictReads);
+    map.destroy();
+  });
+
   it("decodes again when the geometry itself is replaced", () => {
     const first = countingTopology();
     const second = countingTopology();
@@ -1013,6 +1041,96 @@ describe("repainting values without re-decoding the geometry", () => {
     expect(second.reads()).toBe(0);
     map.update({ states: layer(second) });
     expect(second.reads()).toBeGreaterThan(0);
+    map.destroy();
+  });
+});
+
+describe("the insights panel", () => {
+  let host: HTMLElement;
+  beforeEach(() => { host = document.createElement("div"); document.body.appendChild(host); });
+  afterEach(() => { host.remove(); });
+
+  function hover(label: RegExp) {
+    const region = [...host.querySelectorAll('[role="button"]')].find((node) => label.test(node.getAttribute("aria-label") ?? ""))!;
+    region.dispatchEvent(new MouseEvent("mouseenter"));
+  }
+
+  // A live region announces changes to content it already holds. Replacing the
+  // whole element on every hover meant screen readers were handed a new, empty
+  // region each time, and the page was rebuilt for nothing.
+  it("keeps one aria-live element across hovers and updates what is inside it", () => {
+    const map = new IndiaChoropleth(host, {
+      states: stateLayer,
+      renderInsights: (context, container) => { container.textContent = context ? context.label : "Nothing"; },
+    });
+    const panel = host.querySelector(".india-choropleth__insights");
+    expect(panel?.textContent).toBe("Nothing");
+    hover(/^Alpha,/);
+    expect(host.querySelector(".india-choropleth__insights")).toBe(panel);
+    expect(panel?.textContent).toBe("Alpha");
+    hover(/^Beta,/);
+    expect(host.querySelector(".india-choropleth__insights")).toBe(panel);
+    expect(panel?.textContent).toBe("Beta");
+    expect(host.querySelectorAll(".india-choropleth__insights")).toHaveLength(1);
+    map.destroy();
+  });
+
+  it("hands the host an empty container each time", () => {
+    const map = new IndiaChoropleth(host, {
+      states: stateLayer,
+      renderInsights: (context, container) => { container.append(context ? context.label : "Nothing"); },
+    });
+    hover(/^Alpha,/);
+    hover(/^Beta,/);
+    expect(host.querySelector(".india-choropleth__insights")?.textContent).toBe("Beta");
+    map.destroy();
+  });
+
+  it("stays after the legend when the map is rebuilt", () => {
+    const map = new IndiaChoropleth(host, { states: stateLayer, renderInsights: () => {} });
+    map.update({});
+    const children = [...host.querySelector(".india-choropleth")!.children].map((node) => node.className);
+    expect(children.indexOf("india-choropleth__insights")).toBeGreaterThan(children.indexOf("india-choropleth__legend"));
+    map.destroy();
+  });
+
+  it("goes away when renderInsights is removed", () => {
+    const map = new IndiaChoropleth(host, { states: stateLayer, renderInsights: () => {} });
+    map.update({ renderInsights: undefined });
+    expect(host.querySelector(".india-choropleth__insights")).toBeNull();
+    map.destroy();
+  });
+});
+
+describe("select()", () => {
+  let host: HTMLElement;
+  beforeEach(() => { host = document.createElement("div"); document.body.appendChild(host); });
+  afterEach(() => { host.remove(); });
+
+  // Clearing a selection is a change the host has to hear about, as it does
+  // when a click on the sea clears one.
+  it("tells the host when it clears the selection", () => {
+    const onSelectedChange = vi.fn();
+    const map = new IndiaChoropleth(host, { states: stateLayer, defaultSelectedId: "27", onSelectedChange });
+    map.select(null);
+    expect(onSelectedChange).toHaveBeenLastCalledWith(null, "state");
+    expect(map.getSelected()).toBeNull();
+    map.destroy();
+  });
+
+  it("tells the host when an unknown id clears the selection", () => {
+    const onSelectedChange = vi.fn();
+    const map = new IndiaChoropleth(host, { states: stateLayer, defaultSelectedId: "27", onSelectedChange });
+    map.select("nowhere");
+    expect(onSelectedChange).toHaveBeenLastCalledWith(null, "state");
+    map.destroy();
+  });
+
+  it("says nothing when there was no selection to clear", () => {
+    const onSelectedChange = vi.fn();
+    const map = new IndiaChoropleth(host, { states: stateLayer, onSelectedChange });
+    map.select(null);
+    expect(onSelectedChange).not.toHaveBeenCalled();
     map.destroy();
   });
 });

@@ -52,7 +52,9 @@ Other value APIs:
 - `map.setValues({ Goa: 6, Gujarat: 7 })` — many values, one re-render.
 - `map.getValues()` — everything currently set, keyed by display name.
 - `values: { Goa: 6 }` as a constructor option — same thing, before first paint.
-- District values work through the same accessor once you drill in: `map.states["North Goa"] = 3`.
+- `districtValues: { Goa: { "North Goa": 3 } }` as a constructor option, or `map.setDistrictValues({ Goa: { "North Goa": 3 } })` later — district values, nested under their state. District names repeat across states (Aurangabad, Bilaspur, Hamirpur), and nesting is what says which one you mean. Inner keys match a district's name, slug or id, case-insensitively.
+- A flat `map.states["North Goa"] = 3` still works for a name only one state uses.
+- A state's value is never painted onto one of its districts — "New Delhi" is not Delhi — except the only district of a single-district state (Lakshadweep, Chandigarh), which is the state. Sub-districts read no values here; supply them through your own `loadSubDistricts`.
 
 ## Options
 
@@ -91,7 +93,7 @@ Every thickness is a CSS variable, so you can theme without touching the rendere
 
 Every other [`IndiaChoroplethOptions`](https://github.com/shashankbudem/bharat-choropleth/blob/main/packages/js/src/types.ts) field (`referenceOverlay`, `loadDistricts`, `onRegionClick`, `formatValue`, `renderTooltip`, `showLegend`, ...) is accepted and forwarded.
 
-Methods: `setValues`, `getValues`, `select(id)`, `drillDown(name | null)`, `drillDownSubDistrict(id | null)`, `getSelected()`, `getInspected()`, `destroy()`. The full engine is at `map.engine` (`null` until the data loads — `await map.ready` first).
+Methods: `setValues`, `setDistrictValues`, `getValues`, `select(id)`, `drillDown(name | null)`, `drillDownSubDistrict(id | null)`, `getSelected()`, `getInspected()`, `destroy()`. The full engine is at `map.engine` (`null` until the data loads — `await map.ready` first).
 
 ## Hover and focus detail
 

@@ -529,3 +529,143 @@ describe("enumerating .states after a feature gained several keys", () => {
     host.remove();
   });
 });
+
+/** Boundaries served by URL, the way the default data source asks for them. */
+function serveBundles(bundles: { states: unknown; districts?: Record<string, unknown>; subDistricts?: Record<string, unknown> }) {
+  const fetchMock = vi.fn(async (url: string) => {
+    const [, level, id] = /\/(districts|subdistricts)\/([^/]+)\.topo\.json$/.exec(url) ?? [];
+    const body = level === "districts" ? bundles.districts?.[id!] : level === "subdistricts" ? bundles.subDistricts?.[id!] : bundles.states;
+    return { ok: body !== undefined, status: body === undefined ? 404 : 200, json: async () => body } as Response;
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+const box = (west: number) => ({
+  type: "Polygon" as const,
+  coordinates: [[[west, 28], [west + 0.1, 28], [west + 0.1, 28.1], [west, 28.1], [west, 28]]],
+});
+const collection = (...features: [id: string, name: string, west: number][]) => ({
+  type: "FeatureCollection",
+  features: features.map(([id, name, west]) => ({ type: "Feature", properties: { id, name }, geometry: box(west) })),
+});
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe("values below the state level", () => {
+  const bundles = {
+    states: collection(
+      ["in-cs-07-delhi", "Delhi", 77],
+      ["in-cs-34-puducherry", "Puducherry", 79],
+      ["in-cs-22-chhattisgarh", "Chhattisgarh", 82],
+      ["in-cs-02-himachal-pradesh", "Himachal Pradesh", 76],
+    ),
+    districts: {
+      "in-cs-07-delhi": collection(["in-cd-07-1", "New Delhi", 77], ["in-cd-07-2", "North Delhi", 77.2]),
+      "in-cs-34-puducherry": collection(["in-cd-34-1", "Puducherry", 79], ["in-cd-34-2", "Karaikal", 79.2]),
+      "in-cs-22-chhattisgarh": collection(["in-cd-22-1", "Bilaspur", 82], ["in-cd-22-2", "Raipur", 82.2]),
+      "in-cs-02-himachal-pradesh": collection(["in-cd-02-1", "Bilaspur", 76], ["in-cd-02-2", "Shimla", 76.2]),
+    },
+    subDistricts: {
+      "in-cd-07-2": collection(["s1", "Model Town", 77], ["s2", "North Delhi", 77.2]),
+    },
+  };
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  async function drilledInto(state: string, options: ConstructorParameters<typeof BharatChoropleth>[1] = {}) {
+    serveBundles(bundles);
+    const map = new BharatChoropleth(container, options);
+    await map.ready;
+    map.drillDown(state);
+    await settle();
+    return map;
+  }
+
+  it("does not paint a state's value onto a district that shares an alias of its name", async () => {
+    const map = await drilledInto("Delhi", { values: { Delhi: 5 } });
+    expect(regionText(container, /^New Delhi,/)).toMatch(/No data/);
+    expect(regionText(container, /^North Delhi,/)).toMatch(/No data/);
+    map.destroy();
+  });
+
+  it("does not paint a state's value onto a district with exactly the state's name", async () => {
+    const map = await drilledInto("Puducherry", { values: { Puducherry: 7 } });
+    expect(regionText(container, /^Puducherry,/)).toMatch(/No data/);
+    expect(regionText(container, /^Karaikal,/)).toMatch(/No data/);
+    map.destroy();
+  });
+
+  it("does not paint a district's value onto a sub-district of the same name", async () => {
+    const map = await drilledInto("Delhi", { values: { "North Delhi": 9 } });
+    expect(regionText(container, /^North Delhi,/)).toMatch(/9/);
+    map.drillDownSubDistrict("in-cd-07-2");
+    await settle();
+    expect(regionText(container, /^Model Town,/)).toMatch(/No data/);
+    expect(regionText(container, /^North Delhi,/)).toMatch(/No data/);
+    map.destroy();
+  });
+
+  it("repaints a district written through .states after drilling in, without warning", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const map = await drilledInto("Delhi");
+    map.states["North Delhi"] = 3;
+    expect(regionText(container, /^North Delhi,/)).toMatch(/3/);
+    expect(warn).not.toHaveBeenCalled();
+    map.destroy();
+  });
+
+  it("still warns about a name that matches nothing loaded", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const map = await drilledInto("Delhi");
+    map.states["Xanadu"] = 3;
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining("Xanadu"));
+    map.destroy();
+  });
+
+  it("keeps two states' districts of the same name apart through districtValues", async () => {
+    const map = await drilledInto("Chhattisgarh", { districtValues: { Chhattisgarh: { Bilaspur: 11 }, "Himachal Pradesh": { Bilaspur: 22 } } });
+    expect(regionText(container, /^Bilaspur,/)).toMatch(/11/);
+    map.drillDown("Himachal Pradesh");
+    await settle();
+    expect(regionText(container, /^Bilaspur,/)).toMatch(/22/);
+    map.destroy();
+  });
+
+  it("setDistrictValues repaints the district view it names", async () => {
+    const map = await drilledInto("Chhattisgarh");
+    map.setDistrictValues({ Chhattisgarh: { Raipur: 4 } });
+    expect(regionText(container, /^Raipur,/)).toMatch(/4/);
+    expect(regionText(container, /^Bilaspur,/)).toMatch(/No data/);
+    map.destroy();
+  });
+
+  it("applies districtValues over districts from the caller's own loadDistricts", async () => {
+    const map = new BharatChoropleth(container, {
+      geometry: bundles.states as GeometrySource,
+      districtValues: { Delhi: { "North Delhi": 9 } },
+      loadDistricts: async () => ({
+        geometry: bundles.districts["in-cs-07-delhi"] as GeometrySource,
+        getId: (feature) => String(feature.properties?.id),
+        getLabel: (feature) => String(feature.properties?.name),
+        getValue: (feature) => (feature.properties?.id === "in-cd-07-1" ? 4 : null),
+      }),
+    });
+    map.drillDown("Delhi");
+    await settle();
+    expect(regionText(container, /^North Delhi,/)).toMatch(/9/);
+    // A district not named keeps what the caller's layer returned.
+    expect(regionText(container, /^New Delhi,/)).toMatch(/4/);
+    map.destroy();
+  });
+
+  it("warns once about a nested district name the state does not have", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const map = await drilledInto("Chhattisgarh", { districtValues: { Chhattisgarh: { Nowhere: 1 } } });
+    // Back out and in again: the loader runs a second time, the warning does not.
+    map.drillDown(null);
+    map.drillDown("Chhattisgarh");
+    await settle();
+    expect(warn.mock.calls.filter(([message]) => String(message).includes("nowhere"))).toHaveLength(1);
+    map.destroy();
+  });
+});

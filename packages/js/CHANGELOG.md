@@ -1,5 +1,36 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A district no longer shows its state's value. "New Delhi" resolves to Delhi
+  through the state registry, and Puducherry's district is spelled like the UT,
+  so drilling in painted each with its whole state's figure. Only the sole
+  district of a single-district state (Lakshadweep, Chandigarh) keeps it.
+- A sub-district no longer shows the value of a district or state with the same
+  name. 442 of the 5,950 sub-districts share their own district's name.
+  Sub-districts read no values from the zero-config component; supply them
+  through `loadSubDistricts`.
+- Writing a district through `.states` after drilling in repaints it, and no
+  longer warns that the name is not a state and "its value is ignored". The
+  warning now fires only for a name that matches no state or loaded district.
+- Value updates no longer re-decode the drilled-in state's districts or the
+  open sub-districts. Only the state level was cached, so every value written
+  while drilled in unpacked the topology and refitted the projection again.
+- The insights panel is made once and only its content replaced. It was rebuilt
+  on every hover, which churned the DOM and gave screen readers a new, empty
+  live region each time instead of a change to announce.
+- `select(null)`, or an id not on the map, now calls `onSelectedChange(null)`
+  when it clears a selection, as a click on the sea already did.
+
+### Added
+
+- `districtValues` option and `setDistrictValues()`, nesting district values
+  under their state as the React package's `districtValues` prop does. District
+  names repeat across states (Bilaspur, Hamirpur, Pratapgarh), which a flat name
+  cannot tell apart.
+
 ## 0.3.1 - 2026-09-13
 
 ### Fixed
