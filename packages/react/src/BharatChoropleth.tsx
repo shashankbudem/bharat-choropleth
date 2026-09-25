@@ -3,11 +3,13 @@ import { IndiaChoropleth } from "./IndiaChoropleth";
 import { asFeatureCollection } from "./geometry";
 import {
   DEFAULT_DATA_BASE_URL,
+  districtsUrl,
   isInlineGeometry,
   loadDistrictTopology,
   loadSubDistrictTopology,
   resolveGeometry,
   statesUrl,
+  subDistrictsUrl,
   type GeometryInput,
 } from "./data-source";
 import { normalizeStateKey, resolveState } from "./states";
@@ -48,12 +50,12 @@ function keyFor(name: string): string {
  * still reaches Odisha. `has` rather than `??` throughout, so a deliberate null
  * reads as "no data" instead of falling through to the next candidate.
  */
-function lookUp(
+function keyOf(
   exactKeys: ReadonlyMap<string, string>,
   canonical: ReadonlyMap<string, number | null>,
   id: string,
   label: string,
-): number | null {
+): string | undefined {
   for (const candidate of [
     exactKeys.get(id),
     exactKeys.get(label),
@@ -62,9 +64,19 @@ function lookUp(
     normalizeStateKey(id),
     normalizeStateKey(label),
   ]) {
-    if (candidate !== undefined && canonical.has(candidate)) return canonical.get(candidate) ?? null;
+    if (candidate !== undefined && canonical.has(candidate)) return candidate;
   }
-  return null;
+  return undefined;
+}
+
+function lookUp(
+  exactKeys: ReadonlyMap<string, string>,
+  canonical: ReadonlyMap<string, number | null>,
+  id: string,
+  label: string,
+): number | null {
+  const key = keyOf(exactKeys, canonical, id, label);
+  return key === undefined ? null : (canonical.get(key) ?? null);
 }
 
 /** A number, or null for "no data". Anything not finite (NaN, Infinity) reads as no data. */
@@ -341,6 +353,26 @@ export function BharatChoropleth({
   }, [exactKeys, getId, getLabel, resolvedGeometry, valueSignature]);
 
   /**
+   * The value keys the state layer's own regions read from.
+   *
+   * A region below the state level must not land on one of these. "New Delhi"
+   * resolves to Delhi through the registry, and Puducherry's headquarters district
+   * is spelled exactly like the UT, so without this each was painted with its
+   * whole state's figure — a wrong number with nothing to say so.
+   */
+  const stateKeys = useMemo(() => {
+    if (!resolvedGeometry) return new Set<string>();
+    return new Set(
+      asFeatureCollection(resolvedGeometry)
+        .features.map((feature) => keyOf(exactKeys, valueMap, getId(feature), getLabel(feature)))
+        .filter((key): key is string => key !== undefined),
+    );
+    // `valueSignature` stands in for `valueMap`, as for `statesLayer`.
+  }, [exactKeys, getId, getLabel, resolvedGeometry, valueSignature]);
+  const stateKeysRef = useRef(stateKeys);
+  stateKeysRef.current = stateKeys;
+
+  /**
    * Unknown names cannot be judged until the boundary data has landed and named
    * the real label set, so the warning is deferred rather than guessed at — the
    * same order the framework-free facade warns in. Warning during render would
@@ -373,12 +405,15 @@ export function BharatChoropleth({
     }
   }, [duplicated, getId, getLabel, resolvedGeometry, statesLayer, valueSignature, writtenAs]);
 
-  // Drill-down geometry is fetched once per id and held for the component's life.
+  // Drill-down geometry is fetched once per URL and held for the component's life.
+  // Keyed by URL rather than id, so a changed `dataBaseUrl` fetches its own copy.
   // IndiaChoropleth re-runs its district effect whenever the state layer changes
   // — which a value update does — so without this every value change refetched.
   interface DrillDownState {
     controller: AbortController | null;
+    /** By URL. */
     districts: Map<string, Promise<GeometrySource>>;
+    /** By URL. */
     subDistricts: Map<string, Promise<GeometrySource | null>>;
   }
   // Built lazily: `useRef(expr)` evaluates `expr` on every render and discards
@@ -391,6 +426,23 @@ export function BharatChoropleth({
   };
   const drillDown = drillDownRef.current;
   useEffect(() => () => drillDownRef.current?.controller?.abort(), []);
+
+  /**
+   * The signal for a new drill-down fetch.
+   *
+   * StrictMode unmounts and remounts once on mount, and that unmount aborts the
+   * controller while the ref holding it survives — so every fetch after it failed
+   * with "This operation was aborted". A controller found aborted is replaced, and
+   * the fetches it started are dropped from the cache: all of them are doomed.
+   */
+  const drillDownSignal = () => {
+    if (drillDown.controller?.signal.aborted) {
+      drillDown.controller = new AbortController();
+      drillDown.districts.clear();
+      drillDown.subDistricts.clear();
+    }
+    return drillDown.controller?.signal;
+  };
 
   /**
    * Overlays `districtValues` onto a district layer. A district named in the prop
@@ -437,20 +489,33 @@ export function BharatChoropleth({
   const defaultDistrictLoader = useMemo(() => {
     if (!districtsEnabled) return undefined;
     return async (stateId: string): Promise<MapLayer> => {
+      const signal = drillDownSignal();
       const cache = drillDown.districts;
-      let pending = cache.get(stateId);
+      const url = districtsUrl(dataBaseUrl, stateId);
+      let pending = cache.get(url);
       if (!pending) {
-        pending = loadDistrictTopology(dataBaseUrl, stateId, drillDown.controller?.signal);
-        // A failed fetch must not be cached, or a retry can never succeed.
-        pending.catch(() => cache.delete(stateId));
-        cache.set(stateId, pending);
+        const fetching = loadDistrictTopology(dataBaseUrl, stateId, signal);
+        pending = fetching;
+        // A failed fetch must not be cached, or a retry can never succeed. Only
+        // its own entry, though: a replaced controller may have cached a newer one.
+        fetching.catch(() => { if (cache.get(url) === fetching) cache.delete(url); });
+        cache.set(url, fetching);
       }
+      const districtGeometry = await pending;
+      // The sole district of a single-district state (Lakshadweep, Chandigarh) is
+      // the state, so it keeps the state's value. Anywhere else a state's figure
+      // belongs to the state, not to whichever district happens to share its name.
+      const soleDistrict = asFeatureCollection(districtGeometry).features.length === 1;
       return withDistrictValues(
         {
-          geometry: await pending,
+          geometry: districtGeometry,
           getId: defaultGetId,
           getLabel: defaultGetLabel,
-          getValue: (feature) => lookUp(exactKeysRef.current, valuesRef.current, defaultGetId(feature), defaultGetLabel(feature)),
+          getValue: (feature) => {
+            const key = keyOf(exactKeysRef.current, valuesRef.current, defaultGetId(feature), defaultGetLabel(feature));
+            if (key === undefined || (!soleDistrict && stateKeysRef.current.has(key))) return null;
+            return valuesRef.current.get(key) ?? null;
+          },
         },
         stateId,
       );
@@ -464,12 +529,15 @@ export function BharatChoropleth({
   const defaultSubDistrictLoader = useMemo(() => {
     if (!subDistrictsEnabled) return undefined;
     return async (districtId: string): Promise<MapLayer | null> => {
+      const signal = drillDownSignal();
       const cache = drillDown.subDistricts;
-      let pending = cache.get(districtId);
+      const url = subDistrictsUrl(dataBaseUrl, districtId);
+      let pending = cache.get(url);
       if (!pending) {
-        pending = loadSubDistrictTopology(dataBaseUrl, districtId, drillDown.controller?.signal);
-        pending.catch(() => cache.delete(districtId));
-        cache.set(districtId, pending);
+        const fetching = loadSubDistrictTopology(dataBaseUrl, districtId, signal);
+        pending = fetching;
+        fetching.catch(() => { if (cache.get(url) === fetching) cache.delete(url); });
+        cache.set(url, fetching);
       }
       const geometry = await pending;
       // Null means the bundle holds no sub-districts for this district, which
@@ -479,7 +547,11 @@ export function BharatChoropleth({
         geometry,
         getId: defaultGetId,
         getLabel: defaultGetLabel,
-        getValue: (feature) => lookUp(exactKeysRef.current, valuesRef.current, defaultGetId(feature), defaultGetLabel(feature)),
+        // `values` holds states and `districtValues` districts, and sub-districts
+        // are named after both — 442 of them after their own district. Matching
+        // either by name paints the parent's figure onto one of its parts, so
+        // sub-district values come from a custom `loadSubDistricts` only.
+        getValue: () => null,
       };
     };
   }, [dataBaseUrl, subDistrictsEnabled]);

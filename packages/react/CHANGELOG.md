@@ -1,5 +1,23 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A district no longer shows its state's value. "New Delhi" resolves to Delhi
+  through the state registry, and Puducherry's district is spelled like the UT,
+  so drilling in painted each with its whole state's figure. Only the sole
+  district of a single-district state (Lakshadweep, Chandigarh) keeps it.
+- A sub-district no longer shows the value of a district or state with the same
+  name. 442 of the 5,950 sub-districts share their own district's name.
+  Sub-districts read no values from the zero-config component; supply them
+  through `loadSubDistricts`.
+- Drill-down works under `<StrictMode>`. Its practice unmount aborted the
+  controller shared by every district fetch, and nothing replaced it, so the
+  first drill-down in development failed with "This operation was aborted".- Changing `dataBaseUrl` fetches districts and sub-districts from the new
+  location. The drill-down cache was keyed by region id alone, so it kept
+  serving boundaries from the first one.
+
 ## 0.3.1 - 2026-09-13
 
 ### Fixed

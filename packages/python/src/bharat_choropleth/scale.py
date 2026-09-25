@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import isfinite
+from math import floor, isfinite
 from typing import Iterable, Optional, Sequence, Tuple
 
 DEFAULT_COLORS = (
@@ -52,7 +52,10 @@ class ColorScale:
         if len(self.colors) == 1 or minimum == maximum:
             return self.colors[-1]
         relative = (numeric - minimum) / (maximum - minimum)
-        index = round(relative * (len(self.colors) - 1))
+        # Halves round up, as Math.round does in the JavaScript renderers and
+        # round() in Dart. Python's round() sends them to the even neighbour, so
+        # the same number could take a different colour here than on the web.
+        index = floor(relative * (len(self.colors) - 1) + 0.5)
         return self.colors[max(0, min(len(self.colors) - 1, index))]
 
 

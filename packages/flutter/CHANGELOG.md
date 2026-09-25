@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- A map built with `drillDownId` already set loads that state's districts.
+  Nothing started the load, so it sat on "District data is unavailable".
+- A `subDistrictDrillDownId` given together with its `drillDownId` — at build,
+  or both at once later, as a deep link does — opens the sub-districts once the
+  districts arrive, instead of stopping at the district view.
+- A controlled `drillDownId` set back to `null` returns to the national map. It
+  fell back to whatever state had been tapped before the host took control.
+- Changing the controlled `drillDownId` drops the sub-district level of the
+  state just left.
+
 ## 0.3.0 - 2026-09-05
 
 ### Added

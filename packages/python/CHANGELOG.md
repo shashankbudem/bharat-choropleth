@@ -1,5 +1,17 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Values exactly half-way between two colours now take the upper one, as in the
+  React, JavaScript and Flutter packages. `round()` sent them to the even
+  neighbour, so with values from 0 to 12, the values 1, 5 and 9 each took a
+  different colour here than on the web.
+- Each `render_svg` output has its own element ids. Every map used
+  `bharat-map-title` and `region-1`…, so on a page showing two — as a notebook
+  does — the second map's accessible name pointed at the first map's title.
+
 ## 0.3.0
 
 ### Added

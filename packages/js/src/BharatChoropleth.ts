@@ -64,6 +64,20 @@ export interface BharatChoroplethOptions extends Omit<IndiaChoroplethOptions, "s
   getLabel?: (feature: MapFeature) => string;
   /** Initial per-state values. Keys may be display names, slugs or ids. Anything omitted starts as `null` ("no data"). */
   values?: Record<string, number | null>;
+  /**
+   * District values, nested under the state each district belongs to — the same
+   * shape as the React package's `districtValues` prop:
+   *
+   * ```js
+   * districtValues: { Telangana: { Hyderabad: 90 }, Maharashtra: { Aurangabad: 44 } }
+   * ```
+   *
+   * District names repeat across states (Aurangabad, Bilaspur, Hamirpur), so a
+   * flat name cannot say which one is meant; under a state it can. Outer keys
+   * resolve like `values`; inner keys match a district's name, slug or id,
+   * case-insensitively. Change them later with `setDistrictValues`.
+   */
+  districtValues?: Record<string, Record<string, number | null>>;
   colorScale?: ColorScale;
   /** Sets the `--india-map-text` CSS variable (region label/value text color). */
   fontColor?: string;
@@ -146,6 +160,21 @@ export class BharatChoropleth {
   private readonly labelByKey = new Map<string, string>();
   /** Original spelling per key, so a deferred "unknown state" warning quotes what the caller actually typed. */
   private readonly writtenAs = new Map<string, string>();
+  /**
+   * `districtValues`, as state key → normalized district key → value. Not named
+   * `districtValues`: a real property by that name would take a script's
+   * `map.districtValues = {...}` as a write to it, replacing this map.
+   */
+  private readonly nestedDistrictValues = new Map<string, Map<string, number | null>>();
+  /** The keys each loaded state's districts answer to, by state key — for checking nested names. */
+  private readonly loadedDistrictKeys = new Map<string, Set<string>>();
+  /**
+   * The keys of districts that read `.states`, which only the default loader's
+   * do. A write to one of these is a district on its way to the screen, not a typo.
+   */
+  private readonly flatDistrictKeys = new Set<string>();
+  /** Nested district names already warned about, as `stateKey|districtKey`, so each is warned about once. */
+  private readonly warnedDistricts = new Set<string>();
   private readonly statesAccessor: Record<string, number | null>;
   private readonly abortController: AbortController | null;
   private readonly getId: (feature: MapFeature) => string;
@@ -187,6 +216,8 @@ export class BharatChoropleth {
       this.exactKeys.set(name, key);
       if (!this.writtenAs.has(key)) this.writtenAs.set(key, name);
     }
+
+    this.mergeDistrictValues(merged.districtValues ?? {});
 
     this._colorScale = merged.colorScale;
     this._fontColor = merged.fontColor;
@@ -310,7 +341,7 @@ export class BharatChoropleth {
    * then each resolved through the state registry. `has` rather than `??`, so a
    * deliberate null reads as "no data" instead of falling to the next candidate.
    */
-  private valueForFeature(id: string, label: string): number | null {
+  private valueForFeature(id: string, label: string, skip?: (key: string) => boolean): number | null {
     for (const candidate of [
       this.exactKeys.get(id),
       this.exactKeys.get(label),
@@ -319,7 +350,7 @@ export class BharatChoropleth {
       normalizeStateKey(id),
       normalizeStateKey(label),
     ]) {
-      if (candidate !== undefined && this.values.has(candidate)) return this.values.get(candidate) ?? null;
+      if (candidate !== undefined && this.values.has(candidate) && !skip?.(candidate)) return this.values.get(candidate) ?? null;
     }
     return null;
   }
@@ -332,13 +363,45 @@ export class BharatChoropleth {
     // Unknown names can't be judged until the boundary data has landed and told
     // us the real label set — so the warning is deferred, never guessed at.
     if (this.engineInstance) {
-      if (!this.labelByKey.has(key)) this.warnUnknown(name);
-      else this.engineInstance.update({});
+      // Repainted either way: the name may be a district on screen right now,
+      // which the state label set knows nothing about.
+      if (!this.labelByKey.has(key) && !this.flatDistrictKeys.has(key)) this.warnUnknown(name);
+      this.engineInstance.update({});
     }
   }
 
+  /**
+   * Not "ignored": a district of a state not drilled into yet is written this way
+   * too, and is shown once its state loads. What is certain is that nothing on
+   * the map so far goes by this name.
+   */
   private warnUnknown(name: string) {
-    console.warn(`BharatChoropleth: "${name}" is not a recognized state/UT — its value is ignored.`);
+    console.warn(
+      `BharatChoropleth: "${name}" matches no state/UT or loaded district, so nothing shows it. ` +
+        `Check the spelling; for a district, prefer setDistrictValues({ State: { District: value } }).`,
+    );
+  }
+
+  private mergeDistrictValues(values: Record<string, Record<string, number | null>>) {
+    for (const [stateName, districts] of Object.entries(values)) {
+      const stateKey = this.keyFor(stateName);
+      const inner = this.nestedDistrictValues.get(stateKey) ?? new Map<string, number | null>();
+      for (const [districtName, value] of Object.entries(districts ?? {})) inner.set(normalizeStateKey(districtName), value);
+      this.nestedDistrictValues.set(stateKey, inner);
+      this.warnUnknownDistricts(stateKey);
+    }
+  }
+
+  /** Nested names the state's districts do not have. Only knowable once they have loaded. */
+  private warnUnknownDistricts(stateKey: string) {
+    const present = this.loadedDistrictKeys.get(stateKey);
+    if (!present) return;
+    for (const [key, value] of this.nestedDistrictValues.get(stateKey) ?? []) {
+      const seen = `${stateKey}|${key}`;
+      if (value === null || present.has(key) || this.warnedDistricts.has(seen)) continue;
+      this.warnedDistricts.add(seen);
+      console.warn(`BharatChoropleth: "${key}" is not a district of this state — its value is ignored.`);
+    }
   }
 
   /**
@@ -389,6 +452,7 @@ export class BharatChoropleth {
       getId: _getId,
       getLabel: _getLabel,
       values: _values,
+      districtValues: _districtValues,
       fontColor: _fontColor,
       borderColor: _borderColor,
       borderWidth: _borderWidth,
@@ -400,12 +464,15 @@ export class BharatChoropleth {
     } = this.options;
 
     const drillDownEnabled = districts ?? this.usingDefaultData;
+    const callerLoadDistricts = rest.loadDistricts;
     const subDrillDownEnabled = subDistricts ?? this.usingDefaultData;
 
     this.engineInstance = new IndiaChoropleth(this.containerEl, {
       ...rest,
       colorScale,
-      loadDistricts: rest.loadDistricts ?? (drillDownEnabled ? this.defaultDistrictLoader : undefined),
+      loadDistricts: callerLoadDistricts
+        ? async (stateId, state) => this.withDistrictValues(await callerLoadDistricts(stateId, state), state)
+        : drillDownEnabled ? this.defaultDistrictLoader : undefined,
       loadSubDistricts: rest.loadSubDistricts ?? (subDrillDownEnabled ? this.defaultSubDistrictLoader : undefined),
       states: {
         geometry,
@@ -427,26 +494,61 @@ export class BharatChoropleth {
   }
 
   /** Districts for the drilled-in state, fetched from the same base URL as the state layer. */
-  private defaultDistrictLoader = async (stateId: string): Promise<MapLayer> => {
+  private defaultDistrictLoader = async (stateId: string, state: MapRegion): Promise<MapLayer> => {
     const geometry = await loadDistrictTopology(this.dataBaseUrl, stateId, this.abortController?.signal);
-    return {
-      geometry,
-      getId: (feature) => String(feature.properties?.id ?? feature.properties?.name),
-      getLabel: (feature) => String(feature.properties?.name ?? feature.properties?.id),
-      // A singleton district can share its parent's name (Lakshadweep). Resolve
-      // it through the state registry before looking up the parent value, rather
-      // than using its label's bare slug against an id-keyed value map.
-      getValue: (feature) =>
-        this.valueForFeature(String(feature.properties?.id ?? ""), this.getLabel(feature)),
-    };
+    const getId = (feature: MapFeature) => String(feature.properties?.id ?? feature.properties?.name);
+    const getLabel = (feature: MapFeature) => String(feature.properties?.name ?? feature.properties?.id);
+    const features = asFeatureCollection(geometry).features;
+    for (const feature of features) {
+      this.flatDistrictKeys.add(normalizeStateKey(getId(feature)));
+      this.flatDistrictKeys.add(normalizeStateKey(getLabel(feature)));
+    }
+    // The sole district of a single-district state (Lakshadweep, Chandigarh) is
+    // the state, so it keeps the state's value. Anywhere else a state's figure
+    // belongs to the state, not to whichever district shares its name: "New
+    // Delhi" resolves to Delhi, and Puducherry's district is spelled like the UT.
+    const soleDistrict = features.length === 1;
+    const isStateKey = (key: string) => !soleDistrict && this.labelByKey.has(key);
+    return this.withDistrictValues(
+      {
+        geometry,
+        getId,
+        getLabel,
+        getValue: (feature) => this.valueForFeature(String(feature.properties?.id ?? ""), getLabel(feature), isStateKey),
+      },
+      state,
+    );
   };
+
+  /**
+   * Overlays `districtValues` onto a district layer — the default one or the
+   * caller's own. A district named there takes that value; any other keeps what
+   * the layer returned. Mirrors the React facade's `withDistrictValues`.
+   */
+  private withDistrictValues(layer: MapLayer, state: MapRegion): MapLayer {
+    const keysOf = (feature: MapFeature) => [normalizeStateKey(layer.getId(feature)), normalizeStateKey(layer.getLabel(feature))];
+    const stateKey = this.keyForFeature(state.feature);
+    this.loadedDistrictKeys.set(stateKey, new Set(asFeatureCollection(layer.geometry).features.flatMap(keysOf)));
+    this.warnUnknownDistricts(stateKey);
+    return {
+      ...layer,
+      getValue: (feature) => {
+        // Read live, so `setDistrictValues` shows on the next render.
+        const nested = this.nestedDistrictValues.get(stateKey);
+        for (const key of keysOf(feature)) if (nested?.has(key)) return nested.get(key) ?? null;
+        return layer.getValue(feature);
+      },
+    };
+  }
 
   /**
    * Sub-districts for the drilled-in district, from the same base URL. Resolves to
    * null where the bundle has no file, which leaves that district a leaf.
    *
-   * Values resolve the same way districts' do — through the shared key map — so a
-   * sub-district with nothing written against it reads as "no data".
+   * Sub-districts read no values. They are named after states and districts —
+   * 442 after their own district — and `.states` holds both, so matching by name
+   * painted a parent's figure onto one of its parts. Supply sub-district values
+   * through your own `loadSubDistricts`.
    */
   private defaultSubDistrictLoader = async (districtId: string): Promise<MapLayer | null> => {
     const geometry = await loadSubDistrictTopology(this.dataBaseUrl, districtId, this.abortController?.signal);
@@ -455,8 +557,7 @@ export class BharatChoropleth {
       geometry,
       getId: (feature) => String(feature.properties?.id ?? feature.properties?.name),
       getLabel: (feature) => String(feature.properties?.name ?? feature.properties?.id),
-      getValue: (feature) =>
-        this.valueForFeature(String(feature.properties?.id ?? ""), this.getLabel(feature)),
+      getValue: () => null,
     };
   };
 
@@ -508,8 +609,21 @@ export class BharatChoropleth {
       this.values.set(key, value);
       this.exactKeys.set(name, key);
       if (!this.writtenAs.has(key)) this.writtenAs.set(key, name);
-      if (this.engineInstance && !this.labelByKey.has(key)) this.warnUnknown(name);
+      if (this.engineInstance && !this.labelByKey.has(key) && !this.flatDistrictKeys.has(key)) this.warnUnknown(name);
     }
+    this.engineInstance?.update({});
+  }
+
+  /**
+   * District values nested under their state, one re-render. Merged like
+   * `setValues`: districts not listed keep their values.
+   *
+   * ```js
+   * map.setDistrictValues({ Telangana: { Hyderabad: 90 } });
+   * ```
+   */
+  setDistrictValues(values: Record<string, Record<string, number | null>>) {
+    this.mergeDistrictValues(values);
     this.engineInstance?.update({});
   }
 

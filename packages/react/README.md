@@ -129,6 +129,10 @@ slug or id, case-insensitively — but they can only be checked once that state'
 districts have been fetched, so a typo there is warned about when you first drill
 into that state, not at first render.
 
+With the default data source, a state's figure from `values` is never painted
+onto one of its districts — "New Delhi" is not Delhi — except the only district
+of a single-district state (Lakshadweep, Chandigarh), which is the state itself.
+
 It applies to whichever district layer is in use, including one from your own
 `loadDistricts`. A district named here takes this value; one that is not keeps
 whatever the layer returned, so you can override a few and leave the rest:

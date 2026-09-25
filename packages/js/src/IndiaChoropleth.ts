@@ -114,6 +114,37 @@ function makeProjection(collection: MapFeatureCollection): GeoProjection {
 }
 
 /**
+ * Decoded features and fitted projections, held against the geometry they came
+ * from.
+ *
+ * Every `update()` recomputes, and the zero-config facade calls `update({})` for
+ * each value written. Unpacking a topology and refitting a projection cannot
+ * change their answer when only the numbers moved — neither reads them — so each
+ * is done once per geometry object, at every level. Weak, so a level the user
+ * has left is free to go. Mirrors the React renderer's memos on `geometry`.
+ */
+const decoded = new WeakMap<GeometrySource, MapFeatureCollection>();
+const fitted = new WeakMap<MapFeatureCollection, { extra: MapFeatureCollection | null; projection: GeoProjection }>();
+
+function featuresOf(geometry: GeometrySource): MapFeatureCollection {
+  let collection = decoded.get(geometry);
+  if (!collection) {
+    collection = asFeatureCollection(geometry);
+    decoded.set(geometry, collection);
+  }
+  return collection;
+}
+
+/** A projection fitted to `main`, and to the reference context `extra` alongside it. */
+function projectionFor(main: MapFeatureCollection, extra: MapFeatureCollection | null): GeoProjection {
+  const hit = fitted.get(main);
+  if (hit && hit.extra === extra) return hit.projection;
+  const projection = makeProjection(extra ? { type: "FeatureCollection", features: [...main.features, ...extra.features] } : main);
+  fitted.set(main, { extra, projection });
+  return projection;
+}
+
+/**
  * `collection` lets a caller that has already unpacked this layer's geometry
  * hand the features straight in. Preparing a layer is how values reach the
  * screen, so it re-runs on every value change — unpacking the same topology
@@ -123,7 +154,7 @@ function prepareLayer(
   layer: MapLayer,
   projection: GeoProjection,
   minPartExtent = 0,
-  collection: MapFeatureCollection = asFeatureCollection(layer.geometry),
+  collection: MapFeatureCollection = featuresOf(layer.geometry),
 ): PreparedRegion[] {
   const path = geoPath(projection);
   return collection.features.map((feature) => {
@@ -167,7 +198,7 @@ function prepareLayer(
 
 function prepareReferenceOverlay(overlay: ReferenceOverlay, projection: GeoProjection): PreparedReferenceOverlay[] {
   const path = geoPath(projection);
-  return asFeatureCollection(overlay.geometry).features.map((feature) => ({
+  return featuresOf(overlay.geometry).features.map((feature) => ({
     id: overlay.getId(feature),
     label: overlay.getLabel(feature),
     description: overlay.getDescription(feature),
@@ -276,22 +307,6 @@ export class IndiaChoropleth {
   // Tracks which drill-down id we've already kicked off a load attempt for — including
   // failed ones — so a render triggered by a *failed* load (which leaves `loadedDistricts`
   // null, same as "never loaded") doesn't read as "still needs loading" and retry forever.
-  /**
-   * The decoded state features and the projection fitted to them, held against
-   * the geometry they came from.
-   *
-   * `recompute()` runs on every `update()`, and the zero-config facade calls
-   * `update({})` for every value written. Unpacking the topology and refitting
-   * the projection each time is work that cannot change its own answer: only the
-   * numbers moved, and neither step reads them. Mirrors the React renderer,
-   * which memoizes the same two steps on `states.geometry`.
-   */
-  private projectionCache: {
-    geometry: GeometrySource;
-    referenceGeometry: GeometrySource | null;
-    collection: MapFeatureCollection;
-    projection: GeoProjection;
-  } | null = null;
   private attemptedDistrictLoadForId: string | null = null;
   private attemptedSubDistrictLoadForId: string | null = null;
   private attemptedOverlayLoadForId: string | null = null;
@@ -384,8 +399,12 @@ export class IndiaChoropleth {
   /** Select a region by id at the current level (does not change drill-down). */
   select(id: string | null) {
     const region = this.derived.regions.find((candidate) => candidate.id === id) ?? null;
+    // Clearing is a change too, so the host hears of it — as it does when a
+    // click on the sea clears the selection. Nothing to clear, nothing to say.
+    const hadSelection = this.activeSelectedId !== null;
     this.setActiveSelectedId(region?.id ?? null);
     if (region) this.options.onSelectedChange?.(region, this.derived.level);
+    else if (hadSelection) this.options.onSelectedChange?.(null, this.derived.level);
     this.applyInteractionState();
   }
 
@@ -492,23 +511,9 @@ export class IndiaChoropleth {
 
   private recompute() {
     const options = this.options;
-    const referenceGeometry = options.referenceOverlay?.geometry ?? null;
-    const cached = this.projectionCache;
-    let stateCollection: MapFeatureCollection;
-    let nationalProjection: GeoProjection;
-    if (cached && cached.geometry === options.states.geometry && cached.referenceGeometry === referenceGeometry) {
-      stateCollection = cached.collection;
-      nationalProjection = cached.projection;
-    } else {
-      stateCollection = asFeatureCollection(options.states.geometry);
-      const referenceFeatures = referenceGeometry ? asFeatureCollection(referenceGeometry).features : [];
-      nationalProjection = makeProjection({
-        type: "FeatureCollection",
-        features: [...stateCollection.features, ...referenceFeatures],
-      });
-      this.projectionCache = { geometry: options.states.geometry, referenceGeometry, collection: stateCollection, projection: nationalProjection };
-    }
-    const referenceCollection = referenceGeometry ? asFeatureCollection(referenceGeometry) : null;
+    const stateCollection = featuresOf(options.states.geometry);
+    const referenceCollection = options.referenceOverlay ? featuresOf(options.referenceOverlay.geometry) : null;
+    const nationalProjection = projectionFor(stateCollection, referenceCollection);
     // Values live on the layer, not the geometry, so this still runs every time.
     const stateRegions = prepareLayer(options.states, nationalProjection, options.minPartExtent ?? 0, stateCollection);
     const referenceRegions = options.referenceOverlay ? prepareReferenceOverlay(options.referenceOverlay, nationalProjection) : [];
@@ -520,29 +525,27 @@ export class IndiaChoropleth {
     const districtReferenceOverlay = this.loadedDistrictReferenceOverlay?.stateId === this.activeDrillDownId
       ? this.loadedDistrictReferenceOverlay.overlay
       : null;
-    const districtCollection = districtLayer ? asFeatureCollection(districtLayer.geometry) : null;
-    const districtReferenceCollection = districtReferenceOverlay ? asFeatureCollection(districtReferenceOverlay.geometry) : null;
-    const districtProjection = districtCollection
-      ? makeProjection({ type: "FeatureCollection", features: [...districtCollection.features, ...(districtReferenceCollection?.features ?? [])] })
-      : null;
+    const districtCollection = districtLayer ? featuresOf(districtLayer.geometry) : null;
+    const districtReferenceCollection = districtReferenceOverlay ? featuresOf(districtReferenceOverlay.geometry) : null;
+    const districtProjection = districtCollection ? projectionFor(districtCollection, districtReferenceCollection) : null;
 
     // Districts are prepared whenever their layer is loaded rather than only while
     // they are the visible level, because the district below them has to be
     // resolvable — by id, for the breadcrumb and for the loader — from one level down.
-    const districtRegions = districtLayer && districtProjection
-      ? prepareLayer(districtLayer, districtProjection, options.minDistrictPartExtent ?? options.minPartExtent ?? 0)
+    const districtRegions = districtLayer && districtProjection && districtCollection
+      ? prepareLayer(districtLayer, districtProjection, options.minDistrictPartExtent ?? options.minPartExtent ?? 0, districtCollection)
       : [];
     const drilledDistrict = districtRegions.find((region) => region.id === this.activeSubDrillDownId) ?? null;
     const isSubDrillRequested = Boolean(isDrillRequested && drilledDistrict && this.activeSubDrillDownId);
     const level: Level = isSubDrillRequested ? "subdistrict" : isDrillRequested ? "district" : "state";
 
     const subDistrictLayer = this.loadedSubDistricts?.districtId === this.activeSubDrillDownId ? this.loadedSubDistricts.layer : null;
-    const subDistrictCollection = subDistrictLayer ? asFeatureCollection(subDistrictLayer.geometry) : null;
-    const subDistrictProjection = subDistrictCollection ? makeProjection(subDistrictCollection) : null;
+    const subDistrictCollection = subDistrictLayer ? featuresOf(subDistrictLayer.geometry) : null;
+    const subDistrictProjection = subDistrictCollection ? projectionFor(subDistrictCollection, null) : null;
     // Sub-districts share the district knob rather than adding a fourth: they are
     // drawn at the same zoom as districts and want the same small-part treatment.
-    const subDistrictRegions = subDistrictLayer && subDistrictProjection
-      ? prepareLayer(subDistrictLayer, subDistrictProjection, options.minDistrictPartExtent ?? options.minPartExtent ?? 0)
+    const subDistrictRegions = subDistrictLayer && subDistrictProjection && subDistrictCollection
+      ? prepareLayer(subDistrictLayer, subDistrictProjection, options.minDistrictPartExtent ?? options.minPartExtent ?? 0, subDistrictCollection)
       : [];
 
     const regions = level === "subdistrict" ? subDistrictRegions : level === "district" ? districtRegions : stateRegions;
@@ -1314,14 +1317,25 @@ export class IndiaChoropleth {
     this.applyLegendState();
   }
 
+  /**
+   * The panel is made once and only its content replaced. It is a live region,
+   * and a live region announces changes to what it already holds: a fresh element
+   * on every hover gave screen readers nothing to announce, and rebuilt the DOM
+   * for each gesture. Same as the React component, whose `<aside>` stays mounted.
+   */
   private renderInsights() {
     const options = this.options;
-    if (this.insightsEl) { this.insightsEl.remove(); this.insightsEl = null; }
-    if (!options.renderInsights) return;
-    const aside = el("aside", { class: "india-choropleth__insights", "aria-live": "polite" });
-    options.renderInsights(this.computeInsightContext(), aside);
-    this.rootEl.append(aside);
-    this.insightsEl = aside;
+    if (!options.renderInsights) {
+      this.insightsEl?.remove();
+      this.insightsEl = null;
+      return;
+    }
+    if (!this.insightsEl) {
+      this.insightsEl = el("aside", { class: "india-choropleth__insights", "aria-live": "polite" });
+      this.rootEl.append(this.insightsEl);
+    }
+    this.insightsEl.textContent = "";
+    options.renderInsights(this.computeInsightContext(), this.insightsEl);
   }
 
   // ---------------------------------------------------------------------

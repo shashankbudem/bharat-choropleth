@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { StrictMode } from "react";
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -487,5 +487,142 @@ describe("BharatChoropleth districtValues", () => {
     drilled({ districtValues });
     await waitFor(() => expect(regionLabel(/^North Goa,/)).toMatch(/90/));
     expect(JSON.stringify(districtValues)).toBe(before);
+  });
+});
+
+/**
+ * Boundaries served by URL, the way the default data source asks for them. The
+ * mock rejects once its signal is aborted, as a real fetch does — a mock that
+ * ignored the signal would pass against code that aborts every request.
+ */
+function serveBundles(bundles: { states: unknown; districts?: Record<string, unknown>; subDistricts?: Record<string, unknown> }) {
+  const fetchMock = vi.fn(async (url: string, init?: RequestInit) => {
+    if (init?.signal?.aborted) throw Object.assign(new Error("This operation was aborted"), { name: "AbortError" });
+    const [, level, id] = /\/(districts|subdistricts)\/([^/]+)\.topo\.json$/.exec(url) ?? [];
+    const body = level === "districts" ? bundles.districts?.[id!] : level === "subdistricts" ? bundles.subDistricts?.[id!] : bundles.states;
+    return body === undefined ? new Response("", { status: 404 }) : new Response(JSON.stringify(body), { status: 200 });
+  });
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+const box = (west: number, south: number) => ({
+  type: "Polygon" as const,
+  coordinates: [[[west, south], [west + 0.1, south], [west + 0.1, south + 0.1], [west, south + 0.1], [west, south]]],
+});
+const collection = (...features: [id: string, name: string, west: number][]) => ({
+  type: "FeatureCollection",
+  features: features.map(([id, name, west]) => ({ type: "Feature", properties: { id, name }, geometry: box(west, 28) })),
+});
+
+describe("BharatChoropleth values below the state level", () => {
+  const states = collection(
+    ["in-cs-07-delhi", "Delhi", 77],
+    ["in-cs-34-puducherry", "Puducherry", 79],
+    ["in-cs-31-lakshadweep", "Lakshadweep", 72],
+  );
+  const bundles = {
+    states,
+    districts: {
+      "in-cs-07-delhi": collection(["in-cd-07-1", "New Delhi", 77], ["in-cd-07-2", "North Delhi", 77.2]),
+      "in-cs-34-puducherry": collection(["in-cd-34-1", "Puducherry", 79], ["in-cd-34-2", "Karaikal", 79.2]),
+      "in-cs-31-lakshadweep": collection(["in-cd-31-1", "Lakshadweep", 72]),
+    },
+    subDistricts: {
+      "in-cd-07-1": collection(["s3", "Chanakyapuri", 77], ["s4", "New Delhi", 77.2]),
+      "in-cd-07-2": collection(["s1", "Model Town", 77], ["s2", "North Delhi", 77.2]),
+    },
+  };
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("does not paint a state's value onto a sub-district that shares an alias of its name", async () => {
+    serveBundles(bundles);
+    render(<BharatChoropleth values={{ Delhi: 5 }} defaultDrillDownId="in-cs-07-delhi" defaultSubDistrictDrillDownId="in-cd-07-1" />);
+    await waitFor(() => expect(regionLabel(/^Chanakyapuri,/)).toMatch(/No data/));
+    expect(regionLabel(/^New Delhi,/)).toMatch(/No data/);
+  });
+
+  it("does not paint a state's value onto a district that shares an alias of its name", async () => {
+    serveBundles(bundles);
+    render(<BharatChoropleth values={{ Delhi: 5 }} defaultDrillDownId="in-cs-07-delhi" />);
+    await waitFor(() => expect(regionLabel(/^New Delhi,/)).toMatch(/No data/));
+    expect(regionLabel(/^North Delhi,/)).toMatch(/No data/);
+  });
+
+  it("does not paint a state's value onto a district with exactly the state's name", async () => {
+    serveBundles(bundles);
+    render(<BharatChoropleth values={{ Puducherry: 7 }} defaultDrillDownId="in-cs-34-puducherry" />);
+    await waitFor(() => expect(regionLabel(/^Karaikal,/)).toMatch(/No data/));
+    expect(regionLabel(/^Puducherry,/)).toMatch(/No data/);
+  });
+
+  it("still gives the sole district of a single-district state its state's value", async () => {
+    serveBundles(bundles);
+    render(<BharatChoropleth values={{ Lakshadweep: 43 }} defaultDrillDownId="in-cs-31-lakshadweep" />);
+    await waitFor(() => expect(regionLabel(/^Lakshadweep,/)).toMatch(/43/));
+  });
+
+  it("does not paint a district's value onto a sub-district of the same name", async () => {
+    serveBundles(bundles);
+    render(
+      <BharatChoropleth
+        values={{ Delhi: 5 }}
+        districtValues={{ Delhi: { "North Delhi": 9 } }}
+        defaultDrillDownId="in-cs-07-delhi"
+        defaultSubDistrictDrillDownId="in-cd-07-2"
+      />,
+    );
+    await waitFor(() => expect(regionLabel(/^Model Town,/)).toMatch(/No data/));
+    expect(regionLabel(/^North Delhi,/)).toMatch(/No data/);
+  });
+});
+
+describe("BharatChoropleth under StrictMode", () => {
+  const bundles = {
+    states: collection(["in-cs-30-goa", "Goa", 73]),
+    districts: { "in-cs-30-goa": collection(["in-cd-30-585", "North Goa", 73]) },
+  };
+
+  afterEach(() => vi.unstubAllGlobals());
+
+  // StrictMode unmounts and remounts once on mount. The drill-down fetches share
+  // one AbortController that the unmount aborts, so every later fetch failed.
+  it("drills down on a click", async () => {
+    serveBundles(bundles);
+    render(<StrictMode><BharatChoropleth values={{ Goa: 1 }} /></StrictMode>);
+    await waitFor(() => expect(regionLabel(/^Goa,/)).toMatch(/1/));
+    fireEvent.click(screen.getAllByRole("button").find((node) => /^Goa,/.test(node.getAttribute("aria-label") ?? ""))!);
+    await waitFor(() => expect(regionLabel(/^North Goa,/)).toBeTruthy());
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("drills down from a default drill-down id", async () => {
+    serveBundles(bundles);
+    render(<StrictMode><BharatChoropleth values={{ Goa: 1 }} defaultDrillDownId="in-cs-30-goa" /></StrictMode>);
+    await waitFor(() => expect(regionLabel(/^North Goa,/)).toBeTruthy());
+    expect(screen.queryByRole("alert")).toBeNull();
+  });
+});
+
+describe("BharatChoropleth when dataBaseUrl changes", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  // The drill-down cache was keyed by region id alone, so pointing the map at
+  // another copy of the data kept serving boundaries from the first one.
+  it("fetches districts and sub-districts from the new base URL", async () => {
+    const fetchMock = serveBundles({
+      states: collection(["in-cs-30-goa", "Goa", 73]),
+      districts: { "in-cs-30-goa": collection(["in-cd-30-585", "North Goa", 73]) },
+      subDistricts: { "in-cd-30-585": collection(["s1", "Bardez", 73]) },
+    });
+    const props = { values: { Goa: 1 }, defaultDrillDownId: "in-cs-30-goa", defaultSubDistrictDrillDownId: "in-cd-30-585" };
+    const { rerender } = render(<BharatChoropleth {...props} dataBaseUrl="https://first.example/maps" />);
+    await waitFor(() => expect(regionLabel(/^Bardez,/)).toBeTruthy());
+
+    rerender(<BharatChoropleth {...props} dataBaseUrl="https://second.example/maps" />);
+    const fetched = () => fetchMock.mock.calls.map(([url]) => String(url));
+    await waitFor(() => expect(fetched()).toContain("https://second.example/maps/current-2019-districts/districts/in-cs-30-goa.topo.json"));
+    await waitFor(() => expect(fetched()).toContain("https://second.example/maps/current-2019-subdistricts/subdistricts/in-cd-30-585.topo.json"));
   });
 });
