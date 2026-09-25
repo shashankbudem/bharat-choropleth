@@ -27,8 +27,10 @@
     so every island keeps its outline and the gaps between them.
   - Each Lakshadweep island grows about its own centre, keeping its own shape,
     and the group moves slightly west into open sea.
-  - Both get a thin coastline (`--india-map-island-stroke`,
-    `--india-map-island-border-width`) in place of the white border.
+  - Both keep the configured border colour, drawn thinner
+    (`--india-map-island-border-width`, never wider than
+    `--india-map-border-width`) and under the fill, so it cannot cover a
+    thin island.
 
   Only the national map changes; drilled into either UT, its districts are
   drawn true to size. The project communicates values, so a small departure

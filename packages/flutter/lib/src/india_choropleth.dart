@@ -1085,7 +1085,8 @@ final Rect _islandBounds = Rect.fromLTRB(
   kViewBox.height - kViewBoxPadding / 2,
 );
 
-/// The island coastline's width, in screen pixels like [IndiaChoropleth.borderWidth].
+/// The island border's width, in screen pixels like [IndiaChoropleth.borderWidth],
+/// and never more than it.
 const double _islandBorderWidth = .75;
 
 const List<double> _labelSearchTurns = [
@@ -1212,15 +1213,15 @@ class _ChoroplethPainter extends CustomPainter {
       fill.color = dulled ? _dull(color) : color;
       // The border has to fade with its fill. Dulling only the fill would leave
       // a full-strength white mesh drawn over grey.
-      // Island groups get a thin coastline in place of the border, which is
-      // wider than most of Andaman & Nicobar's islands and would cover them.
-      final edge = region.island ? minRegionMarkerOutline : borderColor;
       stroke.color = dulled
-          ? _dull(edge)
+          ? _dull(borderColor)
           : referenceOverlayMergeIds.contains(region.id)
               ? const Color(0x00000000)
-              : edge;
-      stroke.strokeWidth = (region.island ? _islandBorderWidth : borderWidth) / fit.scale;
+              : borderColor;
+      // Island groups keep the border colour but draw it thinner, and under the
+      // fill: at full width, or centred on the edge, it covers most of an island
+      // only a unit or two wide. Same as `paint-order: stroke` on the web.
+      stroke.strokeWidth = (region.island ? math.min(borderWidth, _islandBorderWidth) : borderWidth) / fit.scale;
 
       // The survivors of a filter are lifted off the page, so the picked band
       // reads as a group even where its own colour is nearly white. A shadow
@@ -1238,8 +1239,9 @@ class _ChoroplethPainter extends CustomPainter {
         canvas.restore();
       }
 
+      if (region.island) canvas.drawPath(region.path, stroke);
       canvas.drawPath(region.path, fill);
-      canvas.drawPath(region.path, stroke);
+      if (!region.island) canvas.drawPath(region.path, stroke);
 
       // A region whose largest part is smaller than the marker would otherwise
       // be invisible and untappable. The marker stands in for it at the same

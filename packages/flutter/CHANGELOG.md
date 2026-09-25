@@ -23,7 +23,8 @@
     so every island keeps its outline and the gaps between them.
   - Each Lakshadweep island grows about its own centre, keeping its own shape,
     and the group moves slightly west into open sea.
-  - Both get a thin coastline (drawn in `minRegionMarkerOutline`) in place of the border.
+  - Both keep `borderColor`, drawn thinner (at most 0.75, never wider than
+    `borderWidth`) and under the fill, so it cannot cover a thin island.
   - `ChoroplethRegion.island` marks them, and `placeIslandGroup` is exported.
 
   Only the national map changes; drilled into either UT, its districts are
