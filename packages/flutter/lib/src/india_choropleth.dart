@@ -427,8 +427,9 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
     List<MapFeature> features,
     Map<String, double?> values,
     ReferenceOverlay? overlay,
-    double minPartExtent,
-  ) {
+    double minPartExtent, {
+    bool national = false,
+  }) {
     final all = [...features, ...?overlay?.features];
     if (all.isEmpty) return (const [], const []);
     final canonical = _canonicalize(values);
@@ -452,7 +453,13 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
 
     final regions = <ChoroplethRegion>[];
     for (final feature in features) {
-      final rings = ringsOf(feature);
+      final trueRings = ringsOf(feature);
+      // Island groups are redrawn to be seen on the national map; see
+      // placeIslandGroup. Any host exaggeration still applies on top.
+      final islandRings = national
+          ? placeIslandGroup(feature.id, feature.name, trueRings, widget.smallRegionExtent, _islandBounds)
+          : null;
+      final rings = islandRings ?? trueRings;
       // Puducherry and anything else on the keep-true list is drawn as it really
       // is, however small, because there is no room around it to grow into.
       final projectedRings =
@@ -471,6 +478,7 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
         largestRingExtent: largestRingExtentOf(projectedRings),
         partBounds: projectedRings.map(boundsOfRing).toList(growable: false),
         feature: feature,
+        island: islandRings != null,
       ));
     }
 
@@ -488,7 +496,7 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
 
   void _prepare() {
     final (stateRegions, stateReferences) =
-        _project(widget.features, widget.values, widget.referenceOverlay, widget.minPartExtent);
+        _project(widget.features, widget.values, widget.referenceOverlay, widget.minPartExtent, national: true);
     _stateRegions = stateRegions;
 
     final districts = _districtsFor != null && _districtsFor == _drillDownId ? _districts : null;
@@ -1069,6 +1077,17 @@ class _IndiaChoroplethState extends State<IndiaChoropleth> {
 /// Angles to try when placing a small region's label, as turns from the
 /// away-from-centre direction: straight out first, then progressively to either
 /// side, and inward only as a last resort.
+/// How far a redrawn island group may reach: half the map's padding in from each edge.
+final Rect _islandBounds = Rect.fromLTRB(
+  kViewBoxPadding / 2,
+  kViewBoxPadding / 2,
+  kViewBox.width - kViewBoxPadding / 2,
+  kViewBox.height - kViewBoxPadding / 2,
+);
+
+/// The island coastline's width, in screen pixels like [IndiaChoropleth.borderWidth].
+const double _islandBorderWidth = .75;
+
 const List<double> _labelSearchTurns = [
   0,
   math.pi / 6,
@@ -1193,11 +1212,15 @@ class _ChoroplethPainter extends CustomPainter {
       fill.color = dulled ? _dull(color) : color;
       // The border has to fade with its fill. Dulling only the fill would leave
       // a full-strength white mesh drawn over grey.
+      // Island groups get a thin coastline in place of the border, which is
+      // wider than most of Andaman & Nicobar's islands and would cover them.
+      final edge = region.island ? minRegionMarkerOutline : borderColor;
       stroke.color = dulled
-          ? _dull(borderColor)
+          ? _dull(edge)
           : referenceOverlayMergeIds.contains(region.id)
               ? const Color(0x00000000)
-              : borderColor;
+              : edge;
+      stroke.strokeWidth = (region.island ? _islandBorderWidth : borderWidth) / fit.scale;
 
       // The survivors of a filter are lifted off the page, so the picked band
       // reads as a group even where its own colour is nearly white. A shadow

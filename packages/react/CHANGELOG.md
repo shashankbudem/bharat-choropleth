@@ -18,6 +18,22 @@
   location. The drill-down cache was keyed by region id alone, so it kept
   serving boundaries from the first one.
 
+### Changed
+
+- Andaman & Nicobar and Lakshadweep are drawn so they can be seen on the
+  national map. At that scale Andaman & Nicobar's islands were thinner than the
+  white region border, and Lakshadweep was a single dot.
+  - Andaman & Nicobar is magnified about 1.5× as one group about its own centre,
+    so every island keeps its outline and the gaps between them.
+  - Each Lakshadweep island grows about its own centre, keeping its own shape,
+    and the group moves slightly west into open sea.
+  - Both get a thin coastline (`--india-map-island-stroke`,
+    `--india-map-island-border-width`) in place of the white border.
+
+  Only the national map changes; drilled into either UT, its districts are
+  drawn true to size. The project communicates values, so a small departure
+  from true size and position is the price of a region that can be seen.
+
 ## 0.3.1 - 2026-09-13
 
 ### Fixed

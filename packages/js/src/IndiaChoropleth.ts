@@ -9,6 +9,7 @@ import {
   labelPointFor,
   enlargeSmallParts,
   largestRingExtent,
+  placeIslandGroup,
   placeOutsideLabel,
   ringsToPath,
   scatteredHitArea,
@@ -39,6 +40,13 @@ const TOOLTIP_GAP_PX = 12;
 const SMALL_REGION_EXTENT = 22;
 const SMALL_REGION_CLICK_RADIUS = 14;
 const MIN_REGION_MARKER_SIZE = 7;
+// How far a redrawn island group may reach: half the map's padding in from each edge.
+const ISLAND_BOUNDS = [
+  VIEWBOX.padding / 2,
+  VIEWBOX.padding / 2,
+  VIEWBOX.width - VIEWBOX.padding / 2,
+  VIEWBOX.height - VIEWBOX.padding / 2,
+] as const;
 
 type PreparedRegion = MapRegion & {
   path: string;
@@ -54,6 +62,8 @@ type PreparedRegion = MapRegion & {
   partBounds: Box[];
   /** Longest side of the largest part — the measure of "too small to use". */
   extent: number;
+  /** An island group drawn larger than life, with a coastline for a border. */
+  island: boolean;
 };
 
 /**
@@ -155,6 +165,7 @@ function prepareLayer(
   projection: GeoProjection,
   minPartExtent = 0,
   collection: MapFeatureCollection = featuresOf(layer.geometry),
+  national = false,
 ): PreparedRegion[] {
   const path = geoPath(projection);
   return collection.features.map((feature) => {
@@ -173,17 +184,21 @@ function prepareLayer(
     };
     // Puducherry and anything else on the keep-true list is drawn as it really
     // is, however small, because there is no room around it to grow into.
+    // Island groups are redrawn to be seen on the national map; see
+    // `placeIslandGroup`. Any host exaggeration still applies on top.
+    const trueRings = projectedRings(feature, projection);
+    const islandRings = national ? placeIslandGroup(region.id, region.label, trueRings, SMALL_REGION_EXTENT, ISLAND_BOUNDS) : null;
     const exaggerated = minPartExtent > 0 && !keepsTrueGeometry(region.id);
     const rings = exaggerated
-      ? enlargeSmallParts(projectedRings(feature, projection), minPartExtent)
-      : projectedRings(feature, projection);
+      ? enlargeSmallParts(islandRings ?? trueRings, minPartExtent)
+      : (islandRings ?? trueRings);
     const hull = scatteredHitArea(rings, SMALL_REGION_EXTENT);
     // With exaggeration on, the drawn outline has to come from the moved rings
     // rather than d3's path generator, so what is drawn, measured, labelled and
     // clicked are all the same geometry.
     return {
       ...region,
-      path: exaggerated ? ringsToPath(rings) : (path(feature) ?? ""),
+      path: exaggerated || islandRings ? ringsToPath(rings) : (path(feature) ?? ""),
       hitPath: hull ? ringsToPath([hull]) : null,
       // The largest part's centroid, not the whole feature's: averaging across
       // parts puts an island group's label out at sea between its islands.
@@ -192,6 +207,7 @@ function prepareLayer(
         : (centroid.every(Number.isFinite) ? centroid : fallbackCentroid),
       partBounds: rings.map(boundsOfRing),
       extent: largestRingExtent(rings),
+      island: islandRings !== null,
     };
   });
 }
@@ -515,7 +531,7 @@ export class IndiaChoropleth {
     const referenceCollection = options.referenceOverlay ? featuresOf(options.referenceOverlay.geometry) : null;
     const nationalProjection = projectionFor(stateCollection, referenceCollection);
     // Values live on the layer, not the geometry, so this still runs every time.
-    const stateRegions = prepareLayer(options.states, nationalProjection, options.minPartExtent ?? 0, stateCollection);
+    const stateRegions = prepareLayer(options.states, nationalProjection, options.minPartExtent ?? 0, stateCollection, true);
     const referenceRegions = options.referenceOverlay ? prepareReferenceOverlay(options.referenceOverlay, nationalProjection) : [];
 
     const drilledState = stateRegions.find((region) => region.id === this.activeDrillDownId) ?? null;
@@ -1073,6 +1089,7 @@ export class IndiaChoropleth {
       });
       if (interactive) path.setAttribute("role", "button");
       if (this.derived.mergedReferenceIds.has(region.id)) path.classList.add("india-choropleth__region--reference-merged");
+      if (region.island) path.classList.add("india-choropleth__region--island");
       if (interactive) {
         path.setAttribute("aria-pressed", region.id === this.derived.selected?.id ? "true" : "false");
         path.addEventListener("mouseenter", () => this.inspect(region));

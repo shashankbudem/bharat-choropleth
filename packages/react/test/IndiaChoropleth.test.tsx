@@ -1041,3 +1041,54 @@ describe("warning about a loader recreated on every render", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 });
+
+describe("island groups on the national map", () => {
+  // A mainland and a chain of thin islands off its coast, like the Bay of Bengal.
+  const islands = (code: string, name: string) => ({
+    type: "Feature" as const,
+    properties: { code, name, value: 3 },
+    geometry: { type: "MultiPolygon" as const, coordinates: [
+      [[[92.5, 13], [92.5, 13.6], [92.6, 13.6], [92.6, 13], [92.5, 13]]],
+      [[[92.6, 12.2], [92.6, 12.7], [92.7, 12.7], [92.7, 12.2], [92.6, 12.2]]],
+      [[[93.8, 7], [93.8, 7.2], [93.9, 7.2], [93.9, 7], [93.8, 7]]],
+    ] },
+  });
+  const mainland = { type: "Feature" as const, properties: { code: "main", name: "Mainland", value: 10 }, geometry: { type: "Polygon" as const, coordinates: [[[72, 8], [72, 30], [90, 30], [90, 8], [72, 8]]] } };
+  const layerOf = (...features: object[]): MapLayer => ({
+    geometry: { type: "FeatureCollection", features } as MapLayer["geometry"],
+    getId: (feature) => String(feature.properties?.code),
+    getLabel: (feature) => String(feature.properties?.name),
+    getValue: (feature) => feature.properties?.value as number | null,
+  });
+  const regionIn = (root: ParentNode, label: RegExp) =>
+    [...root.querySelectorAll(".india-choropleth__region")].find((node) => label.test(node.getAttribute("aria-label") ?? ""))!;
+
+  it("draws Andaman & Nicobar larger, with the island coastline, on the national map", () => {
+    const plain = render(<IndiaChoropleth states={layerOf(mainland, islands("isl", "Islands"))} />);
+    const truePath = regionIn(plain.container, /^Islands,/).getAttribute("d");
+    plain.unmount();
+
+    const { container } = render(<IndiaChoropleth states={layerOf(mainland, islands("in-cs-35-andaman-and-nicobar", "Andaman & Nicobar"))} />);
+    const region = regionIn(container, /^Andaman & Nicobar,/);
+    expect(region.getAttribute("d")).not.toBe(truePath);
+    expect(region.classList.contains("india-choropleth__region--island")).toBe(true);
+    expect(regionIn(container, /^Mainland,/).classList.contains("india-choropleth__region--island")).toBe(false);
+  });
+
+  it("leaves the districts of a drilled-in island UT at their true size", async () => {
+    const districts = layerOf(islands("in-cd-35-603", "South Andaman"));
+    const { container } = render(
+      <IndiaChoropleth
+        states={layerOf(mainland, islands("in-cs-35-andaman-and-nicobar", "Andaman & Nicobar"))}
+        defaultDrillDownId="in-cs-35-andaman-and-nicobar"
+        loadDistricts={async () => districts}
+      />,
+    );
+    await waitFor(() => expect(regionIn(container, /^South Andaman,/)).toBeTruthy());
+    const drilled = regionIn(container, /^South Andaman,/);
+    expect(drilled.classList.contains("india-choropleth__region--island")).toBe(false);
+
+    const reference = render(<IndiaChoropleth states={layerOf(islands("d", "Plain"))} />);
+    expect(drilled.getAttribute("d")).toBe(reference.container.querySelector(".india-choropleth__region")!.getAttribute("d"));
+  });
+});

@@ -324,3 +324,81 @@ List<List<Offset>> enlargeSmallParts(
         .toList(growable: false);
   }).toList(growable: false);
 }
+
+/// Island groups redrawn larger than life on the national map.
+///
+/// At national scale both groups all but vanish: Andaman & Nicobar's islands
+/// are a few units wide, and Lakshadweep's are specks. This project is about
+/// getting numbers across, so a region you cannot see is worse than one drawn a
+/// little larger or a little out of place, and both are drawn so they can be seen:
+///
+/// - Andaman & Nicobar is magnified as one group about its own centre. Every
+///   island keeps its outline, its size beside the others and the water between
+///   them; the chain is simply larger.
+/// - Lakshadweep's islands are specks spread over 250 km, so no single factor
+///   shows them without the group reaching Kerala. Each island grows about its
+///   own centre instead, keeping its own shape, and the group moves a little
+///   west into open sea to make room.
+///
+/// Matched on id or label, since host data brings its own ids. Callers apply it
+/// to the national layer only: drilled in, a UT fills the map, and its
+/// districts' labels ("South Andaman") would match. Mirrors `small-regions.ts`.
+const _islandMagnify = {'andaman': 1.8};
+const _islandPartExtent = {'lakshadweep': 8.0};
+const _islandShift = {'lakshadweep': Offset(-14, 0)};
+
+/// An island group's rings redrawn to be seen, or null for any other region.
+///
+/// Magnification stops short of [smallExtent], the "too small to use" threshold,
+/// because staying under it is what keeps the hit area over the sea, the tap
+/// buffer and the value label placed beside the region. The result is pulled
+/// back inside [bounds] if it grew past an edge.
+List<List<Offset>>? placeIslandGroup(
+  String id,
+  String label,
+  List<List<Offset>> rings,
+  double smallExtent,
+  Rect bounds,
+) {
+  final names = '$id $label'.toLowerCase();
+  if (rings.isEmpty) return null;
+  List<List<Offset>> placed;
+  final magnify = _islandMagnify.entries.where((entry) => names.contains(entry.key)).firstOrNull?.value;
+  final grow = _islandPartExtent.keys.where(names.contains).firstOrNull;
+  if (magnify != null) {
+    final largest = largestRingExtentOf(rings);
+    final factor = largest > 0 ? math.max(1.0, math.min(magnify, smallExtent * 0.95 / largest)) : 1.0;
+    final centre = boundsOfRing([for (final ring in rings) ...ring]).center;
+    placed = [
+      for (final ring in rings) [for (final point in ring) centre + (point - centre) * factor],
+    ];
+  } else if (grow != null) {
+    final shift = _islandShift[grow]!;
+    placed = [
+      for (final ring in enlargeSmallParts(rings, _islandPartExtent[grow]!)) [for (final point in ring) point + shift],
+    ];
+  } else {
+    return null;
+  }
+  return _keepInside(placed, bounds);
+}
+
+/// Move a set of rings, unchanged, so their bounds sit inside [bounds].
+List<List<Offset>> _keepInside(List<List<Offset>> rings, Rect bounds) {
+  final box = boundsOfRing([for (final ring in rings) ...ring]);
+  final dx = box.left < bounds.left
+      ? bounds.left - box.left
+      : box.right > bounds.right
+          ? bounds.right - box.right
+          : 0.0;
+  final dy = box.top < bounds.top
+      ? bounds.top - box.top
+      : box.bottom > bounds.bottom
+          ? bounds.bottom - box.bottom
+          : 0.0;
+  if (dx == 0 && dy == 0) return rings;
+  final shift = Offset(dx, dy);
+  return [
+    for (final ring in rings) [for (final point in ring) point + shift],
+  ];
+}

@@ -7,6 +7,10 @@
   --india-map-border-width-active: 2;
   --india-map-selection-width: 3;
   --india-map-small-marker-stroke: #53617b;
+  /* Island groups get a thin coastline in place of the white border, which is
+     wider than most of Andaman & Nicobar's islands and would cover them. */
+  --india-map-island-stroke: var(--india-map-small-marker-stroke);
+  --india-map-island-border-width: .75;
   --india-map-focus: #0f766e;
   --india-map-active: #ff725f;
   --india-map-empty: #e7edf0;
@@ -43,6 +47,7 @@
 .india-choropleth__region:focus { outline: none; }
 .india-choropleth__region:focus-visible { outline: none; }
 .india-choropleth__region--reference-merged { stroke: transparent; }
+.india-choropleth__region--island { stroke: var(--india-map-island-stroke); stroke-width: var(--india-map-island-border-width); }
 .india-choropleth--static .india-choropleth__region { cursor: default; }
 .india-choropleth__region:is(:hover, :focus-visible), .india-choropleth__region--inspected { stroke: var(--india-map-stroke-active); stroke-width: var(--india-map-border-width-active); filter: drop-shadow(0 5px 4px rgb(8 20 53 / .14)); transform: translateY(-2px); }
 /* Selection is a ring, never a fill: on a choropleth the fill carries the value,

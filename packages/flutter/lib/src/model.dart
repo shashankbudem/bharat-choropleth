@@ -94,6 +94,7 @@ class ChoroplethRegion {
     required this.largestRingExtent,
     required this.partBounds,
     required this.feature,
+    this.island = false,
   });
 
   final String id;
@@ -124,6 +125,10 @@ class ChoroplethRegion {
   final List<Rect> partBounds;
 
   final MapFeature feature;
+
+  /// An island group drawn larger than life on the national map, with a thin
+  /// coastline in place of the border. See [placeIslandGroup].
+  final bool island;
 }
 
 /// A reference-overlay feature as it is drawn.
