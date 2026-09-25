@@ -92,7 +92,7 @@ const enclaveLayer: MapLayer = {
   geometry: { type: "FeatureCollection", features: [
     { type: "Feature", properties: { code: "big", name: "Bigland", value: 10 }, geometry: { type: "Polygon", coordinates: [[[72, 18], [72, 19], [73, 19], [73, 18], [72, 18]]] } },
     { type: "Feature", properties: { code: "in-cs-34-puducherry", name: "Puducherry", value: 2 }, geometry: { type: "Polygon", coordinates: [[[74, 18], [74, 18.01], [74.01, 18.01], [74.01, 18], [74, 18]]] } },
-    { type: "Feature", properties: { code: "in-cs-31-lakshadweep", name: "Lakshadweep", value: 1 }, geometry: { type: "Polygon", coordinates: [[[74, 18.5], [74, 18.51], [74.01, 18.51], [74.01, 18.5], [74, 18.5]]] } },
+    { type: "Feature", properties: { code: "speck", name: "Speck", value: 1 }, geometry: { type: "Polygon", coordinates: [[[74, 18.5], [74, 18.51], [74.01, 18.51], [74.01, 18.5], [74, 18.5]]] } },
   ] },
   getId: (feature) => String(feature.properties?.code),
   getLabel: (feature) => String(feature.properties?.name),
@@ -566,8 +566,8 @@ describe("IndiaChoropleth (plain JS)", () => {
 
   it("keeps Puducherry's true outline while its neighbour is exaggerated", () => {
     // Puducherry is enclaves inside another state: grown to the visibility
-    // threshold they land several units inside Tamil Nadu. Lakshadweep grows
-    // into open sea, so it still gets the help.
+    // threshold they land several units inside Tamil Nadu. A speck in open
+    // sea still gets the help.
     const pathFor = (name: string, minPartExtent: number) => {
       const host = document.createElement("div");
       document.body.appendChild(host);
@@ -578,7 +578,7 @@ describe("IndiaChoropleth (plain JS)", () => {
     };
 
     expect(pathFor("Puducherry", 14)).toBe(pathFor("Puducherry", 0));
-    expect(pathFor("Lakshadweep", 14)).not.toBe(pathFor("Lakshadweep", 0));
+    expect(pathFor("Speck", 14)).not.toBe(pathFor("Speck", 0));
   });
 
   it("makes the water inside an island group part of the group", () => {
@@ -1170,6 +1170,19 @@ describe("island groups on the national map", () => {
     expect(region.getAttribute("d")).not.toBe(truePath);
     expect(region.classList.contains("india-choropleth__region--island")).toBe(true);
     expect(regionPath(/^Mainland,/).classList.contains("india-choropleth__region--island")).toBe(false);
+  });
+
+  // Island groups are drawn so they can be seen; a stand-in dot on top of the
+  // magnified islands would cover the very thing it was standing in for.
+  it("draws no stand-in dot for an island group, but still does for other specks", () => {
+    const speck = (code: string, name: string, lon: number) => ({
+      type: "Feature" as const,
+      properties: { code, name, value: 1 },
+      geometry: { type: "Polygon" as const, coordinates: [[[lon, 18], [lon, 18.01], [lon + 0.01, 18.01], [lon + 0.01, 18], [lon, 18]]] },
+    });
+    new IndiaChoropleth(host, { states: layerOf(mainland, speck("in-cs-31-lakshadweep", "Lakshadweep", 70), speck("other", "Speck", 71)) });
+    const markers = host.querySelectorAll(".india-choropleth__small-markers circle");
+    expect(markers).toHaveLength(1);
   });
 
   it("leaves the districts of a drilled-in island UT at their true size", async () => {

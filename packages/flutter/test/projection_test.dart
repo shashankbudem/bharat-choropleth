@@ -224,16 +224,23 @@ void main() {
     // Lakshadweep: specks a fraction of a unit across, far apart.
     final lakshadweep = [rect(300, 520, .5, 1), rect(310, 560, 1, .5)];
 
-    test('grows each Lakshadweep island about its own centre, then moves the group west', () {
+    test('spreads Lakshadweep out as a group, moves it west, and grows each island to be seen', () {
       final placed = placeIslandGroup('in-cs-31-lakshadweep', 'Lakshadweep', lakshadweep, 22, bounds)!;
+      // The group is magnified as one: the gap between islands scales by one factor.
+      final trueGap = boundsOfRing(lakshadweep[1]).center.dy - boundsOfRing(lakshadweep[0]).center.dy;
+      final gap = boundsOfRing(placed[1]).center.dy - boundsOfRing(placed[0]).center.dy;
+      expect(gap / trueGap, greaterThan(1));
       for (var i = 0; i < placed.length; i++) {
         final grown = boundsOfRing(placed[i]);
         final original = boundsOfRing(lakshadweep[i]);
+        // Each island keeps its own proportions, and grows to where it can be seen.
         expect(grown.width / grown.height, closeTo(original.width / original.height, 1e-9));
         expect(grown.longestSide, greaterThanOrEqualTo(7));
-        expect(grown.center.dy, closeTo(original.center.dy, 1e-9));
-        expect(grown.center.dx, lessThan(original.center.dx));
       }
+      // Moved west, not north or south. Growing the islands unevenly nudges the
+      // group's bounding box a little, so "not north or south" is within a unit or two.
+      expect(boundsOf(placed).center.dx, lessThan(boundsOf(lakshadweep).center.dx));
+      expect((boundsOf(placed).center.dy - boundsOf(lakshadweep).center.dy).abs(), lessThan(2));
     });
 
     test("recognises an island group by label when the host's ids do not name it", () {

@@ -1467,7 +1467,9 @@ class _ChoroplethPainter extends CustomPainter {
     return null; // hemmed in on every side — the caller keeps the label inside
   }
 
+  // Island groups are magnified to be seen instead; a dot on top would cover them.
   bool _needsMarker(ChoroplethRegion region) =>
+      !region.island &&
       minRegionMarkerSize > 0 &&
       region.largestRingExtent > 0 &&
       region.largestRingExtent < minRegionMarkerSize;

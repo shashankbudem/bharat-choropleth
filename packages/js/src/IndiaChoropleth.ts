@@ -1119,7 +1119,8 @@ export class IndiaChoropleth {
     // it is painted over whatever is beneath it, so it is what the reader sees and
     // aims at, and the outline it stands in for is too small to hover. Focus stays
     // on the region path, its one tab stop.
-    const markers = this.derived.regions.filter((region) => region.extent > 0 && region.extent < MIN_REGION_MARKER_SIZE);
+    // Island groups are magnified to be seen instead; a dot on top would cover them.
+    const markers = this.derived.regions.filter((region) => !region.island && region.extent > 0 && region.extent < MIN_REGION_MARKER_SIZE);
     if (markers.length > 0) {
       const group = svgEl("g", { class: "india-choropleth__small-markers", "aria-hidden": "true" });
       for (const region of markers) {

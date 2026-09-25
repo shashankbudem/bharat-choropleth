@@ -295,19 +295,23 @@ describe("placeIslandGroup", () => {
     [[310, 560], [311, 560], [311, 560.5], [310, 560.5], [310, 560]],
   ] as Point[][];
 
-  it("grows each Lakshadweep island about its own centre, then moves the group west", () => {
+  it("spreads Lakshadweep out as a group, moves it west, and grows each island to be seen", () => {
     const placed = placeIslandGroup("in-cs-31-lakshadweep", "Lakshadweep", lakshadweep, 22, bounds)!;
+    // The group is magnified as one: the gap between islands scales by one factor.
+    const trueGap = centreOf([lakshadweep[1]!])[1]! - centreOf([lakshadweep[0]!])[1]!;
+    const gap = centreOf([placed[1]!])[1]! - centreOf([placed[0]!])[1]!;
+    expect(gap / trueGap).toBeGreaterThan(1);
     for (const [index, ring] of placed.entries()) {
       const [width, height] = sizeOf(ring);
       const [trueWidth, trueHeight] = sizeOf(lakshadweep[index]!);
-      // Each island keeps its own proportions...
+      // Each island keeps its own proportions, and grows to where it can be seen.
       expect(width! / height!).toBeCloseTo(trueWidth! / trueHeight!);
-      // ...grows to where it can be seen...
       expect(Math.max(width!, height!)).toBeGreaterThanOrEqual(7);
-      // ...and stays at its own latitude, shifted only west.
-      expect(centreOf([ring])[1]).toBeCloseTo(centreOf([lakshadweep[index]!])[1]!);
-      expect(centreOf([ring])[0]).toBeLessThan(centreOf([lakshadweep[index]!])[0]!);
     }
+    // Moved west, not north or south. Growing the islands unevenly nudges the
+    // group's bounding box a little, so "not north or south" is within a unit or two.
+    expect(centreOf(placed)[0]).toBeLessThan(centreOf(lakshadweep)[0]!);
+    expect(Math.abs(centreOf(placed)[1]! - centreOf(lakshadweep)[1]!)).toBeLessThan(2);
   });
 
   it("recognises an island group by label when the host's ids do not name it", () => {

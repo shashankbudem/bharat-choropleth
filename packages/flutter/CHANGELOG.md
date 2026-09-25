@@ -21,8 +21,9 @@
   white region border, and Lakshadweep was a single dot.
   - Andaman & Nicobar is magnified about 1.5× as one group about its own centre,
     so every island keeps its outline and the gaps between them.
-  - Each Lakshadweep island grows about its own centre, keeping its own shape,
-    and the group moves slightly west into open sea.
+  - Lakshadweep is spread out 2× as a group and moved west into the open
+    Arabian Sea, clear of Kerala, and then each island grows about its own
+    centre, keeping its shape. Island groups no longer get a stand-in dot.
   - Both keep `borderColor`, drawn thinner (at most 0.75, never wider than
     `borderWidth`) and under the fill, so it cannot cover a thin island.
   - `ChoroplethRegion.island` marks them, and `placeIslandGroup` is exported.

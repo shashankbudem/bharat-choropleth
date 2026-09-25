@@ -809,7 +809,8 @@ export function IndiaChoropleth({
   }, [formatValue, regions]);
 
   const smallMarkers = useMemo(
-    () => regions.filter((region) => region.extent > 0 && region.extent < MIN_REGION_MARKER_SIZE),
+    // Island groups are magnified to be seen instead; a dot on top would cover them.
+    () => regions.filter((region) => !region.island && region.extent > 0 && region.extent < MIN_REGION_MARKER_SIZE),
     [regions],
   );
 

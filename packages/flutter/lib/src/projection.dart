@@ -329,23 +329,26 @@ List<List<Offset>> enlargeSmallParts(
 ///
 /// At national scale both groups all but vanish: Andaman & Nicobar's islands
 /// are a few units wide, and Lakshadweep's are specks. This project is about
-/// getting numbers across, so a region you cannot see is worse than one drawn a
-/// little larger or a little out of place, and both are drawn so they can be seen:
+/// getting numbers across, so a region you cannot see is worse than one drawn
+/// larger or out of place. Each group is first magnified as one, about its own
+/// centre, like a lens held over it: every island keeps its outline, its place
+/// in the group and the water around it.
 ///
-/// - Andaman & Nicobar is magnified as one group about its own centre. Every
-///   island keeps its outline, its size beside the others and the water between
-///   them; the chain is simply larger.
-/// - Lakshadweep's islands are specks spread over 250 km, so no single factor
-///   shows them without the group reaching Kerala. Each island grows about its
-///   own centre instead, keeping its own shape, and the group moves a little
-///   west into open sea to make room.
+/// - Andaman & Nicobar has open sea all round, and the lens alone is enough.
+/// - Lakshadweep's islands are tiny beside the 250 km they spread over, so a
+///   lens alone only spreads a few specks further apart. The group is magnified
+///   2x and moved 30 units west into the open Arabian Sea, and then each island
+///   grows about its own centre, keeping its shape, until it can be seen.
+///   Measured on the national map, that keeps it more than 20 units clear of
+///   Kerala; the same growth in place would reach the coast.
 ///
 /// Matched on id or label, since host data brings its own ids. Callers apply it
 /// to the national layer only: drilled in, a UT fills the map, and its
 /// districts' labels ("South Andaman") would match. Mirrors `small-regions.ts`.
-const _islandMagnify = {'andaman': 1.8};
-const _islandPartExtent = {'lakshadweep': 8.0};
-const _islandShift = {'lakshadweep': Offset(-14, 0)};
+const _islandGroups = <({String name, double magnify, double partExtent, Offset shift})>[
+  (name: 'andaman', magnify: 1.8, partExtent: 0, shift: Offset.zero),
+  (name: 'lakshadweep', magnify: 2, partExtent: 10, shift: Offset(-30, 0)),
+];
 
 /// An island group's rings redrawn to be seen, or null for any other region.
 ///
@@ -361,26 +364,16 @@ List<List<Offset>>? placeIslandGroup(
   Rect bounds,
 ) {
   final names = '$id $label'.toLowerCase();
-  if (rings.isEmpty) return null;
-  List<List<Offset>> placed;
-  final magnify = _islandMagnify.entries.where((entry) => names.contains(entry.key)).firstOrNull?.value;
-  final grow = _islandPartExtent.keys.where(names.contains).firstOrNull;
-  if (magnify != null) {
-    final largest = largestRingExtentOf(rings);
-    final factor = largest > 0 ? math.max(1.0, math.min(magnify, smallExtent * 0.95 / largest)) : 1.0;
-    final centre = boundsOfRing([for (final ring in rings) ...ring]).center;
-    placed = [
-      for (final ring in rings) [for (final point in ring) centre + (point - centre) * factor],
-    ];
-  } else if (grow != null) {
-    final shift = _islandShift[grow]!;
-    placed = [
-      for (final ring in enlargeSmallParts(rings, _islandPartExtent[grow]!)) [for (final point in ring) point + shift],
-    ];
-  } else {
-    return null;
-  }
-  return _keepInside(placed, bounds);
+  final group = _islandGroups.where((group) => names.contains(group.name)).firstOrNull;
+  if (group == null || rings.isEmpty) return null;
+  final largest = largestRingExtentOf(rings);
+  final factor = largest > 0 ? math.max(1.0, math.min(group.magnify, smallExtent * 0.95 / largest)) : 1.0;
+  final centre = boundsOfRing([for (final ring in rings) ...ring]).center;
+  final magnified = [
+    for (final ring in rings) [for (final point in ring) centre + (point - centre) * factor + group.shift],
+  ];
+  // enlargeSmallParts leaves the rings alone when partExtent is 0.
+  return _keepInside(enlargeSmallParts(magnified, group.partExtent), bounds);
 }
 
 /// Move a set of rings, unchanged, so their bounds sit inside [bounds].
