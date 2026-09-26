@@ -30,9 +30,8 @@ import { version } from './package.json';
  * get right, and nothing fetched from a third party in a viewer's browser. It
  * also works in an air-gapped Grafana with no configuration at all.
  *
- * Only the current-2019 levels are copied — the panel never requests the
- * historical Census-2011 bundle or the claim outline, and every file copied here
- * ends up in the signed manifest.
+ * Only the three current-2019 levels are copied: every file copied here ends up
+ * in the signed manifest.
  */
 const BOUNDARY_DIRS = ['current-2019-states', 'current-2019-districts', 'current-2019-subdistricts'];
 // Two layouts, one config. In this monorepo the geometry is generated at the

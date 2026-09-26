@@ -143,7 +143,7 @@ export default function App() {
           <InsightRail context={insight} metric={metric} />
         </div>
       </main>
-      <footer>Sample values only; totals cover bundled demo geometry, not every national reference area. Hatched areas are non-statistical and have no metric or district coverage. States, districts and sub-districts (2019 boundaries): <a href="https://github.com/datta07/INDIAN-SHAPEFILES">datta07/INDIAN-SHAPEFILES</a> (MIT). <a href="https://github.com/datameet/maps">Use your own geometry</a>.</footer>
+      <footer>Sample values only; totals cover bundled demo geometry, not every national reference area. Hatched areas are non-statistical and have no metric or district coverage. States, districts and sub-districts (2019 boundaries): <a href="https://github.com/datta07/INDIAN-SHAPEFILES">datta07/INDIAN-SHAPEFILES</a> (MIT). <a href="https://github.com/shashankbudem/bharat-choropleth#minimal-usage">Use your own geometry</a>.</footer>
     </div>
   );
 }

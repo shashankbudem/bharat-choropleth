@@ -46,7 +46,7 @@ if (missing.length > 0) {
   console.error(
     `prepare-flutter-example-assets: missing source data:\n${missing.map(({ from }) => `  ${from}`).join("\n")}\n\n` +
       "The generated bundles are committed, so this usually means an incomplete checkout.\n" +
-      "Regenerate them with `pnpm build:data` (needs the pinned DataMeet source checkout).",
+      "Regenerate them with `pnpm build:data` (needs a datta07/INDIAN-SHAPEFILES checkout).",
   );
   process.exit(1);
 }

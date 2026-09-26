@@ -457,7 +457,7 @@ describe("BharatChoropleth with fetched geometry", () => {
 });
 
 describe("values keyed by an id the state registry does not know", () => {
-  // The historical Census bundle in this repo uses in-hs-* ids. They are not in
+  // A host's own geometry can use ids like these in-hs-* ones. They are not in
   // the registry, so before this the feature fell back to being keyed on its
   // label while the caller's values were keyed on the id — and a fully populated
   // dataset rendered as "No data" on every region.

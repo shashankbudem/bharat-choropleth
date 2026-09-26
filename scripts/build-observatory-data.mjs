@@ -9,21 +9,19 @@
  * source and our geometry genuinely disagree, the region is emitted as `null` and
  * renders as "No data" rather than being filled in.
  *
- * Two of the three sources were prepared and audited previously under `work/`,
- * with the download URLs, hashes and join rules recorded there. This script reads
- * those audited files rather than re-deriving them. The third (NFHS-5) is fetched
- * here, and its SHA-256 is checked against the audited value before use.
+ * CGWB was prepared and audited previously under `work/`, with the download URL,
+ * hash and join rules recorded there; this script reads that audited file rather
+ * than re-deriving it. NFHS-5 is fetched here, and its SHA-256 is checked against
+ * the audited value before use.
  *
  *     node scripts/build-observatory-data.mjs
  *
- * ## Why indicators carry a boundary edition
+ * ## Boundary edition
  *
- * They do not share one. Census 2011 is reported on the 2011 administrative
- * units, which this repo ships as the historical 35-state / 640-district bundle.
- * NFHS-5 and CGWB are reported on present-day states, which is the current
- * 36-state bundle. Drawing a 2011 statistic on 2019 boundaries would be a
- * silent lie about which places were measured, so each indicator names the
- * edition it belongs to and the app switches the map with it.
+ * Every indicator is drawn on the current (2019) state/UT bundle, the only one
+ * this repository ships, and names that edition. A statistic belongs on the
+ * units it was collected on, so a source reported on other boundaries — Census
+ * 2011, on its 640 districts — is not included rather than drawn on these.
  */
 import { createHash } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
@@ -47,49 +45,7 @@ function complete(ids, values) {
   return Object.fromEntries([...ids].sort().map((id) => [id, values[id] ?? null]));
 }
 
-/* ------------------------------------------------- 1. Census 2011 literacy */
-
-const census = read("work/census2011/validated-values.json");
-const censusNotes = readFileSync(resolve(root, "work/census2011/raw-source-notes.md"), "utf8");
-const censusSha = /SHA-256: `([0-9a-f]{64})`/.exec(censusNotes)?.[1];
-
-const historicalStateIds = geometryIds("data/generated/census-2011/states.topo.json", "states");
-const historicalDistrictIds = new Set(
-  census.districtValues.map((district) => district.id),
-);
-
-const literacy = {
-  key: "female_literacy",
-  label: "Female literacy rate",
-  short: "Female literacy",
-  unit: "%",
-  description:
-    "Literate females as a share of females aged 7 and above, the universe the Census reports literacy on.",
-  edition: "historical",
-  levels: ["state", "district"],
-  decimals: 1,
-  source: {
-    publisher: "Office of the Registrar General & Census Commissioner, India",
-    title: "Census of India 2011 — Primary Census Abstract",
-    vintage: "2011",
-    url: "https://censusindia.gov.in/nada/index.php/catalog/6191",
-    file: "DDW_PCA0000_2011_Indiastatedist.xlsx",
-    sha256: censusSha,
-    formula: census.formula,
-    joinRule:
-      "Official state and district codes to the historical bundle's sourceStateCode / source.censuscode. Display names are never used to join.",
-  },
-  values: {
-    state: complete(historicalStateIds, Object.fromEntries(
-      census.stateValues.map((row) => [row.id, Number(row.femaleLiteracyRate.toFixed(2))]),
-    )),
-    district: complete(historicalDistrictIds, Object.fromEntries(
-      census.districtValues.map((row) => [row.id, Number(row.femaleLiteracyRate.toFixed(2))]),
-    )),
-  },
-};
-
-/* ------------------------------------------------------ 2. NFHS-5 (state) */
+/* ------------------------------------------------------ 1. NFHS-5 (state) */
 
 const nfhsAudit = read("work/nfhs5/join-audit.json");
 const NFHS_URL = "https://data.gov.in/sites/default/files/datafile/NFHS_5_Factsheets_Data.xls";
@@ -198,7 +154,7 @@ const nfhs = [
   values: { state: complete(currentStateIds, nfhsValues[indicator.key]) },
 }));
 
-/* ------------------------------------------------ 3. CGWB 2023 groundwater */
+/* ------------------------------------------------ 2. CGWB 2023 groundwater */
 
 const cgwb = read("work/cgwb2023/validated-values.json");
 const cgwbAudit = read("work/cgwb2023/join-audit.json");
@@ -256,7 +212,7 @@ const groundwater = {
 /**
  * The one indicator that reaches sub-district, and the only one with no vintage.
  *
- * The published five are collected on particular administrative units, so they
+ * The published indicators are collected on particular administrative units, so they
  * stop where their source stops. A weather API answers for a coordinate at the
  * moment you ask, so it can fill every level of the current bundle honestly —
  * all 5,950 sub-districts included.
@@ -307,12 +263,6 @@ const dataset = {
   note:
     "Every value is a published official statistic joined to boundary data in this repository. Regions a source does not cover are null and render as No data; none are estimated or filled in.",
   editions: {
-    historical: {
-      label: "Census 2011 boundaries",
-      states: "data/generated/census-2011/states.topo.json",
-      districts: "data/generated/census-2011/districts",
-      stateCount: historicalStateIds.size,
-    },
     current: {
       label: "Current (2019) boundaries",
       states: "data/generated/current-2019-states/states.topo.json",
@@ -321,8 +271,8 @@ const dataset = {
     },
   },
   // Live first: it is the one that drills to sub-district, so it is what a
-  // reader should meet before the published five that stop at district.
-  indicators: [liveTemperature, literacy, ...nfhs, groundwater],
+  // reader should meet before the published ones that stop at the state.
+  indicators: [liveTemperature, ...nfhs, groundwater],
 };
 writeFileSync(resolve(out, "india-observatory.json"), `${JSON.stringify(dataset, null, 1)}\n`);
 

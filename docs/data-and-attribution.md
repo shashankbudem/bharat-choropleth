@@ -6,15 +6,15 @@ The renderer’s source code may be released under MIT (or another software lice
 
 Do not describe the boundary data as “MIT” merely because the renderer is MIT-licensed.
 
-## Default community geometry
+## Default geometry
 
-If the project distributes a derived or converted DataMeet boundary dataset, retain the source attribution and the license notice that applies to that exact upstream asset. The included `census-2011` bundle is derived entirely from DataMeet’s Census-2011 district input and is licensed CC BY 2.5 India. Other DataMeet inputs may carry different notices, so do not treat that licence as a blanket licence for future source editions. The demo and documentation should show a compact attribution such as:
+The bundled boundaries are derived from [`datta07/INDIAN-SHAPEFILES`](https://github.com/datta07/INDIAN-SHAPEFILES) at a pinned commit, which is MIT licensed; Lakshadweep's districts come from India Map Studio's MIT-licensed SVG of the same source. The demo and documentation should show a compact attribution such as:
 
-> Administrative boundaries: DataMeet Maps contributors. License, boundary vintage, and coverage: see dataset manifest.
+> State/UT, district and sub-district boundaries derived from datta07/INDIAN-SHAPEFILES (MIT).
 
-Link the attribution to the exact upstream revision/release and to the local dataset manifest, not only to a project home page. The manifest must state the input’s licence, alongside transformations performed (for example, GeoJSON to TopoJSON, simplification tolerance, property normalization, and topology repair).
+Link the attribution to the exact upstream revision and to the local dataset manifest, not only to a project home page. Each manifest states the input's licence alongside the transformations performed (for example, GeoJSON to TopoJSON, simplification, property normalization, and topology repair). See [data/ATTRIBUTION.md](../data/ATTRIBUTION.md).
 
-The default drill-down bundle is a historical Census-2011 hierarchy. Its state/UT parent IDs and district IDs are deterministic, Census-derived identifiers, not LGD IDs or a claim of current administrative coverage. The package must not combine that district layer with a newer state/UT layer unless it publishes a reviewed crosswalk and explains the resulting coverage limitations.
+IDs are LGD-derived where the source carries LGD codes. They are not a claim of current administrative coverage: the source is ~2019 vintage.
 
 ## Administrative and territorial disclaimer
 
@@ -22,19 +22,11 @@ Maps are visualizations of a selected source dataset at a particular vintage. Th
 
 This text belongs in the docs and dataset manifest. The demo should link to it rather than attempting a large legal notice in the UI.
 
-## Keep boundary meaning and data coverage separate
+## Keep reference context separate from values
 
-The country view can contain geometries with different, non-interchangeable meanings. Every release and visible legend must distinguish all three:
+Some geometry is shown for context, not measured: the bundled J&K district view draws the two Pakistan-administered districts (Mirpur, Muzaffarabad) as a non-interactive reference overlay. Reference geometry must stay visible but receive no numeric value, tooltip value, selection, drill-down, percentage, or aggregate contribution. A host must not manufacture a zero or carry a neighbour's value across the boundary. The renderers' `referenceOverlay` and `loadDistrictReferenceOverlay` have no value accessor for exactly this reason.
 
-| Concept | What it may show | What it must not imply |
-| --- | --- | --- |
-| **Political-claim context overlay** | An openly licensed, contemporary DataMeet state layer used as a non-metric reference overlay and checked against the Survey of India (SoI) political-map depiction. It is not an SoI dataset. | A legal adjudication, a statement of administrative control, Census-data coverage, or an assertion that the package republishes official SoI geometry. |
-| **Administrative control** | Nothing by default. Only show it if an independently sourced, dated control/administration dataset expressly defines it. | That it is derivable from an external boundary, a political claim, or a Census unit. |
-| **Census statistical coverage** | The historical Census-2011 DataMeet state/UT and district features for which the bundle has an ID and the host supplies a value. | Current administrative coverage, nationwide completeness, or a value for territory absent from the Census layer. |
-
-Where the political-claim context overlay extends beyond the Census feature collection, the overlay-only area must remain visible but non-interactive, use a distinct `Not covered by Census-2011 data` legend/status treatment, and receive no numeric value, tooltip value, selection, drill-down, percentage, or aggregate contribution. A host must not manufacture a zero, carry a neighbour’s value across the boundary, or re-label the historical aggregate as a national total.
-
-The context overlay must record its exact DataMeet source revision, licence, checksum, transformation, and coverage. Cite the SoI political-map page as the official position/reference used for the comparison, but do not describe the overlay as official SoI data. SoI's site copyright policy requires written permission for reproduction in whole or part, so the package must neither copy, transform, nor redistribute SoI boundary geometry. The DataMeet contemporary overlay and the historical DataMeet Census-2011 statistical bundle remain separate sources with separate licences and manifests.
+Survey of India's site copyright policy requires written permission for reproduction in whole or part, so the package must neither copy, transform, nor redistribute SoI boundary geometry.
 
 ## Bringing alternate or official geometry
 

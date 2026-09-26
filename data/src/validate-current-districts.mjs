@@ -133,7 +133,7 @@ async function main() {
   }
 
   // Every current-state must have a matching district asset — this bundle has no
-  // district-less states, unlike the historical Census-2011 bundle's Lakshadweep gap.
+  // district-less states.
   const currentStatesTopo = await readJson(join(dataDir, "generated", "current-2019-states", "states.topo.json"));
   const currentStatesFeatures = topojsonFeature(currentStatesTopo, currentStatesTopo.objects.states);
   const allCurrentStateIds = new Set(currentStatesFeatures.features.map((f) => f.properties.id));

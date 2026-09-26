@@ -9,8 +9,7 @@ import { presimplify, simplify } from "topojson-simplify";
 const here = dirname(fileURLToPath(import.meta.url));
 const dataDir = resolve(here, "..");
 const outputDir = join(dataDir, "generated", "current-2019-states");
-// This is an independently sourced current-vintage layer, deliberately outside
-// the DataMeet Census-2011 checkout used by prepare-boundaries.mjs.
+// The datta07/INDIAN-SHAPEFILES checkout, outside the repository.
 const sourceDir = resolve(
   process.env.INDIA_SHAPEFILES_DIR || join(dataDir, "../../../work/india-shapefiles"),
 );

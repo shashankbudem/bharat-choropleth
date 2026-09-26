@@ -112,8 +112,8 @@ async function main() {
       errors.push(`state ${item.properties.id}: bounds span nearly the complete national envelope.`);
     }
   }
-  // Cross-checked against the same official political-outline extent used to validate
-  // the DataMeet claim overlay: current-vintage source geometry should reach it too.
+  // Cross-checked against the official political-outline extent: the source geometry
+  // should reach it on every side.
   if (nationalBounds.minLongitude > 69) errors.push(`Western extent too truncated: ${nationalBounds.minLongitude}.`);
   if (nationalBounds.maxLongitude < 97) errors.push(`Eastern extent too truncated: ${nationalBounds.maxLongitude}.`);
   if (nationalBounds.maxLatitude < 37) errors.push(`Northern extent too truncated: ${nationalBounds.maxLatitude}.`);
