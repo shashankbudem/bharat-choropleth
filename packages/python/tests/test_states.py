@@ -80,9 +80,9 @@ class ValueLookupTest(unittest.TestCase):
         self.assertEqual(value_for({"in-cs-30-goa": 6, "Goa": 99}, goa), 6)
 
     def test_matches_ids_the_registry_does_not_know(self):
-        # A host's own geometry can use ids like in-hs-*, and district ids are not
+        # A host's own geometry can use ids like custom-*, and district ids are not
         # in the registry at all. Keying by them has to keep working.
-        self.assertEqual(value_for({"in-hs-30-goa": 6}, _feature("in-hs-30-goa", "Goa")), 6)
+        self.assertEqual(value_for({"custom-30-goa": 6}, _feature("custom-30-goa", "Goa")), 6)
         self.assertEqual(value_for({"in-cd-30-585": 90}, _feature("in-cd-30-585", "North Goa")), 90)
 
     def test_matches_below_the_state_level_case_insensitively(self):

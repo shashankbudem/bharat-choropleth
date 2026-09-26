@@ -521,7 +521,7 @@ describe("IndiaChoropleth (plain JS)", () => {
   });
 
   it("loads state-keyed district reference context without making it a district data point", async () => {
-    const districtOverlay = { ...referenceOverlay, getLabel: () => "Historical context outline" };
+    const districtOverlay = { ...referenceOverlay, getLabel: () => "District context outline" };
     new IndiaChoropleth(container, {
       states: stateLayer,
       loadDistricts: async () => districtLayer,
@@ -530,7 +530,7 @@ describe("IndiaChoropleth (plain JS)", () => {
     byLabel(container, /alpha, 42/i).dispatchEvent(new MouseEvent("click", { bubbles: true }));
     const context = await vi.waitFor(() => {
       const found = container.querySelector('[role="img"]');
-      if (!found || !/historical context outline\. national reference outline/i.test(found.getAttribute("aria-label") ?? "")) throw new Error("not yet");
+      if (!found || !/district context outline\. national reference outline/i.test(found.getAttribute("aria-label") ?? "")) throw new Error("not yet");
       return found;
     });
     expect(context.hasAttribute("tabindex")).toBe(false);

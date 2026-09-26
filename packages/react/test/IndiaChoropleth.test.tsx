@@ -403,7 +403,7 @@ describe("IndiaChoropleth", () => {
   });
 
   it("loads state-keyed district reference context without making it a district data point", async () => {
-    const districtOverlay = { ...referenceOverlay, getLabel: () => "Historical context outline" };
+    const districtOverlay = { ...referenceOverlay, getLabel: () => "District context outline" };
     render(
       <IndiaChoropleth
         states={stateLayer}
@@ -412,11 +412,11 @@ describe("IndiaChoropleth", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /alpha, 42/i }));
-    const context = await screen.findByRole("img", { name: /historical context outline\. national reference outline/i });
+    const context = await screen.findByRole("img", { name: /district context outline\. national reference outline/i });
     expect(context).not.toHaveAttribute("tabindex");
     expect(screen.getByText("Reference context · data unavailable")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /delta, 9/i })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /historical context outline/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /district context outline/i })).not.toBeInTheDocument();
   });
 
   it("drops a stale district reference overlay when controlled drill-down changes", async () => {

@@ -317,7 +317,7 @@ describe("placeIslandGroup", () => {
   it("recognises an island group by label when the host's ids do not name it", () => {
     expect(placeIslandGroup("35", "Andaman & Nicobar", andaman, 22, bounds)).not.toBeNull();
     expect(placeIslandGroup("31", "Lakshadweep", lakshadweep, 22, bounds)).not.toBeNull();
-    expect(placeIslandGroup("in-hs-35-andaman-and-nicobar-island", "Andaman & Nicobar Island", andaman, 22, bounds)).not.toBeNull();
+    expect(placeIslandGroup("custom-35-andaman-and-nicobar-island", "Andaman & Nicobar Island", andaman, 22, bounds)).not.toBeNull();
   });
 
   it("leaves every other region alone", () => {
