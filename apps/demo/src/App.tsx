@@ -1,10 +1,7 @@
 import { IndiaChoropleth, type InsightContext, type MapRegion, type TooltipContext } from "bharat-choropleth";
 import { useCallback, useMemo, useState } from "react";
-import { currentContextOverlay, currentStateLayer, loadCurrentDistrictLayer, loadCurrentDistrictReferenceOverlay, loadCurrentSubDistrictLayer, loadDistrictLayer, loadDistrictReferenceOverlay, sampleValue, stateLayer, type DemoMetric, type DemoYear } from "./data";
-import statesTopology from "../../../data/generated/census-2011/states.topo.json";
+import { currentStateLayer, loadCurrentDistrictLayer, loadCurrentDistrictReferenceOverlay, loadCurrentSubDistrictLayer, sampleValue, type DemoMetric, type DemoYear } from "./data";
 import currentStatesTopology from "../../../data/generated/current-2019-states/states.topo.json";
-
-type BoundaryEdition = "historical" | "current";
 
 const formatter = new Intl.NumberFormat("en-IN");
 
@@ -88,52 +85,26 @@ function InsightRail({ context, metric }: { context: InsightContext | null; metr
 
 export default function App() {
   const [year, setYear] = useState<DemoYear>(2026);
-  const [edition, setEdition] = useState<BoundaryEdition>("historical");
   const [drillDownId, setDrillDownId] = useState<string | null>(null);
   const [subDistrictDrillDownId, setSubDistrictDrillDownId] = useState<string | null>(null);
   const [insight, setInsight] = useState<InsightContext | null>(null);
   const [metric, setMetric] = useState<DemoMetric>("index");
   const active = METRICS[metric];
-  const layer = useMemo(
-    () => edition === "current" ? currentStateLayer(year, metric) : stateLayer(year, metric),
-    [edition, metric, year],
-  );
-  const referenceOverlay = useMemo(() => edition === "historical" ? currentContextOverlay() : undefined, [edition]);
-  const loadDistricts = useCallback((id: string, state: MapRegion) => loadDistrictLayer(id, state, year, metric), [metric, year]);
-  const loadCurrentDistricts = useCallback((id: string, state: MapRegion) => loadCurrentDistrictLayer(id, state, year, metric), [metric, year]);
-  const loadDistrictContext = useCallback((id: string) => loadDistrictReferenceOverlay(id), []);
-  const loadCurrentDistrictContext = useCallback((id: string) => loadCurrentDistrictReferenceOverlay(id), []);
-  // The third level exists only for the current edition: the historical Census-2011
-  // bundle has no sub-district layer, so its districts stay leaves.
-  const loadCurrentSubDistricts = useCallback(
+  const layer = useMemo(() => currentStateLayer(year, metric), [metric, year]);
+  const loadDistricts = useCallback((id: string, state: MapRegion) => loadCurrentDistrictLayer(id, state, year, metric), [metric, year]);
+  const loadDistrictContext = useCallback((id: string) => loadCurrentDistrictReferenceOverlay(id), []);
+  const loadSubDistricts = useCallback(
     (id: string, district: MapRegion, stateId: string) => loadCurrentSubDistrictLayer(id, district, stateId, year, metric),
     [metric, year],
   );
-  const total = useMemo(() => {
-    if (drillDownId) return null;
-    return edition === "current" ? currentStatesTotal(year) : statesTotal(year);
-  }, [drillDownId, edition, year]);
+  const total = useMemo(() => (drillDownId ? null : statesTotal(year)), [drillDownId, year]);
   const scopeLabel = subDistrictDrillDownId ? "Sub-district performance" : drillDownId ? "District performance" : "State-level performance";
-
-  const changeEdition = (next: BoundaryEdition) => {
-    setEdition(next);
-    setDrillDownId(null);
-    setSubDistrictDrillDownId(null);
-    setInsight(null);
-  };
 
   return (
     <div className="app-shell">
       <header className="app-header">
         <a className="brand" href="#map">Bharat Choropleth</a>
         <div className="header-controls">
-          <label className="edition-control">
-            <span>Boundary edition</span>
-            <select value={edition} onChange={(event) => changeEdition(event.target.value as BoundaryEdition)}>
-              <option value="historical">Historical (Census 2011)</option>
-              <option value="current">Current (2019 boundaries)</option>
-            </select>
-          </label>
           <label className="metric-control">
             <span>Indicator</span>
             <select value={metric} onChange={(event) => { setMetric(event.target.value as DemoMetric); setInsight(null); }}>
@@ -144,29 +115,22 @@ export default function App() {
         </div>
       </header>
       <main id="map">
-        <section className="intro"><div><h1>Regional performance</h1><p>Explore totals across regions, then select one to see its districts — and, on the current edition, a district to see its sub-districts.</p></div><div className="total-block"><span>{drillDownId ? "Selected state / UT" : metric === "index" ? "Sample Census-coverage aggregate" : METRICS[metric].label}</span><strong>{subDistrictDrillDownId ? "Sub-district view" : drillDownId ? "District view" : metric === "index" ? formatter.format(total ?? 0) : "Per-region only"}</strong></div></section>
+        <section className="intro"><div><h1>Regional performance</h1><p>Explore totals across regions, then select one to see its districts, and a district to see its sub-districts.</p></div><div className="total-block"><span>{drillDownId ? "Selected state / UT" : metric === "index" ? "Sample national aggregate" : METRICS[metric].label}</span><strong>{subDistrictDrillDownId ? "Sub-district view" : drillDownId ? "District view" : metric === "index" ? formatter.format(total ?? 0) : "Per-region only"}</strong></div></section>
         <div className="dashboard-grid">
           <section className="map-workspace" aria-labelledby="map-title"><div className="map-toolbar"><h2 id="map-title">{scopeLabel === "State-level performance" ? "All states" : scopeLabel}</h2><span className="helper">
-              {/* Which depths this edition actually offers. The historical
-                  Census-2011 bundle has no sub-district layer, so its districts
-                  are leaves — without saying so, the third level looks missing
-                  rather than absent by vintage. */}
-              {edition === "current" ? "State → district → sub-district" : "State → district (this vintage has no sub-districts)"}
-              <span aria-hidden="true"> · </span>Tab · Enter/Space · Esc
+              State → district → sub-district<span aria-hidden="true"> · </span>Tab · Enter/Space · Esc
             </span></div>
             <IndiaChoropleth
-              key={edition}
               states={layer}
-              referenceOverlay={referenceOverlay}
-              defaultSelectedId={edition === "current" ? "in-cs-27-maharashtra" : "in-hs-27-maharashtra"}
+              defaultSelectedId="in-cs-27-maharashtra"
               drillDownId={drillDownId}
               onDrillDownChange={(next) => { setDrillDownId(next); setInsight(null); }}
               subDistrictDrillDownId={subDistrictDrillDownId}
               onSubDistrictDrillDownChange={(next) => { setSubDistrictDrillDownId(next); setInsight(null); }}
               onInsight={setInsight}
-              loadDistricts={edition === "historical" ? loadDistricts : loadCurrentDistricts}
-              loadSubDistricts={edition === "current" ? loadCurrentSubDistricts : undefined}
-              loadDistrictReferenceOverlay={edition === "historical" ? loadDistrictContext : loadCurrentDistrictContext}
+              loadDistricts={loadDistricts}
+              loadSubDistricts={loadSubDistricts}
+              loadDistrictReferenceOverlay={loadDistrictContext}
               referenceOverlayFill="solid"
               showRegionValues
               colorScale={active.colorScale}
@@ -179,18 +143,13 @@ export default function App() {
           <InsightRail context={insight} metric={metric} />
         </div>
       </main>
-      <footer>Sample values only; totals cover bundled demo geometry, not every national reference area. Hatched areas are non-statistical and have no metric or district coverage. Historical Census-2011 districts: <a href="https://github.com/datameet/maps">DataMeet India community</a> (<a href="https://github.com/datameet/maps/blob/b3fbbde595310b397a55d718e0958ce249a4fa1f/Districts/README.md">CC BY 2.5 India</a>). Reference context overlay: DataMeet current-state geometry (<a href="https://github.com/datameet/maps">CC BY 4.0</a>), cross-checked against the <a href="https://surveyofindia.gov.in/pages/political-map-of-india">Survey of India political-map depiction</a>; it is not Survey of India geometry. Current (2019) boundary edition, states and districts: <a href="https://github.com/datta07/INDIAN-SHAPEFILES">datta07/INDIAN-SHAPEFILES</a> (MIT). <a href="https://github.com/datameet/maps">Use your own geometry</a>.</footer>
+      <footer>Sample values only; totals cover bundled demo geometry, not every national reference area. Hatched areas are non-statistical and have no metric or district coverage. States, districts and sub-districts (2019 boundaries): <a href="https://github.com/datta07/INDIAN-SHAPEFILES">datta07/INDIAN-SHAPEFILES</a> (MIT). <a href="https://github.com/datameet/maps">Use your own geometry</a>.</footer>
     </div>
   );
 }
 
 function statesTotal(year: DemoYear) {
   // This repeats only the value definition—not geometry parsing—so the dashboard chrome remains independent of the renderer.
-  const states = statesTopology.objects.states.geometries;
-  return states.reduce((sum, feature) => sum + (feature.properties.id === "in-hs-31-lakshadweep" ? 0 : sampleValue(feature.properties.id, year)), 0);
-}
-
-function currentStatesTotal(year: DemoYear) {
   const states = currentStatesTopology.objects.states.geometries;
   return states.reduce((sum, feature) => sum + sampleValue(feature.properties.id, year), 0);
 }

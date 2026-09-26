@@ -1,8 +1,4 @@
-import type { MapFeature, MapFeatureCollection, MapLayer, ReferenceOverlay } from "bharat-choropleth";
-import { feature as topoFeature } from "topojson-client";
-import statesTopology from "../../../data/generated/census-2011/states.topo.json";
-import currentContextTopology from "../../../data/generated/datameet-current-claim-outline/outline.topo.json";
-import jkCurrentClaimTopology from "../../../data/generated/datameet-current-claim-outline/historical-parent-overlays/in-hs-01-jammu-and-kashmir.topo.json";
+import type { MapFeature, MapLayer, ReferenceOverlay } from "bharat-choropleth";
 import currentStatesTopology from "../../../data/generated/current-2019-states/states.topo.json";
 
 type FeatureProperties = { id: string; name: string };
@@ -40,40 +36,8 @@ export function makeLayer(geometry: MapLayer["geometry"], year: DemoYear, metric
     geometry,
     getId: (feature) => properties(feature).id,
     getLabel: (feature) => properties(feature).name,
-    // One stable no-data example lets consumers inspect the renderer's missing-value treatment.
-    getValue: (feature) => properties(feature).id === "in-hs-31-lakshadweep" ? null : sampleValue(properties(feature).id, year, metric),
+    getValue: (feature) => sampleValue(properties(feature).id, year, metric),
   };
-}
-
-const JK_STATE_ID = "in-hs-01-jammu-and-kashmir";
-
-/**
- * The Census-2011 J&K feature only covers Indian-administered districts. For the
- * top-level state view we swap in DataMeet's current-claim outline (J&K + Ladakh,
- * matching the Survey of India political-map extent) so J&K renders as one normal
- * interactive state, same as every other state — no separate reference patch.
- * District drill-down still uses the Census-2011 boundary; only the 22 historical
- * districts carry real values there.
- */
-function statesWithJkCurrentClaimExtent(): MapFeatureCollection {
-  const statesTopo = statesTopology as never as { objects: Record<string, never> };
-  const claimTopo = jkCurrentClaimTopology as never as { objects: Record<string, never> };
-  const states = topoFeature(statesTopo as never, statesTopo.objects.states) as unknown as MapFeatureCollection;
-  const claim = topoFeature(claimTopo as never, claimTopo.objects.outline) as unknown as MapFeatureCollection;
-  const claimGeometry = claim.features[0]?.geometry;
-  if (!claimGeometry) return states;
-  return {
-    ...states,
-    features: states.features.map((stateFeature) =>
-      properties(stateFeature).id === JK_STATE_ID
-        ? { ...stateFeature, geometry: claimGeometry }
-        : stateFeature,
-    ),
-  };
-}
-
-export function stateLayer(year: DemoYear, metric: DemoMetric = "index") {
-  return makeLayer(statesWithJkCurrentClaimExtent(), year, metric);
 }
 
 /**
@@ -85,28 +49,9 @@ export function currentStateLayer(year: DemoYear, metric: DemoMetric = "index") 
   return makeLayer({ topology: currentStatesTopology as never, object: "states" }, year, metric);
 }
 
-const districtModules = import.meta.glob("../../../data/generated/census-2011/districts/*.topo.json");
-const districtReferenceModules = import.meta.glob("../../../data/generated/datameet-current-claim-outline/historical-parent-overlays/*.topo.json");
 const currentDistrictModules = import.meta.glob("../../../data/generated/current-2019-districts/districts/*.topo.json");
 const currentDistrictReferenceModules = import.meta.glob("../../../data/generated/current-2019-districts/district-reference-overlays/*.topo.json");
 const currentSubDistrictModules = import.meta.glob("../../../data/generated/current-2019-subdistricts/subdistricts/*.topo.json");
-
-/** DataMeet CC BY 4.0 contemporary context geometry; it is not SoI geometry. */
-export function currentContextOverlay(): ReferenceOverlay {
-  return {
-    geometry: { topology: currentContextTopology as never, object: "outline" },
-    getId: (feature) => properties(feature).id,
-    getLabel: (feature) => properties(feature).name,
-    getDescription: () => "National reference outline; hatched portions outside the statistical layer have no data.",
-  };
-}
-
-export async function loadDistrictLayer(stateId: string, _state: { id: string }, year: DemoYear, metric: DemoMetric = "index"): Promise<MapLayer> {
-  const load = districtModules[`../../../data/generated/census-2011/districts/${stateId}.topo.json`];
-  if (!load) return makeLayer({ type: "FeatureCollection", features: [] }, year, metric);
-  const module = await load();
-  return makeLayer({ topology: (module as { default: unknown }).default as never, object: "districts" }, year, metric);
-}
 
 export async function loadCurrentDistrictLayer(stateId: string, _state: { id: string }, year: DemoYear, metric: DemoMetric = "index"): Promise<MapLayer> {
   const load = currentDistrictModules[`../../../data/generated/current-2019-districts/districts/${stateId}.topo.json`];
@@ -116,8 +61,8 @@ export async function loadCurrentDistrictLayer(stateId: string, _state: { id: st
 }
 
 /**
- * Sub-districts (tehsils / taluks / mandals / blocks) for one current-edition
- * district, or null where the bundle has none.
+ * Sub-districts (tehsils / taluks / mandals / blocks) for one district, or null
+ * where the bundle has none.
  *
  * Three of the 788 districts have no sub-district asset — Delhi's Nazul, which is
  * a land-tenure artifact rather than a district, and Rajasthan's urban Jaipur and
@@ -131,21 +76,8 @@ export async function loadCurrentSubDistrictLayer(districtId: string, _district:
   return makeLayer({ topology: (module as { default: unknown }).default as never, object: "subdistricts" }, year, metric);
 }
 
-/** Only historical J&K gets extra DataMeet current-context geometry behind its Census districts. */
-export async function loadDistrictReferenceOverlay(stateId: string): Promise<ReferenceOverlay | null> {
-  const load = districtReferenceModules[`../../../data/generated/datameet-current-claim-outline/historical-parent-overlays/${stateId}.topo.json`];
-  if (!load) return null;
-  const module = await load();
-  return {
-    geometry: { topology: (module as { default: unknown }).default as never, object: "outline" },
-    getId: (feature) => properties(feature).id,
-    getLabel: (feature) => properties(feature).name,
-    getDescription: () => "Current reference outline; hatched portions outside the Census-2011 district layer have no data.",
-  };
-}
-
 /**
- * Only current-edition J&K gets this: Mirpur and Muzaffarabad are Pakistan-administered
+ * Only J&K gets this: Mirpur and Muzaffarabad are Pakistan-administered
  * districts in the source, not Indian districts, so they're kept out of the value-bearing
  * district set and rendered here as non-interactive reference context instead.
  */

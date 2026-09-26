@@ -44,7 +44,7 @@ packages/js       Framework-free library: `new BharatChoropleth("#map")` from a 
 packages/flutter  Native Dart/Flutter renderer (CustomPainter) — full parity with the web packages, no WebView
 packages/python   Dependency-light Python renderer: accessible SVG by default, optional Matplotlib
 data              Reproducible Census-2011 boundary preparation, manifest, and attribution
-apps/demo         Documentation/demo application using the included historical bundle
+apps/demo         Documentation/demo application on the current 2019 boundaries
 ```
 
 `pnpm check` covers the JavaScript workspace only. The Flutter and Python packages are independently packaged — run `pnpm check:flutter` for the Dart one, and the Python checks from `packages/python`.
