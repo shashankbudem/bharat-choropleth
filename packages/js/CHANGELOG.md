@@ -31,6 +31,25 @@
   names repeat across states (Bilaspur, Hamirpur, Pratapgarh), which a flat name
   cannot tell apart.
 
+### Changed
+
+- Andaman & Nicobar and Lakshadweep are drawn so they can be seen on the
+  national map. At that scale Andaman & Nicobar's islands were thinner than the
+  white region border, and Lakshadweep was a single dot.
+  - Andaman & Nicobar is magnified about 1.5× as one group about its own centre,
+    so every island keeps its outline and the gaps between them.
+  - Lakshadweep is spread out 2× as a group and moved west into the open
+    Arabian Sea, clear of Kerala, and then each island grows about its own
+    centre, keeping its shape. Island groups no longer get a stand-in dot.
+  - Both keep the configured border colour, drawn thinner
+    (`--india-map-island-border-width`, never wider than
+    `--india-map-border-width`) and under the fill, so it cannot cover a
+    thin island.
+
+  Only the national map changes; drilled into either UT, its districts are
+  drawn true to size. The project communicates values, so a small departure
+  from true size and position is the price of a region that can be seen.
+
 ## 0.3.1 - 2026-09-13
 
 ### Fixed

@@ -14,7 +14,6 @@
   var SITE = new URL("../", document.baseURI).href;
   var DATA_BASE = SITE + "data/generated";
   var EDITIONS = {
-    historical: { states: DATA_BASE + "/census-2011/states.topo.json", districts: DATA_BASE + "/census-2011/districts" },
     current: { states: DATA_BASE + "/current-2019-states/states.topo.json", districts: DATA_BASE + "/current-2019-districts/districts" },
   };
   var RAMP = ["#e6f2f0", "#c2e2dc", "#95cec4", "#63b5a8", "#3a988b", "#1e786d", "#0b5750"];

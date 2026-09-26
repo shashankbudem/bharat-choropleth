@@ -151,10 +151,10 @@ export class BharatChoropleth {
    * to a value, so `this.values` stays the single source of truth and a later
    * write through one spelling is seen through every other.
    *
-   * It exists because not every id belongs to the registry: the historical
-   * Census bundle in this repository uses `in-hs-*` ids it does not know, so a
-   * feature keyed on its id would fall through to being keyed on its *label*,
-   * and values written against ids would silently never match.
+   * It exists because not every id belongs to the registry: a host's own
+   * geometry can use ids it does not know, so a feature keyed on its id would
+   * fall through to being keyed on its *label*, and values written against ids
+   * would silently never match.
    */
   private readonly exactKeys = new Map<string, string>();
   private readonly labelByKey = new Map<string, string>();

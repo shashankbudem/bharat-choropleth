@@ -9,9 +9,8 @@
  *
  *     pnpm prepare:observatory-flutter-assets
  *
- * Both district vintages are copied, plus the sub-districts: female literacy
- * drills the historical bundle, and the live-temperature indicator drills the
- * current one all the way to sub-district.
+ * The current states, districts and sub-districts are copied: the
+ * live-temperature indicator drills all the way to sub-district.
  */
 import { cpSync, existsSync, mkdirSync, rmSync } from "node:fs";
 import { resolve } from "node:path";
@@ -21,9 +20,7 @@ const assets = resolve(root, "examples/observatory/flutter/assets");
 
 const COPIES = [
   { to: "india-observatory.json", from: "examples/observatory/data/india-observatory.json" },
-  { to: "historical/states.topo.json", from: "data/generated/census-2011/states.topo.json" },
   { to: "current/states.topo.json", from: "data/generated/current-2019-states/states.topo.json" },
-  { to: "historical-districts", from: "data/generated/census-2011/districts" },
   // The live indicator drills the current bundle all the way down.
   { to: "region-centroids.json", from: "examples/observatory/data/region-centroids.json" },
   { to: "current-districts", from: "data/generated/current-2019-districts/districts" },

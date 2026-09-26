@@ -39,16 +39,15 @@ pip install -r scripts/requirements.txt
 
 ## The data is real
 
-Six published official indicators, joined to boundary bundles this repository
-already ships. `pnpm build:observatory-data` regenerates
+Five published official indicators, joined to the current (2019) boundary
+bundle this repository ships. `pnpm build:observatory-data` regenerates
 `data/india-observatory.json`, recording each figure's publisher, download URL,
-source SHA-256, vintage and join rule. Two of the three sources were downloaded
-and audited previously under `work/`; the third (NFHS-5) is fetched at build
-time and its hash checked against that audit before a single number is used.
+source SHA-256, vintage and join rule. CGWB was downloaded and audited
+previously under `work/`; NFHS-5 is fetched at build time and its hash checked
+against that audit before a single number is used.
 
 | Indicator | Source | Vintage | Levels |
 | --- | --- | --- | --- |
-| Female literacy | Census of India 2011, Primary Census Abstract | 2011 | state + district |
 | Improved sanitation | NFHS-5 state factsheets | 2019–21 | state |
 | Full child vaccination | NFHS-5 state factsheets | 2019–21 | state |
 | Child stunting | NFHS-5 state factsheets | 2019–21 | state |
@@ -66,29 +65,26 @@ Where a source and this repository's geometry genuinely disagree, the region is
   gives a percentage with no volume to weight a merge by, so the two cannot be
   honestly combined and the merged UT is left empty.
 - **NFHS-5 districts are absent entirely.** They are reported on the survey's own
-  707-district frame, which matches neither the 640-district historical bundle
-  nor the 788-district current one.
+  707-district frame, which does not match the 788-district current bundle.
 - **CGWB districts are absent entirely.** The audit under `work/cgwb2023/`
   matched 607 of 705 district rows against the current bundle, which is not a
   complete enough join to publish.
 
 ### Indicators carry a boundary edition
 
-They do not share one, and the apps switch the map with the indicator rather
-than drawing every statistic on the newest outline. Census 2011 is reported on
-2011 units — the historical 35-state / 640-district bundle. NFHS-5 and CGWB are
-reported on present-day states — the current 36-state bundle. Drawing a 2011
-figure on 2019 boundaries would misstate which places were measured.
+Every indicator names the boundaries it is drawn on, and all of them are on the
+current 36-state bundle. A statistic belongs on the units it was collected on,
+so a source reported on other boundaries — Census 2011, on its 640 districts —
+is left out rather than drawn on these.
 
 ## The live indicator, and why it is the one that reaches sub-district
 
 It is the first tab in all three apps.
 
 
-The six published indicators stop at district, and no rearranging fixes that: a
-statistic is collected on particular administrative units, so drawing a 2011
-figure on 2019 outlines would misstate which places were measured, and none of
-the audited sources publishes below district anyway.
+The five published indicators stop at the state, and no rearranging fixes that:
+a statistic is collected on particular administrative units, and none of the
+audited sources publishes a complete enough set below that level.
 
 A weather API has no vintage. It answers for a coordinate, now — so every level
 of the current bundle can be filled honestly, all 5,950 sub-districts included.

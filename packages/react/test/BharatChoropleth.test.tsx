@@ -65,31 +65,31 @@ describe("BharatChoropleth", () => {
   });
 
   it("matches values keyed by a feature id the state registry does not know", async () => {
-    // The historical Census bundle in this repo uses in-hs-* ids. They are not
+    // A host's own geometry can use ids like these custom-* ones. They are not
     // in the registry, so before this the feature fell back to being keyed on
     // its label while the caller's values were keyed on the id — and a fully
     // populated dataset rendered as "No data" on every region.
-    const historical: GeometrySource = {
+    const customGeometry: GeometrySource = {
       type: "FeatureCollection",
       features: [
-        { type: "Feature", properties: { id: "in-hs-30-goa", name: "Goa" }, geometry: { type: "Polygon", coordinates: [[[72, 15], [73, 15], [73, 16], [72, 16], [72, 15]]] } },
-        { type: "Feature", properties: { id: "in-hs-33-tamil-nadu", name: "Tamil Nadu" }, geometry: { type: "Polygon", coordinates: [[[77, 10], [78, 10], [78, 11], [77, 11], [77, 10]]] } },
+        { type: "Feature", properties: { id: "custom-30-goa", name: "Goa" }, geometry: { type: "Polygon", coordinates: [[[72, 15], [73, 15], [73, 16], [72, 16], [72, 15]]] } },
+        { type: "Feature", properties: { id: "custom-33-tamil-nadu", name: "Tamil Nadu" }, geometry: { type: "Polygon", coordinates: [[[77, 10], [78, 10], [78, 11], [77, 11], [77, 10]]] } },
       ],
     };
-    render(<BharatChoropleth geometry={historical} values={{ "in-hs-30-goa": 6, "in-hs-33-tamil-nadu": 18 }} />);
+    render(<BharatChoropleth geometry={customGeometry} values={{ "custom-30-goa": 6, "custom-33-tamil-nadu": 18 }} />);
     await waitFor(() => expect(regionLabel(/^Goa,/)).toMatch(/6/));
     expect(regionLabel(/^Tamil Nadu,/)).toMatch(/18/);
   });
 
   it("still prefers an exact key over a registry match, so ids and names can mix", async () => {
-    const historical: GeometrySource = {
+    const customGeometry: GeometrySource = {
       type: "FeatureCollection",
       features: [
-        { type: "Feature", properties: { id: "in-hs-30-goa", name: "Goa" }, geometry: { type: "Polygon", coordinates: [[[72, 15], [73, 15], [73, 16], [72, 16], [72, 15]]] } },
+        { type: "Feature", properties: { id: "custom-30-goa", name: "Goa" }, geometry: { type: "Polygon", coordinates: [[[72, 15], [73, 15], [73, 16], [72, 16], [72, 15]]] } },
       ],
     };
     // Both keys address the same region; the literal id must win.
-    render(<BharatChoropleth geometry={historical} values={{ "in-hs-30-goa": 6, Goa: 99 }} />);
+    render(<BharatChoropleth geometry={customGeometry} values={{ "custom-30-goa": 6, Goa: 99 }} />);
     await waitFor(() => expect(regionLabel(/^Goa,/)).toMatch(/6/));
   });
 

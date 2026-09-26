@@ -10,6 +10,7 @@ import {
   labelPointFor,
   enlargeSmallParts,
   largestRingExtent,
+  placeIslandGroup,
   placeOutsideLabel,
   ringsToPath,
   scatteredHitArea,
@@ -40,6 +41,13 @@ const TOOLTIP_GAP_PX = 12;
 const SMALL_REGION_EXTENT = 22;
 const SMALL_REGION_CLICK_RADIUS = 14;
 const MIN_REGION_MARKER_SIZE = 7;
+// How far a redrawn island group may reach: half the map's padding in from each edge.
+const ISLAND_BOUNDS = [
+  VIEWBOX.padding / 2,
+  VIEWBOX.padding / 2,
+  VIEWBOX.width - VIEWBOX.padding / 2,
+  VIEWBOX.height - VIEWBOX.padding / 2,
+] as const;
 
 type PreparedRegion = MapRegion & {
   path: string;
@@ -55,6 +63,8 @@ type PreparedRegion = MapRegion & {
   partBounds: Box[];
   /** Longest side of the largest part — the measure of "too small to use". */
   extent: number;
+  /** An island group drawn larger than life, with a coastline for a border. */
+  island: boolean;
 };
 
 /**
@@ -114,6 +124,7 @@ function prepareLayer(
   projection = makeProjection(asFeatureCollection(layer.geometry)),
   minPartExtent = 0,
   collection: MapFeatureCollection = asFeatureCollection(layer.geometry),
+  national = false,
 ): PreparedRegion[] {
   const path = geoPath(projection);
   return collection.features.map((feature) => {
@@ -132,10 +143,14 @@ function prepareLayer(
     };
     // Puducherry and anything else on the keep-true list is drawn as it really
     // is, however small, because there is no room around it to grow into.
+    // Island groups are redrawn to be seen on the national map; see
+    // `placeIslandGroup`. Any host exaggeration still applies on top.
+    const trueRings = projectedRings(feature, projection);
+    const islandRings = national ? placeIslandGroup(region.id, region.label, trueRings, SMALL_REGION_EXTENT, ISLAND_BOUNDS) : null;
     const exaggerate = minPartExtent > 0 && !keepsTrueGeometry(region.id);
     const rings = exaggerate
-      ? enlargeSmallParts(projectedRings(feature, projection), minPartExtent)
-      : projectedRings(feature, projection);
+      ? enlargeSmallParts(islandRings ?? trueRings, minPartExtent)
+      : (islandRings ?? trueRings);
     const fallback: [number, number] = centroid.every(Number.isFinite) ? centroid : fallbackCentroid;
     const hull = scatteredHitArea(rings, SMALL_REGION_EXTENT);
     // With exaggeration on, the drawn outline has to come from the moved rings
@@ -143,13 +158,14 @@ function prepareLayer(
     // clicked are all the same geometry.
     return {
       ...region,
-      path: exaggerate ? ringsToPath(rings) : (path(feature) ?? ""),
+      path: exaggerate || islandRings ? ringsToPath(rings) : (path(feature) ?? ""),
       hitPath: hull ? ringsToPath([hull]) : null,
       // The largest part's centroid, not the whole feature's: averaging across
       // parts puts an island group's label out at sea between its islands.
       centroid: rings.length > 0 ? (labelPointFor(rings, fallback) as [number, number]) : fallback,
       partBounds: rings.map(boundsOfRing),
       extent: largestRingExtent(rings),
+      island: islandRings !== null,
     };
   });
 }
@@ -355,7 +371,7 @@ export function IndiaChoropleth({
     [referenceCollection, stateCollection],
   );
   const stateRegions = useMemo(
-    () => prepareLayer(states, nationalProjection, minPartExtent, stateCollection),
+    () => prepareLayer(states, nationalProjection, minPartExtent, stateCollection, true),
     [minPartExtent, nationalProjection, stateCollection, states],
   );
   const referenceRegions = useMemo(
@@ -793,7 +809,8 @@ export function IndiaChoropleth({
   }, [formatValue, regions]);
 
   const smallMarkers = useMemo(
-    () => regions.filter((region) => region.extent > 0 && region.extent < MIN_REGION_MARKER_SIZE),
+    // Island groups are magnified to be seen instead; a dot on top would cover them.
+    () => regions.filter((region) => !region.island && region.extent > 0 && region.extent < MIN_REGION_MARKER_SIZE),
     [regions],
   );
 
@@ -969,7 +986,7 @@ export function IndiaChoropleth({
             return (
               <path
                 key={region.id}
-                className={`india-choropleth__region${isInspected ? " india-choropleth__region--inspected" : ""}${isSelected ? " india-choropleth__region--selected" : ""}${mergedReferenceIds.has(region.id) ? " india-choropleth__region--reference-merged" : ""}${isDimmed(region.id) ? " india-choropleth__dimmed" : ""}`}
+                className={`india-choropleth__region${isInspected ? " india-choropleth__region--inspected" : ""}${isSelected ? " india-choropleth__region--selected" : ""}${mergedReferenceIds.has(region.id) ? " india-choropleth__region--reference-merged" : ""}${region.island ? " india-choropleth__region--island" : ""}${isDimmed(region.id) ? " india-choropleth__dimmed" : ""}`}
                 d={region.path}
                 fill={colorFor(region.value, region, min, max, colorScale)}
                 tabIndex={interactive ? 0 : -1}

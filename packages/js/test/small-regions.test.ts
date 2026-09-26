@@ -4,6 +4,7 @@ import {
   convexHull,
   enlargeSmallParts,
   distanceToBox,
+  placeIslandGroup,
   distanceToParts,
   keepsTrueGeometry,
   labelPointFor,
@@ -245,5 +246,90 @@ describe("scatteredHitArea", () => {
   it("leaves a region that is already easy to point at", () => {
     // Andaman-sized parts: scattered, but each one big enough to aim for.
     expect(scatteredHitArea([square(0, 0, 30), square(0, 60, 30)], 22)).toBeNull();
+  });
+});
+
+describe("placeIslandGroup", () => {
+  const bounds = [0, 0, 960, 640] as const;
+  const centreOf = (rings: readonly (readonly Point[])[]) => {
+    const [minX, minY, maxX, maxY] = boundsOfRing(rings.flat());
+    return [(minX + maxX) / 2, (minY + maxY) / 2];
+  };
+  const sizeOf = (ring: readonly Point[]) => {
+    const [minX, minY, maxX, maxY] = boundsOfRing(ring);
+    return [maxX - minX, maxY - minY];
+  };
+
+  // A chain of long, thin islands, the way Andaman & Nicobar projects.
+  const andaman = [
+    [[600, 500], [603, 500], [603, 510], [600, 510], [600, 500]],
+    [[602, 520], [605, 520], [605, 526], [602, 526], [602, 520]],
+    [[606, 560], [607, 560], [607, 562], [606, 562], [606, 560]],
+  ] as Point[][];
+
+  it("magnifies Andaman & Nicobar as one group about its own centre", () => {
+    const placed = placeIslandGroup("in-cs-35-andaman-and-nicobar", "Andaman & Nicobar", andaman, 22, bounds)!;
+    expect(centreOf(placed)[0]).toBeCloseTo(centreOf(andaman)[0]!);
+    expect(centreOf(placed)[1]).toBeCloseTo(centreOf(andaman)[1]!);
+    // One factor for every island and every gap, so the chain keeps its shape.
+    const factor = sizeOf(placed[0]!)[1]! / sizeOf(andaman[0]!)[1]!;
+    expect(factor).toBeGreaterThan(1);
+    for (const [index, ring] of placed.entries()) {
+      expect(sizeOf(ring)[0]).toBeCloseTo(sizeOf(andaman[index]!)[0]! * factor);
+      expect(sizeOf(ring)[1]).toBeCloseTo(sizeOf(andaman[index]!)[1]! * factor);
+    }
+    expect(boundsOfRing(placed[2]!)[1] - boundsOfRing(placed[0]!)[1]).toBeCloseTo(60 * factor);
+  });
+
+  it("stops magnifying before Andaman & Nicobar's largest island stops counting as small", () => {
+    // Staying under the threshold keeps the hit area, click buffer and outside
+    // value label that the renderers give a small region.
+    const placed = placeIslandGroup("in-cs-35-andaman-and-nicobar", "Andaman & Nicobar", andaman, 12, bounds)!;
+    expect(largestRingExtent(placed)).toBeLessThan(12);
+    expect(largestRingExtent(placed)).toBeGreaterThan(largestRingExtent(andaman));
+  });
+
+  // Lakshadweep: specks a fraction of a unit across, far apart.
+  const lakshadweep = [
+    [[300, 520], [300.5, 520], [300.5, 521], [300, 521], [300, 520]],
+    [[310, 560], [311, 560], [311, 560.5], [310, 560.5], [310, 560]],
+  ] as Point[][];
+
+  it("spreads Lakshadweep out as a group, moves it west, and grows each island to be seen", () => {
+    const placed = placeIslandGroup("in-cs-31-lakshadweep", "Lakshadweep", lakshadweep, 22, bounds)!;
+    // The group is magnified as one: the gap between islands scales by one factor.
+    const trueGap = centreOf([lakshadweep[1]!])[1]! - centreOf([lakshadweep[0]!])[1]!;
+    const gap = centreOf([placed[1]!])[1]! - centreOf([placed[0]!])[1]!;
+    expect(gap / trueGap).toBeGreaterThan(1);
+    for (const [index, ring] of placed.entries()) {
+      const [width, height] = sizeOf(ring);
+      const [trueWidth, trueHeight] = sizeOf(lakshadweep[index]!);
+      // Each island keeps its own proportions, and grows to where it can be seen.
+      expect(width! / height!).toBeCloseTo(trueWidth! / trueHeight!);
+      expect(Math.max(width!, height!)).toBeGreaterThanOrEqual(7);
+    }
+    // Moved west, not north or south. Growing the islands unevenly nudges the
+    // group's bounding box a little, so "not north or south" is within a unit or two.
+    expect(centreOf(placed)[0]).toBeLessThan(centreOf(lakshadweep)[0]!);
+    expect(Math.abs(centreOf(placed)[1]! - centreOf(lakshadweep)[1]!)).toBeLessThan(2);
+  });
+
+  it("recognises an island group by label when the host's ids do not name it", () => {
+    expect(placeIslandGroup("35", "Andaman & Nicobar", andaman, 22, bounds)).not.toBeNull();
+    expect(placeIslandGroup("31", "Lakshadweep", lakshadweep, 22, bounds)).not.toBeNull();
+    expect(placeIslandGroup("custom-35-andaman-and-nicobar-island", "Andaman & Nicobar Island", andaman, 22, bounds)).not.toBeNull();
+  });
+
+  it("leaves every other region alone", () => {
+    expect(placeIslandGroup("in-cs-30-goa", "Goa", andaman, 22, bounds)).toBeNull();
+    expect(placeIslandGroup("in-cs-34-puducherry", "Puducherry", andaman, 22, bounds)).toBeNull();
+  });
+
+  it("pulls a magnified group back inside the map", () => {
+    // Great Nicobar is at the bottom of the national map, so magnifying the
+    // chain about its centre pushes its southern tip past the edge.
+    const nearEdge = andaman.map((ring) => ring.map(([x, y]) => [x, y + 70] as Point));
+    const placed = placeIslandGroup("in-cs-35-andaman-and-nicobar", "Andaman & Nicobar", nearEdge, 22, bounds)!;
+    expect(boundsOfRing(placed.flat())[3]).toBeLessThanOrEqual(640);
   });
 });

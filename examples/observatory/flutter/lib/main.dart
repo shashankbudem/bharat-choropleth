@@ -231,8 +231,8 @@ class _ObservatoryPageState extends State<ObservatoryPage> {
     });
     if (!editionChanged && _features != null) return;
 
-    // A different vintage is a different map: a 2011 statistic belongs on 2011
-    // units, so the geometry is swapped with the indicator rather than reused.
+    // The geometry follows the indicator's edition: a statistic belongs on the
+    // units it was collected on.
     final raw = await rootBundle.loadString('assets/${next.edition}/states.topo.json');
     final features = decodeTopoJson(jsonDecode(raw) as Map<String, Object?>, objectName: 'states');
     if (!mounted) return;

@@ -219,9 +219,9 @@ export function BharatChoropleth({
     /**
      * The caller's keys exactly as written, checked before the registry.
      *
-     * Not every id belongs to the registry. The historical Census bundle in this
-     * repository uses `in-hs-*` ids, which `resolveState` does not know, so a
-     * feature keyed on its id would fall through to being keyed on its *label* —
+     * Not every id belongs to the registry. A host's own geometry can use ids
+     * `resolveState` does not know, so a feature keyed on its id would fall
+     * through to being keyed on its *label* —
      * and values written against ids would silently never match, leaving a fully
      * populated dataset rendering as "No data" everywhere. Keeping the literal
      * keys means id-keyed values work for any geometry, registry or not.

@@ -2,7 +2,7 @@ import { BharatChoropleth, type InsightContext, type MapLayer, type MapRegion } 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import raw from "../../data/india-observatory.json";
 
-type Edition = "historical" | "current";
+type Edition = "current";
 
 type LiveSpec = {
   provider: string;
@@ -49,11 +49,6 @@ const dataset = raw as unknown as {
 const SITE = new URL("../", document.baseURI).href;
 const DATA_BASE = `${SITE}data/generated`;
 const EDITION_PATHS: Record<Edition, { states: string; districts: string; object: string }> = {
-  historical: {
-    states: `${DATA_BASE}/census-2011/states.topo.json`,
-    districts: `${DATA_BASE}/census-2011/districts`,
-    object: "states",
-  },
   current: {
     states: `${DATA_BASE}/current-2019-states/states.topo.json`,
     districts: `${DATA_BASE}/current-2019-districts/districts`,
@@ -202,8 +197,8 @@ export default function App() {
     return () => { cancelled = true; };
   }, [centroids, live]);
 
-  // The edition changes with the indicator, because the two are not
-  // interchangeable: a 2011 statistic belongs on 2011 units.
+  // The edition comes with the indicator: a statistic belongs on the units it
+  // was collected on. Every indicator here is on the current edition.
   const openedRef = useRef(false);
   useEffect(() => {
     let cancelled = false;

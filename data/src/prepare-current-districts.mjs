@@ -11,8 +11,7 @@ const dataDir = resolve(here, "..");
 const outputDir = join(dataDir, "generated", "current-2019-districts");
 const districtDir = join(outputDir, "districts");
 const currentStatesPath = join(dataDir, "generated", "current-2019-states", "states.topo.json");
-// Same independently sourced checkout as prepare-current-states.mjs, deliberately
-// outside the DataMeet Census-2011 checkout used by prepare-boundaries.mjs.
+// Same checkout as prepare-current-states.mjs.
 const sourceDir = resolve(
   process.env.INDIA_SHAPEFILES_DIR || join(dataDir, "../../../work/india-shapefiles"),
 );

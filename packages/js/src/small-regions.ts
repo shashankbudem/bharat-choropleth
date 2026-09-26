@@ -290,6 +290,76 @@ export function scatteredHitArea(
   return hull.length >= 3 ? hull : null;
 }
 
+/**
+ * Island groups redrawn larger than life on the national map.
+ *
+ * At national scale both groups all but vanish: Andaman & Nicobar's islands
+ * are a few units wide, and Lakshadweep's are specks. This project is about
+ * getting numbers across, so a region you cannot see is worse than one drawn
+ * larger or out of place. Each group is first magnified as one, about its own
+ * centre, like a lens held over it: every island keeps its outline, its place
+ * in the group and the water around it.
+ *
+ * - Andaman & Nicobar has open sea all round, and the lens alone is enough.
+ * - Lakshadweep's islands are tiny beside the 250 km they spread over, so a
+ *   lens alone only spreads a few specks further apart. The group is magnified
+ *   2x and moved 30 units west into the open Arabian Sea, and then each island
+ *   grows about its own centre, keeping its shape, until it can be seen.
+ *   Measured on the national map, that keeps it more than 20 units clear of
+ *   Kerala; the same growth in place would reach the coast.
+ *
+ * Matched on id or label, since host data brings its own ids. Callers apply it
+ * to the national layer only: drilled in, a UT fills the map, and its districts'
+ * labels ("South Andaman") would match.
+ */
+const ISLAND_GROUPS: readonly { name: string; magnify: number; partExtent?: number; shift?: Point }[] = [
+  { name: "andaman", magnify: 1.8 },
+  { name: "lakshadweep", magnify: 2, partExtent: 10, shift: [-30, 0] },
+];
+
+function islandGroupOf(id: string, label: string) {
+  const names = `${id} ${label}`.toLowerCase();
+  return ISLAND_GROUPS.find((group) => names.includes(group.name)) ?? null;
+}
+
+/**
+ * An island group's rings redrawn to be seen, or null for any other region.
+ *
+ * Magnification stops short of [smallExtent], the renderers' "too small to use"
+ * threshold, because staying under it is what keeps the hit area over the sea,
+ * the click buffer and the value label placed beside the region. The result is
+ * pulled back inside [bounds] if it grew past an edge.
+ */
+export function placeIslandGroup(
+  id: string,
+  label: string,
+  rings: readonly (readonly Point[])[],
+  smallExtent: number,
+  bounds: Box,
+): Point[][] | null {
+  const group = islandGroupOf(id, label);
+  if (!group || rings.length === 0) return null;
+  const largest = largestRingExtent(rings);
+  const factor = largest > 0 ? Math.max(1, Math.min(group.magnify, (smallExtent * 0.95) / largest)) : 1;
+  const [minX, minY, maxX, maxY] = boundsOfRing(rings.flat());
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const [dx, dy] = group.shift ?? [0, 0];
+  const magnified = rings.map((ring) =>
+    ring.map(([x, y]) => [cx + (x - cx) * factor + dx, cy + (y - cy) * factor + dy] as Point));
+  const placed = group.partExtent ? enlargeSmallParts(magnified, group.partExtent) : magnified;
+  return keepInside(placed, bounds);
+}
+
+/** Move a set of rings, unchanged, so their bounds sit inside [bounds]. */
+function keepInside(rings: Point[][], [left, top, right, bottom]: Box): Point[][] {
+  const [minX, minY, maxX, maxY] = boundsOfRing(rings.flat());
+  const dx = minX < left ? left - minX : maxX > right ? right - maxX : 0;
+  const dy = minY < top ? top - minY : maxY > bottom ? bottom - maxY : 0;
+  if (dx === 0 && dy === 0) return rings;
+  return rings.map((ring) => ring.map(([x, y]) => [x + dx, y + dy] as Point));
+}
+
 /** An SVG path string for a set of rings, used when exaggeration has moved them. */
 export function ringsToPath(rings: readonly (readonly Point[])[]): string {
   let d = "";

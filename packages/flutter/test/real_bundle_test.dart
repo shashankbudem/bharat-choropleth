@@ -7,6 +7,20 @@ import 'package:flutter/material.dart';
 import 'package:flutter/semantics.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+/// Where a region is drawn on the national map. Island groups are magnified,
+/// and Lakshadweep moved west (see [placeIslandGroup]), so a tap aimed at a
+/// group's true position would land in empty sea.
+List<List<Offset>> drawnRings(MapFeature region, MercatorProjection projection) {
+  final rings = [for (final ring in region.rings) ring.map(projection.project).toList()];
+  final bounds = Rect.fromLTRB(
+    kViewBoxPadding / 2,
+    kViewBoxPadding / 2,
+    kViewBox.width - kViewBoxPadding / 2,
+    kViewBox.height - kViewBoxPadding / 2,
+  );
+  return placeIslandGroup(region.id, region.name, rings, 22, bounds) ?? rings;
+}
+
 /// Decoding hand-written fixtures proves the algorithm; decoding the real
 /// prepared bundle proves it against the data people will actually pass in —
 /// quantized, 36 features, multi-part island territories and all.
@@ -138,6 +152,36 @@ void main() {
       handle.dispose();
     });
 
+    test('keeps both island groups magnified, in open sea and inside the map', () {
+      // placeIslandGroup's settings are tuned against this map, so they are
+      // checked on it: magnified, each group must stay clear of every other region.
+      final projection = MercatorProjection.fit(features);
+      for (final id in ['in-cs-31-lakshadweep', 'in-cs-35-andaman-and-nicobar']) {
+        final region = features.firstWhere((f) => f.id == id);
+        final trueRings = [for (final ring in region.rings) ring.map(projection.project).toList()];
+        final placed = drawnRings(region, projection);
+        final placedBox = boundsOfRing([for (final ring in placed) ...ring]);
+        expect(placedBox.width, greaterThan(boundsOfRing([for (final ring in trueRings) ...ring]).width * 1.4), reason: id);
+
+        final mainland = [
+          for (final other in features.where((f) => f.id != id))
+            for (final ring in other.rings) ...ring.map(projection.project),
+        ];
+        var nearest = double.infinity;
+        for (final ring in placed) {
+          for (final point in ring) {
+            for (final coast in mainland) {
+              final d = (point - coast).distance;
+              if (d < nearest) nearest = d;
+            }
+          }
+        }
+        expect(nearest, greaterThan(20), reason: '$id should sit clear of the mainland');
+        expect(placedBox.left, greaterThanOrEqualTo(kViewBoxPadding / 2), reason: id);
+        expect(placedBox.bottom, lessThanOrEqualTo(kViewBox.height - kViewBoxPadding / 2), reason: id);
+      }
+    });
+
     testWidgets('taps in the sea near Goa, Lakshadweep and Andaman & Nicobar select them', (tester) async {
       // These three are the hard ones to hit: Goa is a few view-box units wide,
       // the other two are island groups whose parts are a fraction of a pixel.
@@ -160,7 +204,7 @@ void main() {
         // bounds: Andaman & Nicobar is a north-south chain, and the centre of the
         // box that contains it is open sea far from any island.
         final region = features.firstWhere((f) => f.id == id);
-        final parts = region.rings.map((ring) => ring.map(projection.project).toList()).toList()
+        final parts = drawnRings(region, projection)
           ..sort((a, b) => boundsOfRing(b).longestSide.compareTo(boundsOfRing(a).longestSide));
         final part = boundsOfRing(parts.first);
         final edge = Offset(nudge.dx < 0 ? part.left : part.right, part.center.dy);
@@ -208,7 +252,7 @@ void main() {
       final origin = tester.getTopLeft(finder);
       final projection = MercatorProjection.fit(features);
       final laksh = features.firstWhere((f) => f.id == 'in-cs-31-lakshadweep');
-      final rings = [for (final ring in laksh.rings) ring.map(projection.project).toList()];
+      final rings = drawnRings(laksh, projection);
       final parts = rings.map(boundsOfRing).toList();
       final hull = scatteredHitArea(rings, 22)!;
       final hullPath = Path()..moveTo(hull.first.dx, hull.first.dy);
@@ -253,7 +297,7 @@ void main() {
       final projection = MercatorProjection.fit(features);
       Offset largestPartCentre(String id) {
         final region = features.firstWhere((f) => f.id == id);
-        final parts = [for (final ring in region.rings) boundsOfRing(ring.map(projection.project).toList())]
+        final parts = [for (final ring in drawnRings(region, projection)) boundsOfRing(ring)]
           ..sort((a, b) => b.longestSide.compareTo(a.longestSide));
         return parts.first.center;
       }

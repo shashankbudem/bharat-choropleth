@@ -192,6 +192,74 @@ void main() {
     });
   });
 
+  group('placeIslandGroup', () {
+    const bounds = Rect.fromLTRB(0, 0, 960, 640);
+    Rect boundsOf(List<List<Offset>> rings) => boundsOfRing([for (final ring in rings) ...ring]);
+    List<Offset> rect(double x, double y, double w, double h) =>
+        [Offset(x, y), Offset(x + w, y), Offset(x + w, y + h), Offset(x, y + h), Offset(x, y)];
+
+    // A chain of long, thin islands, the way Andaman & Nicobar projects.
+    final andaman = [rect(600, 500, 3, 10), rect(602, 520, 3, 6), rect(606, 560, 1, 2)];
+
+    test('magnifies Andaman & Nicobar as one group about its own centre', () {
+      final placed = placeIslandGroup('in-cs-35-andaman-and-nicobar', 'Andaman & Nicobar', andaman, 22, bounds)!;
+      expect(boundsOf(placed).center.dx, closeTo(boundsOf(andaman).center.dx, 1e-9));
+      expect(boundsOf(placed).center.dy, closeTo(boundsOf(andaman).center.dy, 1e-9));
+      // One factor for every island and every gap, so the chain keeps its shape.
+      final factor = boundsOfRing(placed[0]).height / boundsOfRing(andaman[0]).height;
+      expect(factor, greaterThan(1));
+      for (var i = 0; i < placed.length; i++) {
+        expect(boundsOfRing(placed[i]).width, closeTo(boundsOfRing(andaman[i]).width * factor, 1e-9));
+        expect(boundsOfRing(placed[i]).height, closeTo(boundsOfRing(andaman[i]).height * factor, 1e-9));
+      }
+      expect(boundsOfRing(placed[2]).top - boundsOfRing(placed[0]).top, closeTo(60 * factor, 1e-9));
+    });
+
+    test("stops magnifying before Andaman & Nicobar's largest island stops counting as small", () {
+      final placed = placeIslandGroup('in-cs-35-andaman-and-nicobar', 'Andaman & Nicobar', andaman, 12, bounds)!;
+      expect(largestRingExtentOf(placed), lessThan(12));
+      expect(largestRingExtentOf(placed), greaterThan(largestRingExtentOf(andaman)));
+    });
+
+    // Lakshadweep: specks a fraction of a unit across, far apart.
+    final lakshadweep = [rect(300, 520, .5, 1), rect(310, 560, 1, .5)];
+
+    test('spreads Lakshadweep out as a group, moves it west, and grows each island to be seen', () {
+      final placed = placeIslandGroup('in-cs-31-lakshadweep', 'Lakshadweep', lakshadweep, 22, bounds)!;
+      // The group is magnified as one: the gap between islands scales by one factor.
+      final trueGap = boundsOfRing(lakshadweep[1]).center.dy - boundsOfRing(lakshadweep[0]).center.dy;
+      final gap = boundsOfRing(placed[1]).center.dy - boundsOfRing(placed[0]).center.dy;
+      expect(gap / trueGap, greaterThan(1));
+      for (var i = 0; i < placed.length; i++) {
+        final grown = boundsOfRing(placed[i]);
+        final original = boundsOfRing(lakshadweep[i]);
+        // Each island keeps its own proportions, and grows to where it can be seen.
+        expect(grown.width / grown.height, closeTo(original.width / original.height, 1e-9));
+        expect(grown.longestSide, greaterThanOrEqualTo(7));
+      }
+      // Moved west, not north or south. Growing the islands unevenly nudges the
+      // group's bounding box a little, so "not north or south" is within a unit or two.
+      expect(boundsOf(placed).center.dx, lessThan(boundsOf(lakshadweep).center.dx));
+      expect((boundsOf(placed).center.dy - boundsOf(lakshadweep).center.dy).abs(), lessThan(2));
+    });
+
+    test("recognises an island group by label when the host's ids do not name it", () {
+      expect(placeIslandGroup('35', 'Andaman & Nicobar', andaman, 22, bounds), isNotNull);
+      expect(placeIslandGroup('31', 'Lakshadweep', lakshadweep, 22, bounds), isNotNull);
+    });
+
+    test('leaves every other region alone', () {
+      expect(placeIslandGroup('in-cs-30-goa', 'Goa', andaman, 22, bounds), isNull);
+      expect(placeIslandGroup('in-cs-34-puducherry', 'Puducherry', andaman, 22, bounds), isNull);
+    });
+
+    test('pulls a magnified group back inside the map', () {
+      final nearEdge = [for (final ring in andaman) [for (final point in ring) point.translate(0, 70)]];
+      final placed = placeIslandGroup('in-cs-35-andaman-and-nicobar', 'Andaman & Nicobar', nearEdge, 22, bounds)!;
+      expect(boundsOf(placed).bottom, lessThanOrEqualTo(640));
+    });
+  });
+
   group('keepsTrueGeometry', () {
     test('holds back Puducherry, whose enclaves have no room to grow into', () {
       expect(keepsTrueGeometry('in-cs-34-puducherry'), isTrue);

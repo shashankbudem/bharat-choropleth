@@ -54,9 +54,9 @@ import {
 import stateGeometry from "./boundaries/states.topo.json";
 
 const values = new Map([
-  ["in-hs-27-maharashtra", 1520],
-  ["in-hs-29-karnataka", 980],
-  ["in-hs-07-nct-of-delhi", null], // No data, distinct from zero.
+  ["in-cs-27-maharashtra", 1520],
+  ["in-cs-29-karnataka", 980],
+  ["in-cs-07-delhi", null], // No data, distinct from zero.
 ]);
 
 const states: MapLayer = {
@@ -83,9 +83,9 @@ function PerformanceMap() {
 }
 ```
 
-`id` must use the identifier scheme published by the geometry package. Avoid matching on `name`; labels can change, be transliterated, or be duplicated. The bundled historical hierarchy uses deterministic Census-derived IDs: parent states/UTs are `in-hs-{zero-padded ST_CEN_CD}-{normalised source name}`, and districts are `in-d{zero-padded ST_CEN_CD}-{zero-padded DT_CEN_CD}`. The full source-native code and exact mapping are recorded in `data/generated/census-2011/manifest.json`.
+`id` must use the identifier scheme published by the geometry package. Avoid matching on `name`; labels can change, be transliterated, or be duplicated. The bundled boundaries use LGD-derived IDs: states/UTs are `in-cs-{zero-padded State_LGD code}-{normalized name}`, districts `in-cd-…` and sub-districts `in-csd-…`. The exact schemes and source codes are recorded in each bundle's `manifest.json` under `data/generated/current-2019-*`.
 
-This historical hierarchy is intended to be used together at both levels. It is not a crosswalk to newer state/UT boundaries. For contemporary official geometry, supply your own layer and stable IDs (prefer LGD IDs where available).
+The three levels are meant to be used together. For other geometry, supply your own layer and stable IDs (prefer LGD IDs where available).
 
 ## Lazy district geometry
 

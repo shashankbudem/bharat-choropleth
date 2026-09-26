@@ -14,6 +14,24 @@
 - Changing the controlled `drillDownId` drops the sub-district level of the
   state just left.
 
+### Changed
+
+- Andaman & Nicobar and Lakshadweep are drawn so they can be seen on the
+  national map. At that scale Andaman & Nicobar's islands were thinner than the
+  white region border, and Lakshadweep was a single dot.
+  - Andaman & Nicobar is magnified about 1.5× as one group about its own centre,
+    so every island keeps its outline and the gaps between them.
+  - Lakshadweep is spread out 2× as a group and moved west into the open
+    Arabian Sea, clear of Kerala, and then each island grows about its own
+    centre, keeping its shape. Island groups no longer get a stand-in dot.
+  - Both keep `borderColor`, drawn thinner (at most 0.75, never wider than
+    `borderWidth`) and under the fill, so it cannot cover a thin island.
+  - `ChoroplethRegion.island` marks them, and `placeIslandGroup` is exported.
+
+  Only the national map changes; drilled into either UT, its districts are
+  drawn true to size. The project communicates values, so a small departure
+  from true size and position is the price of a region that can be seen.
+
 ## 0.3.0 - 2026-09-05
 
 ### Added

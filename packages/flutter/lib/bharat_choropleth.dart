@@ -31,6 +31,7 @@ export 'src/projection.dart'
         kViewBoxPadding,
         labelPointFor,
         largestRingExtentOf,
+        placeIslandGroup,
         scatteredHitArea;
 export 'src/states.dart' show StateIdentity, kStates, normalizeStateKey, resolveState;
 export 'src/tooltip_position.dart' show TooltipPlacement, TooltipSide, placeTooltip;
